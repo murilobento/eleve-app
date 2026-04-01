@@ -1,0 +1,494 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import {
+  type ColumnDef,
+  type ColumnFiltersState,
+  type SortingState,
+  type VisibilityState,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+import { ChevronDown, Pencil, Search, Trash2 } from "lucide-react";
+
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  type CreateManagedUserInput,
+  type ManagedUser,
+  type UpdateManagedUserInput,
+} from "@/lib/users-admin";
+import type { RoleRecord } from "@/lib/rbac-shared";
+import { useI18n, useLocale } from "@/i18n/provider";
+
+import { UserFormDialog } from "./user-form-dialog";
+
+type DataTableProps = {
+  users: ManagedUser[];
+  roles: RoleRecord[];
+  onCreateUser: (values: CreateManagedUserInput) => Promise<void>;
+  onUpdateUser: (id: string, values: UpdateManagedUserInput) => Promise<void>;
+  onDeleteUser: (id: string) => Promise<void>;
+  isMutating: boolean;
+};
+
+function formatDate(value: string, locale: string) {
+  return new Intl.DateTimeFormat(locale, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
+export function DataTable({
+  users,
+  roles,
+  onCreateUser,
+  onUpdateUser,
+  onDeleteUser,
+  isMutating,
+}: DataTableProps) {
+  const { t } = useI18n();
+  const locale = useLocale();
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [rowSelection, setRowSelection] = useState({});
+  const [globalFilter, setGlobalFilter] = useState("");
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<ManagedUser | null>(null);
+
+  const columns = useMemo<ColumnDef<ManagedUser>[]>(
+    () => [
+      {
+        id: "select",
+        header: ({ table }) => (
+          <div className="flex items-center justify-center px-2">
+            <Checkbox
+              checked={
+                table.getIsAllPageRowsSelected() ||
+                (table.getIsSomePageRowsSelected() && "indeterminate")
+              }
+              onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+              aria-label={t("users.selectAll")}
+            />
+          </div>
+        ),
+        cell: ({ row }) => (
+          <div className="flex items-center justify-center px-2">
+            <Checkbox
+              checked={row.getIsSelected()}
+              onCheckedChange={(value) => row.toggleSelected(!!value)}
+              aria-label={t("users.selectRow")}
+            />
+          </div>
+        ),
+        enableSorting: false,
+        enableHiding: false,
+        size: 50,
+      },
+      {
+        accessorKey: "name",
+        header: t("users.title"),
+        cell: ({ row }) => {
+          const user = row.original;
+
+          return (
+            <div className="flex items-center gap-3">
+              <Avatar className="h-8 w-8">
+                <AvatarFallback className="text-xs font-medium">{user.avatar}</AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col">
+                <span className="font-medium">{user.name}</span>
+                <span className="text-sm text-muted-foreground">{user.email}</span>
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        id: "roles",
+        header: t("users.roles"),
+        cell: ({ row }) => {
+          const user = row.original;
+
+          return (
+            <div className="flex flex-wrap gap-1">
+              {user.roles.map((role) => (
+                <Badge key={role.id} variant="secondary">
+                  {role.name}
+                </Badge>
+              ))}
+            </div>
+          );
+        },
+        filterFn: (row, _columnId, filterValue) => {
+          if (!filterValue) {
+            return true;
+          }
+
+          return row.original.roles.some((role) => role.slug === filterValue);
+        },
+      },
+      {
+        accessorKey: "statusLabel",
+        header: t("users.status"),
+        cell: ({ row }) => {
+          const user = row.original;
+          const className =
+            user.status === "active"
+              ? "text-green-600 bg-green-50 dark:text-green-400 dark:bg-green-900/20"
+              : user.status === "pending"
+                ? "text-orange-600 bg-orange-50 dark:text-orange-400 dark:bg-orange-900/20"
+                : "text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-900/20";
+
+          return (
+            <Badge variant="secondary" className={className}>
+              {user.statusLabel}
+            </Badge>
+          );
+        },
+        filterFn: "equals",
+      },
+      {
+        accessorKey: "emailVerified",
+        header: t("users.email"),
+        cell: ({ row }) => (
+          <span className="text-sm">
+            {row.original.emailVerified ? t("common.verified") : t("common.unverified")}
+          </span>
+        ),
+      },
+      {
+        accessorKey: "joinedDate",
+        header: t("users.joined"),
+        cell: ({ row }) => <span className="text-sm">{formatDate(row.original.joinedDate, locale)}</span>,
+      },
+      {
+        accessorKey: "updatedDate",
+        header: t("users.updated"),
+        cell: ({ row }) => <span className="text-sm">{formatDate(row.original.updatedDate, locale)}</span>,
+      },
+      {
+        id: "actions",
+        header: t("users.actions"),
+        cell: ({ row }) => {
+          const user = row.original;
+
+          return (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 cursor-pointer"
+                onClick={() => setEditingUser(user)}
+                disabled={isMutating}
+              >
+                <Pencil className="size-4" />
+                <span className="sr-only">{t("users.editUser")}</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 cursor-pointer text-red-600"
+                onClick={async () => {
+                  const confirmed = window.confirm(t("users.confirmDelete", { name: user.name }));
+
+                  if (!confirmed) {
+                    return;
+                  }
+
+                  await onDeleteUser(user.id);
+                }}
+                disabled={isMutating}
+              >
+                <Trash2 className="size-4" />
+                <span className="sr-only">{t("common.delete")}</span>
+              </Button>
+            </div>
+          );
+        },
+      },
+    ],
+    [isMutating, locale, onDeleteUser, t],
+  );
+
+  const table = useReactTable({
+    data: users,
+    columns,
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange: setRowSelection,
+    onGlobalFilterChange: setGlobalFilter,
+    globalFilterFn: (row, _columnId, filterValue) => {
+      const value = String(filterValue).toLowerCase();
+      return (
+        row.original.name.toLowerCase().includes(value) ||
+        row.original.email.toLowerCase().includes(value)
+      );
+    },
+    state: {
+      sorting,
+      columnFilters,
+      columnVisibility,
+      rowSelection,
+      globalFilter,
+    },
+  });
+
+  const roleFilter = (table.getColumn("roles")?.getFilterValue() as string) || "all";
+  const statusFilter = (table.getColumn("statusLabel")?.getFilterValue() as string) || "all";
+
+  return (
+    <div className="w-full space-y-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-1 items-center space-x-2">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder={t("users.searchPlaceholder")}
+              value={globalFilter}
+              onChange={(event) => setGlobalFilter(event.target.value)}
+              className="pl-9"
+            />
+          </div>
+        </div>
+        <UserFormDialog
+          mode="create"
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          onSubmit={onCreateUser}
+          isSubmitting={isMutating}
+          availableRoles={roles}
+        />
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-3 sm:gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="role-filter" className="text-sm font-medium">
+            {t("users.role")}
+          </Label>
+          <Select
+            value={roleFilter}
+            onValueChange={(value) =>
+              table.getColumn("roles")?.setFilterValue(value === "all" ? undefined : value)
+            }
+          >
+            <SelectTrigger className="cursor-pointer w-full" id="role-filter">
+              <SelectValue placeholder={t("users.selectRole")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("users.allRoles")}</SelectItem>
+              {roles.map((role) => (
+                <SelectItem key={role.id} value={role.slug}>
+                  {role.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="status-filter" className="text-sm font-medium">
+            {t("users.status")}
+          </Label>
+          <Select
+            value={statusFilter}
+            onValueChange={(value) =>
+              table.getColumn("statusLabel")?.setFilterValue(value === "all" ? undefined : value)
+            }
+          >
+            <SelectTrigger className="cursor-pointer w-full" id="status-filter">
+              <SelectValue placeholder={t("users.selectStatus")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("users.allStatuses")}</SelectItem>
+              <SelectItem value="Active">{t("users.active")}</SelectItem>
+              <SelectItem value="Pending">{t("users.pending")}</SelectItem>
+              <SelectItem value="Banned">{t("users.banned")}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="column-visibility" className="text-sm font-medium">
+            {t("users.columnVisibility")}
+          </Label>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild id="column-visibility">
+              <Button variant="outline" className="cursor-pointer w-full">
+                {t("users.columns")} <ChevronDown className="ml-2 size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {table
+                .getAllColumns()
+                .filter((column) => column.getCanHide())
+                .map((column) => (
+                  <DropdownMenuCheckboxItem
+                    key={column.id}
+                    className="capitalize"
+                    checked={column.getIsVisible()}
+                    onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                  >
+                    {column.id}
+                  </DropdownMenuCheckboxItem>
+                ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
+                  <TableHead key={header.id}>
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(header.column.columnDef.header, header.getContext())}
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center">
+                  {t("users.noUsers")}
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      <div className="flex items-center justify-between space-x-2 py-4">
+        <div className="flex items-center space-x-2">
+          <Label htmlFor="page-size" className="text-sm font-medium">
+            {t("users.show")}
+          </Label>
+          <Select
+            value={`${table.getState().pagination.pageSize}`}
+            onValueChange={(value) => {
+              table.setPageSize(Number(value));
+            }}
+          >
+            <SelectTrigger className="w-20 cursor-pointer" id="page-size">
+              <SelectValue placeholder={table.getState().pagination.pageSize} />
+            </SelectTrigger>
+            <SelectContent side="top">
+              {[10, 20, 30, 40, 50].map((pageSize) => (
+                <SelectItem key={pageSize} value={`${pageSize}`}>
+                  {pageSize}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex-1 text-sm text-muted-foreground hidden sm:block">
+          {t("users.selectedRows", {
+            selected: table.getFilteredSelectedRowModel().rows.length,
+            total: table.getFilteredRowModel().rows.length,
+          })}
+        </div>
+
+        <div className="flex items-center space-x-6 lg:space-x-8">
+          <div className="flex items-center space-x-2 hidden sm:flex">
+            <p className="text-sm font-medium">{t("users.page")}</p>
+            <strong className="text-sm">
+              {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+            </strong>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+              className="cursor-pointer"
+            >
+              {t("common.previous")}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+              className="cursor-pointer"
+            >
+              {t("common.next")}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <UserFormDialog
+        mode="edit"
+        open={Boolean(editingUser)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingUser(null);
+          }
+        }}
+        onSubmit={async (values) => {
+          if (!editingUser) {
+            return;
+          }
+
+          await onUpdateUser(editingUser.id, values as UpdateManagedUserInput);
+        }}
+        isSubmitting={isMutating}
+        user={editingUser}
+        availableRoles={roles}
+      />
+    </div>
+  );
+}
