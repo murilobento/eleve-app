@@ -39,6 +39,9 @@ const SYSTEM_ROLE_SLUGS = {
   user: "user",
 } as const;
 
+let rbacBaseBootstrapPromise: Promise<void> | null = null;
+let rbacBaseBootstrapped = false;
+
 function normalizeLegacyRole(role?: string | null) {
   return role
     ?.split(",")
@@ -195,7 +198,7 @@ async function seedSystemRoles() {
     name: "User",
     slug: SYSTEM_ROLE_SLUGS.user,
     description: "Default signed-in access.",
-    isSystem: true,
+    isSystem: false,
   });
 
   await syncRolePermissions(adminRoleId, PERMISSION_CATALOG.map((permission) => permission.key));
@@ -264,9 +267,23 @@ async function ensureLegacyRoleSync(userId: string) {
 }
 
 export async function bootstrapRbac(user?: SessionUser | null) {
-  await ensureSchema();
-  await seedPermissions();
-  await seedSystemRoles();
+  if (!rbacBaseBootstrapped) {
+    if (!rbacBaseBootstrapPromise) {
+      rbacBaseBootstrapPromise = (async () => {
+        await ensureSchema();
+        await seedPermissions();
+        await seedSystemRoles();
+        rbacBaseBootstrapped = true;
+      })().catch((error) => {
+        rbacBaseBootstrapPromise = null;
+        rbacBaseBootstrapped = false;
+        throw error;
+      });
+    }
+
+    await rbacBaseBootstrapPromise;
+  }
+
   await ensureBootstrapUser(user);
 }
 
@@ -491,6 +508,73 @@ export async function getUserRoleAssignments(userId: string, legacyRole?: string
   await assignRoleToUser(userId, fallbackRole);
   await ensureLegacyRoleSync(userId);
   return getUserRoleAssignments(userId);
+}
+
+export async function getUserRoleAssignmentsBatch(
+  users: Array<{ id: string; legacyRole?: string | null }>,
+): Promise<Map<string, UserRoleSummary[]>> {
+  await bootstrapRbac();
+
+  if (users.length === 0) {
+    return new Map();
+  }
+
+  const userIds = [...new Set(users.map((user) => user.id))];
+  const result = await pool.query<RoleRow & { user_id: string }>(
+    `
+      SELECT ur.user_id, r.id, r.name, r.slug, r.description, r.is_system
+      FROM user_roles ur
+      INNER JOIN roles r ON r.id = ur.role_id
+      WHERE ur.user_id = ANY($1::text[])
+      ORDER BY r.is_system DESC, r.name ASC
+    `,
+    [userIds],
+  );
+
+  const rolesByUser = new Map<string, UserRoleSummary[]>();
+
+  for (const row of result.rows) {
+    const current = rolesByUser.get(row.user_id) ?? [];
+    current.push({
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      isSystem: row.is_system,
+    });
+    rolesByUser.set(row.user_id, current);
+  }
+
+  const fallbackRolesResult = await pool.query<RoleRow>(
+    `SELECT id, name, slug, description, is_system FROM roles WHERE slug = ANY($1::text[])`,
+    [[SYSTEM_ROLE_SLUGS.admin, SYSTEM_ROLE_SLUGS.user]],
+  );
+
+  const fallbackBySlug = new Map(fallbackRolesResult.rows.map((row) => [row.slug, row]));
+
+  for (const user of users) {
+    if (rolesByUser.has(user.id)) {
+      continue;
+    }
+
+    const fallbackSlug = normalizeLegacyRole(user.legacyRole).includes(SYSTEM_ROLE_SLUGS.admin)
+      ? SYSTEM_ROLE_SLUGS.admin
+      : SYSTEM_ROLE_SLUGS.user;
+    const fallbackRole = fallbackBySlug.get(fallbackSlug);
+
+    if (!fallbackRole) {
+      rolesByUser.set(user.id, []);
+      continue;
+    }
+
+    rolesByUser.set(user.id, [{
+      id: fallbackRole.id,
+      name: fallbackRole.name,
+      slug: fallbackRole.slug,
+      isSystem: fallbackRole.is_system,
+    }]);
+  }
+
+  return rolesByUser;
 }
 
 export async function getUserRoleSlugs(userId: string, legacyRole?: string | null) {

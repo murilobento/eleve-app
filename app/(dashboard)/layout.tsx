@@ -3,7 +3,6 @@
 import * as React from "react"
 import { AppSidebar } from "@/components/app-sidebar"
 import { SiteHeader } from "@/components/site-header"
-import { SiteFooter } from "@/components/site-footer"
 import { useSidebarConfig } from "@/hooks/use-sidebar-config"
 import { SidebarConfigProvider } from "@/contexts/sidebar-context"
 import {
@@ -36,7 +35,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
   React.useEffect(() => {
     if (!isPending && !session) {
-      router.push(getAppUrl("/auth/sign-in", locale))
+      router.replace(getAppUrl("/auth/sign-in", locale))
     }
   }, [session, isPending, locale, router])
 
@@ -56,7 +55,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     return <div className="min-h-screen flex items-center justify-center">{t("common.loading")}</div>
   }
 
-  if (!session) return null;
+  if (!session) {
+    return <div className="min-h-screen flex items-center justify-center">{t("common.loading")}</div>
+  }
 
   return (
     <UISidebarProvider
@@ -85,7 +86,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 </div>
               </div>
             </div>
-            <SiteFooter />
           </SidebarInset>
         </>
       ) : (
@@ -99,7 +99,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 </div>
               </div>
             </div>
-            <SiteFooter />
           </SidebarInset>
           <AppSidebar 
             variant={config.variant} 

@@ -27,11 +27,6 @@ export default function proxy(request: NextRequest) {
   }
 
   if (isLanding || isAuthPage || isApiRoute) {
-    if (sessionCookie && isAuthPage) {
-      const url = request.nextUrl.clone();
-      url.pathname = getLocalizedPath("/dashboard", pathLocale ?? preferredLocale);
-      return NextResponse.redirect(url);
-    }
     return NextResponse.next();
   }
 

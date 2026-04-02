@@ -4,8 +4,8 @@ import { APIError } from "better-auth";
 import { auth } from "@/lib/auth";
 import {
   assignRolesToUser,
+  getUserRoleAssignmentsBatch,
   getRoleById,
-  getUserRoleAssignments,
   listAssignableRoles,
   requirePermission,
 } from "@/lib/rbac";
@@ -55,7 +55,12 @@ export async function GET(request: Request) {
       },
     });
 
-    const users = await Promise.all(result.users.map(async (user) => mapAuthUserToManagedUser(user, await getUserRoleAssignments(user.id, user.role))));
+    const userRolesById = await getUserRoleAssignmentsBatch(
+      result.users.map((user) => ({ id: user.id, legacyRole: user.role })),
+    );
+    const users = result.users.map((user) =>
+      mapAuthUserToManagedUser(user, userRolesById.get(user.id) ?? []),
+    );
     const roles = await listAssignableRoles();
 
     return NextResponse.json({
