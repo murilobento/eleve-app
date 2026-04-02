@@ -2,9 +2,11 @@
 
 import * as React from "react"
 import { AppSidebar } from "@/components/app-sidebar"
+import { AppTopbar } from "@/components/app-navigation"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { useSidebarConfig } from "@/hooks/use-sidebar-config"
+import { useIsMobile } from "@/hooks/use-mobile"
 import {
   SidebarInset,
   SidebarProvider,
@@ -18,6 +20,9 @@ interface BaseLayoutProps {
 
 export function BaseLayout({ children, title, description }: BaseLayoutProps) {
   const { config } = useSidebarConfig()
+  const isMobile = useIsMobile()
+  const showSidebar = config.navigationMode === "sidebar" || isMobile
+  const showTopbar = config.navigationMode === "topbar" && !isMobile
 
   return (
     <SidebarProvider
@@ -32,13 +37,16 @@ export function BaseLayout({ children, title, description }: BaseLayoutProps) {
     >
       {config.side === "left" ? (
         <>
-          <AppSidebar 
-            variant={config.variant} 
-            collapsible={config.collapsible} 
-            side={config.side} 
-          />
+          {showSidebar ? (
+            <AppSidebar 
+              variant={config.variant} 
+              collapsible={config.collapsible} 
+              side={config.side} 
+            />
+          ) : null}
           <SidebarInset>
             <SiteHeader />
+            {showTopbar ? <AppTopbar /> : null}
             <div className="flex flex-1 flex-col">
               <div className="@container/main flex flex-1 flex-col gap-2">
                 <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
@@ -63,6 +71,7 @@ export function BaseLayout({ children, title, description }: BaseLayoutProps) {
         <>
           <SidebarInset>
             <SiteHeader />
+            {showTopbar ? <AppTopbar /> : null}
             <div className="flex flex-1 flex-col">
               <div className="@container/main flex flex-1 flex-col gap-2">
                 <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
@@ -82,11 +91,13 @@ export function BaseLayout({ children, title, description }: BaseLayoutProps) {
             </div>
             <SiteFooter />
           </SidebarInset>
-          <AppSidebar 
-            variant={config.variant} 
-            collapsible={config.collapsible} 
-            side={config.side} 
-          />
+          {showSidebar ? (
+            <AppSidebar 
+              variant={config.variant} 
+              collapsible={config.collapsible} 
+              side={config.side} 
+            />
+          ) : null}
         </>
       )}
     </SidebarProvider>

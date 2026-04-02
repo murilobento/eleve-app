@@ -5,21 +5,12 @@ import { useRouter } from "next/navigation"
 import { Command as CommandPrimitive } from "cmdk"
 import {
   Search,
-  LayoutDashboard,
-  Calendar,
-  Building2,
-  BriefcaseBusiness,
-  Users,
-  Shield,
-  Truck,
-  Wrench,
   type LucideIcon,
 } from "lucide-react"
 
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import { useRbac } from "@/hooks/use-rbac"
-import { useI18n, useLocale } from "@/i18n/provider"
-import { getAppUrl } from "@/lib/utils"
+import { useI18n } from "@/i18n/provider"
+import { useAppNavigation } from "@/components/app-navigation"
 import { cn } from "@/lib/utils"
 
 const Command = React.forwardRef<
@@ -121,30 +112,15 @@ interface CommandSearchProps {
 export function CommandSearch({ open, onOpenChange }: CommandSearchProps) {
   const router = useRouter()
   const commandRef = React.useRef<HTMLDivElement>(null)
-  const { hasPermission } = useRbac()
   const { t } = useI18n()
-  const locale = useLocale()
+  const { flatItems } = useAppNavigation()
 
-  const searchItems: SearchItem[] = [
-    { title: t("navigation.dashboard"), url: getAppUrl("/dashboard", locale), group: t("navigation.dashboards"), icon: LayoutDashboard },
-    { title: t("navigation.calendar"), url: getAppUrl("/calendar", locale), group: t("navigation.apps"), icon: Calendar },
-    { title: t("navigation.company"), url: getAppUrl("/company", locale), group: t("navigation.apps"), icon: Building2 },
-    { title: t("navigation.clients"), url: getAppUrl("/clients", locale), group: t("navigation.apps"), icon: BriefcaseBusiness },
-    { title: t("navigation.equipment"), url: getAppUrl("/equipment", locale), group: t("navigation.apps"), icon: Truck },
-    { title: t("navigation.equipmentTypes"), url: getAppUrl("/equipment-types", locale), group: t("navigation.apps"), icon: Wrench },
-    { title: t("navigation.users"), url: getAppUrl("/users", locale), group: t("navigation.apps"), icon: Users },
-    { title: t("navigation.roles"), url: getAppUrl("/roles", locale), group: t("navigation.apps"), icon: Shield },
-  ].filter((item) => {
-    if (item.url.endsWith("/dashboard")) return hasPermission("dashboard.read")
-    if (item.url.endsWith("/calendar")) return hasPermission("calendar.read")
-    if (item.url.endsWith("/company")) return hasPermission("company.read")
-    if (item.url.endsWith("/clients")) return hasPermission("clients.read")
-    if (item.url.endsWith("/equipment")) return hasPermission("equipment.read")
-    if (item.url.endsWith("/equipment-types")) return hasPermission("equipment-types.read")
-    if (item.url.endsWith("/users")) return hasPermission("users.read")
-    if (item.url.endsWith("/roles")) return hasPermission("roles.read")
-    return true
-  })
+  const searchItems: SearchItem[] = flatItems.map((item) => ({
+    title: item.title,
+    url: item.url,
+    group: item.group,
+    icon: item.icon,
+  }))
 
   const groupedItems = searchItems.reduce((acc, item) => {
     if (!acc[item.group]) {

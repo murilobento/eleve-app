@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { AppSidebar } from "@/components/app-sidebar"
+import { AppTopbar } from "@/components/app-navigation"
 import { SiteHeader } from "@/components/site-header"
 import { useSidebarConfig } from "@/hooks/use-sidebar-config"
 import { SidebarConfigProvider } from "@/contexts/sidebar-context"
@@ -15,6 +16,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { getAppUrl } from "@/lib/utils"
 import { stripLocaleFromPath } from "@/i18n/config"
 import { useI18n, useLocale } from "@/i18n/provider"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 const routePermissions = [
   { path: "/dashboard", permission: "dashboard.read" },
@@ -29,6 +31,7 @@ const routePermissions = [
 
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const { config } = useSidebarConfig()
+  const isMobile = useIsMobile()
   const { data: session, isPending } = useSession()
   const { hasPermission, isLoading: isLoadingRbac, hasResolved, error: rbacError } = useRbac(Boolean(session))
   const pathname = usePathname()
@@ -73,6 +76,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     return <div className="min-h-screen flex items-center justify-center">{t("common.loading")}</div>
   }
 
+  const showSidebar = config.navigationMode === "sidebar" || isMobile
+  const showTopbar = config.navigationMode === "topbar" && !isMobile
+
   return (
     <UISidebarProvider
       style={
@@ -86,13 +92,16 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     >
       {config.side === "left" ? (
         <>
-          <AppSidebar 
-            variant={config.variant} 
-            collapsible={config.collapsible} 
-            side={config.side} 
-          />
+          {showSidebar ? (
+            <AppSidebar 
+              variant={config.variant} 
+              collapsible={config.collapsible} 
+              side={config.side} 
+            />
+          ) : null}
           <SidebarInset>
             <SiteHeader />
+            {showTopbar ? <AppTopbar /> : null}
             <div className="flex flex-1 flex-col">
               <div className="@container/main flex flex-1 flex-col gap-2">
                 <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
@@ -106,6 +115,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         <>
           <SidebarInset>
             <SiteHeader />
+            {showTopbar ? <AppTopbar /> : null}
             <div className="flex flex-1 flex-col">
               <div className="@container/main flex flex-1 flex-col gap-2">
                 <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
@@ -114,11 +124,13 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               </div>
             </div>
           </SidebarInset>
-          <AppSidebar 
-            variant={config.variant} 
-            collapsible={config.collapsible} 
-            side={config.side} 
-          />
+          {showSidebar ? (
+            <AppSidebar 
+              variant={config.variant} 
+              collapsible={config.collapsible} 
+              side={config.side} 
+            />
+          ) : null}
         </>
       )}
     </UISidebarProvider>

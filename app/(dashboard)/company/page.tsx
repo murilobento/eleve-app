@@ -273,8 +273,8 @@ export default function CompanyPage() {
             </CardHeader>
             <CardContent>
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
-                  <div className="grid gap-4 md:grid-cols-2">
+                <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+                  <div className="grid gap-3 md:grid-cols-2">
                     <FormField
                       control={form.control}
                       name="legalName"
@@ -303,7 +303,7 @@ export default function CompanyPage() {
                       )}
                     />
 
-                    <div className="grid gap-4 md:col-span-2 md:grid-cols-[minmax(0,1fr)_auto]">
+                    <div className="grid gap-3 md:col-span-2 md:grid-cols-[minmax(0,1fr)_auto]">
                       <FormField
                         control={form.control}
                         name="cnpj"
@@ -337,77 +337,88 @@ export default function CompanyPage() {
                       </div>
                     </div>
 
-                    <FormField
-                      control={form.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{t("company.email")}</FormLabel>
-                          <FormControl>
-                            <Input placeholder="contato@empresa.com" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    <div className="grid gap-3 md:col-span-2 md:grid-cols-3">
+                      <FormField
+                        control={form.control}
+                        name="email"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t("company.email")}</FormLabel>
+                            <FormControl>
+                              <Input placeholder="contato@empresa.com" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                    <FormField
-                      control={form.control}
-                      name="phone"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{t("company.phone")}</FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder="(11) 99999-9999"
-                              {...field}
-                              value={field.value ?? ""}
-                              onChange={(event) => field.onChange(formatPhone(event.target.value))}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                      <FormField
+                        control={form.control}
+                        name="phone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t("company.phone")}</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="(11) 99999-9999"
+                                {...field}
+                                value={field.value ?? ""}
+                                onChange={(event) => field.onChange(formatPhone(event.target.value))}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                    <FormField
-                      control={form.control}
-                      name="website"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{t("company.website")}</FormLabel>
-                          <FormControl>
-                            <Input placeholder="empresa.com.br" {...field} value={field.value ?? ""} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                      <FormField
+                        control={form.control}
+                        name="website"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t("company.website")}</FormLabel>
+                            <FormControl>
+                              <Input placeholder="empresa.com.br" {...field} value={field.value ?? ""} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                   </div>
 
-                  <div className="space-y-4">
-                    <div>
-                      <h2 className="text-base font-semibold">{t("company.addressSection")}</h2>
-                      <p className="text-sm text-muted-foreground">{t("company.addressDescription")}</p>
-                    </div>
-
-                    <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
+                  <div className="grid gap-3">
+                    <div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)_auto]">
                       <FormField
-                      control={form.control}
-                      name="postalCode"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{t("company.postalCode")}</FormLabel>
-                          <FormControl>
+                        control={form.control}
+                        name="postalCode"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t("company.postalCode")}</FormLabel>
+                            <FormControl>
                               <Input
                                 placeholder="00000-000"
                                 {...field}
                                 value={field.value ?? ""}
                                 onChange={(event) => field.onChange(formatPostalCode(event.target.value))}
                               />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="street"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t("company.street")}</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Rua Exemplo" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
                         )}
                       />
 
@@ -425,21 +436,7 @@ export default function CompanyPage() {
                       </div>
                     </div>
 
-                    <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_180px]">
-                      <FormField
-                        control={form.control}
-                        name="street"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>{t("company.street")}</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Rua Exemplo" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
+                    <div className="grid gap-3 md:grid-cols-[120px_220px_minmax(0,1fr)]">
                       <FormField
                         control={form.control}
                         name="number"
@@ -453,9 +450,7 @@ export default function CompanyPage() {
                           </FormItem>
                         )}
                       />
-                    </div>
 
-                    <div className="grid gap-4 md:grid-cols-2">
                       <FormField
                         control={form.control}
                         name="complement"
@@ -483,7 +478,9 @@ export default function CompanyPage() {
                           </FormItem>
                         )}
                       />
+                    </div>
 
+                    <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_140px_180px]">
                       <FormField
                         control={form.control}
                         name="city"
