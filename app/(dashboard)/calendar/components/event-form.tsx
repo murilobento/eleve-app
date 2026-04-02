@@ -1,10 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { CalendarIcon, Clock, MapPin, Users, Type, Tag } from "lucide-react"
 import { format } from "date-fns"
 
 import { Button } from "@/components/ui/button"
+import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -31,6 +32,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { useI18n } from "@/i18n/provider"
 import { cn } from "@/lib/utils"
 import { type CalendarEvent } from "../types"
 
@@ -62,6 +64,7 @@ const durationOptions = [
 ]
 
 export function EventForm({ event, open, onOpenChange, onSave, onDelete }: EventFormProps) {
+  const { t } = useI18n()
   const [formData, setFormData] = useState({
     title: event?.title || "",
     date: event?.date || new Date(),
@@ -77,6 +80,24 @@ export function EventForm({ event, open, onOpenChange, onSave, onDelete }: Event
 
   const [showCalendar, setShowCalendar] = useState(false)
   const [newAttendee, setNewAttendee] = useState("")
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
+  useEffect(() => {
+    setFormData({
+      title: event?.title || "",
+      date: event?.date || new Date(),
+      time: event?.time || "9:00 AM",
+      duration: event?.duration || "1 hour",
+      type: event?.type || "meeting",
+      location: event?.location || "",
+      description: event?.description || "",
+      attendees: event?.attendees || [],
+      allDay: false,
+      reminder: true,
+    })
+    setNewAttendee("")
+    setShowDeleteConfirm(false)
+  }, [event, open])
 
   const handleSave = () => {
     const eventData: Partial<CalendarEvent> = {
@@ -91,6 +112,7 @@ export function EventForm({ event, open, onOpenChange, onSave, onDelete }: Event
   const handleDelete = () => {
     if (event?.id && onDelete) {
       onDelete(event.id)
+      setShowDeleteConfirm(false)
       onOpenChange(false)
     }
   }
@@ -324,7 +346,7 @@ export function EventForm({ event, open, onOpenChange, onSave, onDelete }: Event
               {event ? "Update Event" : "Create Event"}
             </Button>
             {event && onDelete && (
-              <Button onClick={handleDelete} variant="destructive" className="cursor-pointer">
+              <Button onClick={() => setShowDeleteConfirm(true)} variant="destructive" className="cursor-pointer">
                 Delete
               </Button>
             )}
@@ -334,6 +356,19 @@ export function EventForm({ event, open, onOpenChange, onSave, onDelete }: Event
           </div>
         </div>
       </DialogContent>
+
+      <ConfirmDeleteDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        description={
+          event
+            ? t("calendar.confirmDelete", { name: event.title })
+            : t("calendar.confirmDeleteFallback")
+        }
+        onConfirm={async () => {
+          handleDelete()
+        }}
+      />
     </Dialog>
   )
 }

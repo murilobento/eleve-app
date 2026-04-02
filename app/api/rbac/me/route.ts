@@ -9,6 +9,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
+  if (!state.accessState.isActive) {
+    return NextResponse.json(
+      { error: state.accessState.reason || "Your account is inactive." },
+      { status: 403 },
+    );
+  }
+
   return NextResponse.json({
     roles: state.roles,
     permissions: state.permissions,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 import { DataTable } from "./components/data-table";
 import type { ManagedRole, CreateRoleInput, UpdateRoleInput } from "@/lib/roles-admin";
@@ -48,15 +49,24 @@ export default function RolesPage() {
     void loadRoles();
   }, []);
 
-  const runMutation = async (operation: () => Promise<void>) => {
+  const runMutation = async (
+    operation: () => Promise<void>,
+    successMessage: string,
+    fallbackErrorMessage: string,
+  ) => {
     setIsMutating(true);
     setError(null);
 
     try {
       await operation();
       await loadRoles();
+      toast.success(successMessage);
     } catch (mutationError) {
-      setError(mutationError instanceof Error ? mutationError.message : t("roles.updateError"));
+      const message =
+        mutationError instanceof Error ? mutationError.message : fallbackErrorMessage;
+      setError(message);
+      toast.error(message);
+      throw mutationError;
     } finally {
       setIsMutating(false);
     }
@@ -73,7 +83,7 @@ export default function RolesPage() {
           body: JSON.stringify(values),
         }),
       );
-    });
+    }, t("common.roleCreateSuccess"), t("roles.updateError"));
   };
 
   const handleUpdateRole = async (id: string, values: UpdateRoleInput) => {
@@ -87,7 +97,7 @@ export default function RolesPage() {
           body: JSON.stringify(values),
         }),
       );
-    });
+    }, t("common.roleUpdateSuccess"), t("roles.updateError"));
   };
 
   const handleDeleteRole = async (id: string) => {
@@ -97,7 +107,7 @@ export default function RolesPage() {
           method: "DELETE",
         }),
       );
-    });
+    }, t("common.roleDeleteSuccess"), t("roles.updateError"));
   };
 
   return (

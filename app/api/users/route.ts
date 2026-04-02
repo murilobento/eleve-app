@@ -4,13 +4,15 @@ import { APIError } from "better-auth";
 import { auth } from "@/lib/auth";
 import {
   assignRolesToUser,
+  getUserAccessStateBatch,
+  getUserRoleAssignments,
   getUserRoleAssignmentsBatch,
   getRoleById,
   listAssignableRoles,
   requirePermission,
+  setUserAccessState,
 } from "@/lib/rbac";
 import {
-  buildUserStatusData,
   createManagedUserSchema,
   mapAuthUserToManagedUser,
 } from "@/lib/users-admin";
@@ -58,8 +60,13 @@ export async function GET(request: Request) {
     const userRolesById = await getUserRoleAssignmentsBatch(
       result.users.map((user) => ({ id: user.id, legacyRole: user.role })),
     );
+    const userAccessById = await getUserAccessStateBatch(result.users.map((user) => user.id));
     const users = result.users.map((user) =>
-      mapAuthUserToManagedUser(user, userRolesById.get(user.id) ?? []),
+      mapAuthUserToManagedUser(
+        user,
+        userRolesById.get(user.id) ?? [],
+        userAccessById.get(user.id) ?? null,
+      ),
     );
     const roles = await listAssignableRoles();
 
@@ -100,15 +107,18 @@ export async function POST(request: Request) {
         password: payload.password,
         name: payload.name,
         role: compatibilityRole,
-        data: buildUserStatusData(payload.status),
       },
     });
 
     await assignRolesToUser(result.user.id, payload.roleIds);
+    await setUserAccessState(result.user.id, payload.status === "active");
     const userRoles = await getUserRoleAssignments(result.user.id, result.user.role);
 
     return NextResponse.json({
-      user: mapAuthUserToManagedUser(result.user, userRoles),
+      user: mapAuthUserToManagedUser(result.user, userRoles, {
+        isActive: payload.status === "active",
+        reason: payload.status === "active" ? null : "Marked as inactive by administrator",
+      }),
     });
   } catch (error) {
     return getErrorResponse(error);

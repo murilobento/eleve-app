@@ -16,6 +16,7 @@ import { Pencil, Search, ShieldCheck, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { CreateRoleInput, ManagedRole, UpdateRoleInput } from "@/lib/roles-admin";
@@ -44,6 +45,7 @@ export function DataTable({
   const [globalFilter, setGlobalFilter] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<ManagedRole | null>(null);
+  const [deletingRole, setDeletingRole] = useState<ManagedRole | null>(null);
 
   const columns = useMemo<ColumnDef<ManagedRole>[]>(() => [
     {
@@ -112,15 +114,7 @@ export function DataTable({
               variant="ghost"
               size="icon"
               className="h-8 w-8 cursor-pointer text-red-600"
-              onClick={async () => {
-                const confirmed = window.confirm(t("roles.confirmDelete", { name: role.name }));
-
-                if (!confirmed) {
-                  return;
-                }
-
-                await onDeleteRole(role.id);
-              }}
+              onClick={() => setDeletingRole(role)}
               disabled={isMutating || isProtected}
             >
               <Trash2 className="size-4" />
@@ -155,6 +149,11 @@ export function DataTable({
       sorting,
       columnFilters,
       globalFilter,
+    },
+    initialState: {
+      pagination: {
+        pageSize: 10,
+      },
     },
   });
 
@@ -259,6 +258,27 @@ export function DataTable({
         }}
         isSubmitting={isMutating}
         role={editingRole}
+      />
+
+      <ConfirmDeleteDialog
+        open={Boolean(deletingRole)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeletingRole(null);
+          }
+        }}
+        description={
+          deletingRole ? t("roles.confirmDelete", { name: deletingRole.name }) : ""
+        }
+        onConfirm={async () => {
+          if (!deletingRole) {
+            return;
+          }
+
+          await onDeleteRole(deletingRole.id);
+          setDeletingRole(null);
+        }}
+        isLoading={isMutating}
       />
     </div>
   );

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const userStatusSchema = z.enum(["active", "pending", "banned"]);
+export const userStatusSchema = z.enum(["active", "inactive"]);
 export const userRoleAssignmentSchema = z.array(z.string().uuid()).min(1, "Select at least one role.");
 
 const nameSchema = z
@@ -60,6 +60,11 @@ type AuthAdminUser = {
   banReason?: string | null;
 };
 
+export type UserAccessState = {
+  isActive: boolean;
+  reason: string | null;
+};
+
 export type ManagedRoleAssignment = {
   id: string;
   name: string;
@@ -86,8 +91,7 @@ export type ManagedUser = {
 export type ManagedUsersStats = {
   totalUsers: number;
   activeUsers: number;
-  pendingUsers: number;
-  bannedUsers: number;
+  inactiveUsers: number;
 };
 
 export function getUserInitials(name: string) {
@@ -103,55 +107,32 @@ export function getUserInitials(name: string) {
   return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
 }
 
-export function getStatusFromUser(user: Pick<AuthAdminUser, "emailVerified" | "banned">): ManagedUserStatus {
+export function getStatusFromUser(
+  user: Pick<AuthAdminUser, "banned">,
+  accessState?: UserAccessState | null,
+): ManagedUserStatus {
   if (user.banned) {
-    return "banned";
+    return "inactive";
   }
 
-  return user.emailVerified ? "active" : "pending";
+  return accessState?.isActive === false ? "inactive" : "active";
 }
 
 export function getStatusLabel(status: ManagedUserStatus) {
   switch (status) {
     case "active":
       return "Active";
-    case "pending":
-      return "Pending";
-    case "banned":
-      return "Banned";
-  }
-}
-
-export function buildUserStatusData(status: ManagedUserStatus) {
-  switch (status) {
-    case "active":
-      return {
-        emailVerified: true,
-        banned: false,
-        banReason: null,
-        banExpires: null,
-      };
-    case "pending":
-      return {
-        emailVerified: false,
-        banned: false,
-        banReason: null,
-        banExpires: null,
-      };
-    case "banned":
-      return {
-        emailVerified: true,
-        banned: true,
-        banReason: "Banned by administrator",
-      };
+    case "inactive":
+      return "Inactive";
   }
 }
 
 export function mapAuthUserToManagedUser(
   user: AuthAdminUser,
   roles: ManagedRoleAssignment[],
+  accessState?: UserAccessState | null,
 ): ManagedUser {
-  const status = getStatusFromUser(user);
+  const status = getStatusFromUser(user, accessState);
 
   return {
     id: user.id,
@@ -177,10 +158,8 @@ export function buildManagedUsersStats(users: ManagedUser[]): ManagedUsersStats 
 
       if (user.status === "active") {
         stats.activeUsers += 1;
-      } else if (user.status === "pending") {
-        stats.pendingUsers += 1;
-      } else if (user.status === "banned") {
-        stats.bannedUsers += 1;
+      } else if (user.status === "inactive") {
+        stats.inactiveUsers += 1;
       }
 
       return stats;
@@ -188,8 +167,7 @@ export function buildManagedUsersStats(users: ManagedUser[]): ManagedUsersStats 
     {
       totalUsers: 0,
       activeUsers: 0,
-      pendingUsers: 0,
-      bannedUsers: 0,
+      inactiveUsers: 0,
     },
   );
 }

@@ -23,6 +23,31 @@ export function LoginForm2({
   const { t } = useI18n()
   const locale = useLocale()
 
+  const getLoginErrorMessage = React.useCallback((rawMessage?: string | null, status?: number) => {
+    const normalizedMessage = rawMessage?.toLowerCase() ?? ""
+
+    if (
+      status === 403 ||
+      normalizedMessage.includes("inactive") ||
+      normalizedMessage.includes("inativ")
+    ) {
+      return t("auth.inactiveUser")
+    }
+
+    if (
+      normalizedMessage.includes("invalid") ||
+      normalizedMessage.includes("wrong") ||
+      normalizedMessage.includes("credential") ||
+      normalizedMessage.includes("email or password") ||
+      normalizedMessage.includes("senha") ||
+      normalizedMessage.includes("credencial")
+    ) {
+      return t("auth.invalidCredentials")
+    }
+
+    return rawMessage || t("auth.failedSignIn")
+  }, [t])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -37,13 +62,23 @@ export function LoginForm2({
         router.push(getAppUrl("/dashboard", locale))
       },
       onError: (ctx) => {
-        setError(ctx.error.message || t("auth.failedSignIn"))
+        setError(
+          getLoginErrorMessage(
+            ctx.error.message,
+            typeof ctx.error.status === "number" ? ctx.error.status : undefined,
+          ),
+        )
         setLoading(false)
       }
     })
     
     if (error) {
-       setError(error.message)
+       setError(
+        getLoginErrorMessage(
+          error.message,
+          typeof error.status === "number" ? error.status : undefined,
+        ),
+      )
        setLoading(false)
     }
   }

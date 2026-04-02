@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 import { DataTable } from "./components/data-table";
 import type {
@@ -57,15 +58,24 @@ export default function UsersPage() {
     void loadUsers();
   }, []);
 
-  const runMutation = async (operation: () => Promise<void>) => {
+  const runMutation = async (
+    operation: () => Promise<void>,
+    successMessage: string,
+    fallbackErrorMessage: string,
+  ) => {
     setIsMutating(true);
     setError(null);
 
     try {
       await operation();
       await loadUsers();
+      toast.success(successMessage);
     } catch (mutationError) {
-      setError(mutationError instanceof Error ? mutationError.message : t("users.updateError"));
+      const message =
+        mutationError instanceof Error ? mutationError.message : fallbackErrorMessage;
+      setError(message);
+      toast.error(message);
+      throw mutationError;
     } finally {
       setIsMutating(false);
     }
@@ -82,7 +92,7 @@ export default function UsersPage() {
           body: JSON.stringify(values),
         }),
       );
-    });
+    }, t("common.userCreateSuccess"), t("users.updateError"));
   };
 
   const handleUpdateUser = async (id: string, values: UpdateManagedUserInput) => {
@@ -96,7 +106,7 @@ export default function UsersPage() {
           body: JSON.stringify(values),
         }),
       );
-    });
+    }, t("common.userUpdateSuccess"), t("users.updateError"));
   };
 
   const handleDeleteUser = async (id: string) => {
@@ -106,7 +116,7 @@ export default function UsersPage() {
           method: "DELETE",
         }),
       );
-    });
+    }, t("common.userDeleteSuccess"), t("users.updateError"));
   };
 
   return (

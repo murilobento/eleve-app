@@ -3,8 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { ManagedUsersStats } from "@/lib/users-admin";
 import {
-  Ban,
-  Clock3,
+  ShieldOff,
   TrendingUp,
   UserCheck,
   Users,
@@ -26,14 +25,9 @@ const statItems = [
     icon: UserCheck,
   },
   {
-    key: "pendingUsers",
-    title: "Pending Users",
-    icon: Clock3,
-  },
-  {
-    key: "bannedUsers",
-    title: "Banned Users",
-    icon: Ban,
+    key: "inactiveUsers",
+    title: "Inactive Users",
+    icon: ShieldOff,
   },
 ] as const satisfies ReadonlyArray<{
   key: keyof ManagedUsersStats;

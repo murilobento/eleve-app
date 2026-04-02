@@ -9,7 +9,7 @@ import {
   SidebarInset,
   SidebarProvider as UISidebarProvider,
 } from "@/components/ui/sidebar"
-import { useSession } from "@/lib/auth-client"
+import { signOut, useSession } from "@/lib/auth-client"
 import { useRbac } from "@/hooks/use-rbac"
 import { usePathname, useRouter } from "next/navigation"
 import { getAppUrl } from "@/lib/utils"
@@ -19,6 +19,10 @@ import { useI18n, useLocale } from "@/i18n/provider"
 const routePermissions = [
   { path: "/dashboard", permission: "dashboard.read" },
   { path: "/calendar", permission: "calendar.read" },
+  { path: "/company", permission: "company.read" },
+  { path: "/clients", permission: "clients.read" },
+  { path: "/equipment-types", permission: "equipment-types.read" },
+  { path: "/equipment", permission: "equipment.read" },
   { path: "/users", permission: "users.read" },
   { path: "/roles", permission: "roles.read" },
 ] as const
@@ -26,7 +30,7 @@ const routePermissions = [
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const { config } = useSidebarConfig()
   const { data: session, isPending } = useSession()
-  const { hasPermission, isLoading: isLoadingRbac, hasResolved } = useRbac(Boolean(session))
+  const { hasPermission, isLoading: isLoadingRbac, hasResolved, error: rbacError } = useRbac(Boolean(session))
   const pathname = usePathname()
   const locale = useLocale()
   const { t } = useI18n()
@@ -38,6 +42,16 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       router.replace(getAppUrl("/auth/sign-in", locale))
     }
   }, [session, isPending, locale, router])
+
+  React.useEffect(() => {
+    if (!session || !rbacError || !/inactive|ban/i.test(rbacError)) {
+      return
+    }
+
+    void signOut().finally(() => {
+      router.replace(getAppUrl("/auth/sign-in", locale))
+    })
+  }, [locale, rbacError, router, session])
 
   React.useEffect(() => {
     if (!session || isLoadingRbac || !hasResolved || normalizedPathname === "/unauthorized") {

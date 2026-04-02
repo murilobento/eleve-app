@@ -13,12 +13,14 @@ export function useRbac(enabled = true) {
   const [data, setData] = useState<RbacState | null>(null);
   const [isLoading, setIsLoading] = useState(enabled);
   const [hasResolved, setHasResolved] = useState(!enabled);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!enabled) {
       setIsLoading(false);
       setHasResolved(false);
       setData(null);
+      setError(null);
       return;
     }
 
@@ -40,10 +42,12 @@ export function useRbac(enabled = true) {
 
         if (active) {
           setData(payload);
+          setError(null);
         }
-      } catch {
+      } catch (loadError) {
         if (active) {
           setData(null);
+          setError(loadError instanceof Error ? loadError.message : "Failed to load permissions.");
         }
       } finally {
         if (active) {
@@ -64,6 +68,7 @@ export function useRbac(enabled = true) {
 
   return {
     data,
+    error,
     isLoading,
     hasResolved,
     permissionSet,

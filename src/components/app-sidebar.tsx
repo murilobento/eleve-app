@@ -5,8 +5,12 @@ import {
   LayoutDashboard,
   Calendar,
   LayoutTemplate,
+  Building2,
+  BriefcaseBusiness,
   Users,
   Shield,
+  Truck,
+  Wrench,
 } from "lucide-react"
 import Link from "next/link"
 import { Logo } from "@/components/logo"
@@ -52,6 +56,30 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             url: getAppUrl("/calendar", locale),
             icon: Calendar,
             visible: hasPermission("calendar.read"),
+          },
+          {
+            title: t("navigation.company"),
+            url: getAppUrl("/company", locale),
+            icon: Building2,
+            visible: hasPermission("company.read"),
+          },
+          {
+            title: t("navigation.clients"),
+            url: getAppUrl("/clients", locale),
+            icon: BriefcaseBusiness,
+            visible: hasPermission("clients.read"),
+          },
+          {
+            title: t("navigation.equipment"),
+            url: getAppUrl("/equipment", locale),
+            icon: Truck,
+            visible: hasPermission("equipment.read"),
+          },
+          {
+            title: t("navigation.equipmentTypes"),
+            url: getAppUrl("/equipment-types", locale),
+            icon: Wrench,
+            visible: hasPermission("equipment-types.read"),
           },
           {
             title: t("navigation.users"),

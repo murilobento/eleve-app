@@ -18,6 +18,7 @@ import { ChevronDown, Pencil, Search, Trash2 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
@@ -85,6 +86,7 @@ export function DataTable({
   const [globalFilter, setGlobalFilter] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<ManagedUser | null>(null);
+  const [deletingUser, setDeletingUser] = useState<ManagedUser | null>(null);
 
   const columns = useMemo<ColumnDef<ManagedUser>[]>(
     () => [
@@ -126,10 +128,7 @@ export function DataTable({
               <Avatar className="h-8 w-8">
                 <AvatarFallback className="text-xs font-medium">{user.avatar}</AvatarFallback>
               </Avatar>
-              <div className="flex flex-col">
-                <span className="font-medium">{user.name}</span>
-                <span className="text-sm text-muted-foreground">{user.email}</span>
-              </div>
+              <span className="font-medium">{user.name}</span>
             </div>
           );
         },
@@ -166,9 +165,7 @@ export function DataTable({
           const className =
             user.status === "active"
               ? "text-green-600 bg-green-50 dark:text-green-400 dark:bg-green-900/20"
-              : user.status === "pending"
-                ? "text-orange-600 bg-orange-50 dark:text-orange-400 dark:bg-orange-900/20"
-                : "text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-900/20";
+              : "text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-900/20";
 
           return (
             <Badge variant="secondary" className={className}>
@@ -180,7 +177,7 @@ export function DataTable({
       },
       {
         accessorKey: "emailVerified",
-        header: t("users.email"),
+        header: t("users.verification"),
         cell: ({ row }) => (
           <span className="text-sm">
             {row.original.emailVerified ? t("common.verified") : t("common.unverified")}
@@ -219,15 +216,7 @@ export function DataTable({
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8 cursor-pointer text-red-600"
-                onClick={async () => {
-                  const confirmed = window.confirm(t("users.confirmDelete", { name: user.name }));
-
-                  if (!confirmed) {
-                    return;
-                  }
-
-                  await onDeleteUser(user.id);
-                }}
+                onClick={() => setDeletingUser(user)}
                 disabled={isMutating}
               >
                 <Trash2 className="size-4" />
@@ -266,6 +255,11 @@ export function DataTable({
       columnVisibility,
       rowSelection,
       globalFilter,
+    },
+    initialState: {
+      pagination: {
+        pageSize: 10,
+      },
     },
   });
 
@@ -337,8 +331,7 @@ export function DataTable({
             <SelectContent>
               <SelectItem value="all">{t("users.allStatuses")}</SelectItem>
               <SelectItem value="Active">{t("users.active")}</SelectItem>
-              <SelectItem value="Pending">{t("users.pending")}</SelectItem>
-              <SelectItem value="Banned">{t("users.banned")}</SelectItem>
+              <SelectItem value="Inactive">{t("users.inactive")}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -488,6 +481,27 @@ export function DataTable({
         isSubmitting={isMutating}
         user={editingUser}
         availableRoles={roles}
+      />
+
+      <ConfirmDeleteDialog
+        open={Boolean(deletingUser)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeletingUser(null);
+          }
+        }}
+        description={
+          deletingUser ? t("users.confirmDelete", { name: deletingUser.name }) : ""
+        }
+        onConfirm={async () => {
+          if (!deletingUser) {
+            return;
+          }
+
+          await onDeleteUser(deletingUser.id);
+          setDeletingUser(null);
+        }}
+        isLoading={isMutating}
       />
     </div>
   );

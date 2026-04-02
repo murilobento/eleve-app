@@ -8,9 +8,9 @@ import {
   getRoleById,
   getUserRoleAssignments,
   requirePermission,
+  setUserAccessState,
 } from "@/lib/rbac";
 import {
-  buildUserStatusData,
   mapAuthUserToManagedUser,
   updateManagedUserSchema,
 } from "@/lib/users-admin";
@@ -67,7 +67,6 @@ export async function PUT(
           name: payload.name,
           email: payload.email,
           role: compatibilityRole,
-          ...buildUserStatusData(payload.status),
         },
       },
     });
@@ -83,10 +82,14 @@ export async function PUT(
     }
 
     await assignRolesToUser(id, payload.roleIds);
+    await setUserAccessState(id, payload.status === "active");
     const userRoles = await getUserRoleAssignments(id, compatibilityRole);
 
     return NextResponse.json({
-      user: mapAuthUserToManagedUser(result.user ?? result, userRoles),
+      user: mapAuthUserToManagedUser(result.user ?? result, userRoles, {
+        isActive: payload.status === "active",
+        reason: payload.status === "active" ? null : "Marked as inactive by administrator",
+      }),
     });
   } catch (error) {
     return getErrorResponse(error);

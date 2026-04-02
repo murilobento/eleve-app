@@ -34,6 +34,82 @@ type PermissionRow = {
   key: PermissionKey;
 };
 
+type EquipmentTypeRow = {
+  id: string;
+  name: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type EquipmentRow = {
+  id: string;
+  type_id: string;
+  type_name: string;
+  license_required: "A" | "B" | "C" | "D" | "E";
+  name: string;
+  model: string;
+  brand: string;
+  year: number;
+  plate: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type CompanyRow = {
+  id: string;
+  legal_name: string;
+  trade_name: string | null;
+  cnpj: string;
+  email: string;
+  phone: string;
+  website: string | null;
+  postal_code: string;
+  street: string;
+  number: string;
+  complement: string | null;
+  district: string;
+  city: string;
+  state: string;
+  country: string;
+  created_at: string;
+  updated_at: string;
+};
+
+type ClientRow = {
+  id: string;
+  person_type: "PF" | "PJ";
+  legal_name: string;
+  trade_name: string | null;
+  document: string;
+  contact_name: string | null;
+  contact_phone: string | null;
+  email: string | null;
+  phone: string;
+  website: string | null;
+  postal_code: string;
+  street: string;
+  number: string;
+  complement: string | null;
+  district: string;
+  city: string;
+  state: string;
+  country: string;
+  created_at: string;
+  updated_at: string;
+};
+
+type UserAccessRow = {
+  user_id: string;
+  is_active: boolean;
+  reason: string | null;
+};
+
+type UserAccessState = {
+  isActive: boolean;
+  reason: string | null;
+};
+
 const SYSTEM_ROLE_SLUGS = {
   admin: "admin",
   user: "user",
@@ -50,6 +126,16 @@ function normalizeLegacyRole(role?: string | null) {
 }
 
 async function ensureSchema() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_access_status (
+      user_id text PRIMARY KEY REFERENCES "user"(id) ON DELETE CASCADE,
+      is_active boolean NOT NULL DEFAULT true,
+      reason text,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+  `);
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS roles (
       id text PRIMARY KEY,
@@ -90,6 +176,116 @@ async function ensureSchema() {
       PRIMARY KEY (user_id, role_id)
     );
   `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS equipment_types (
+      id text PRIMARY KEY,
+      name text NOT NULL,
+      description text,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+  `);
+
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS equipment_types_name_lower_idx
+    ON equipment_types ((lower(name)));
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS equipment (
+      id text PRIMARY KEY,
+      type_id text NOT NULL REFERENCES equipment_types(id) ON DELETE RESTRICT,
+      license_required text NOT NULL,
+      name text NOT NULL,
+      model text NOT NULL,
+      brand text NOT NULL,
+      year integer NOT NULL,
+      plate text,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS company (
+      id text PRIMARY KEY,
+      singleton_key boolean NOT NULL DEFAULT true UNIQUE,
+      legal_name text NOT NULL,
+      trade_name text,
+      cnpj text NOT NULL,
+      email text NOT NULL,
+      phone text NOT NULL,
+      website text,
+      postal_code text NOT NULL,
+      street text NOT NULL,
+      number text NOT NULL,
+      complement text,
+      district text NOT NULL,
+      city text NOT NULL,
+      state text NOT NULL,
+      country text NOT NULL DEFAULT 'Brasil',
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+  `);
+
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS company_cnpj_idx
+    ON company (cnpj);
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS clients (
+      id text PRIMARY KEY,
+      person_type text NOT NULL,
+      legal_name text NOT NULL,
+      trade_name text,
+      document text NOT NULL,
+      contact_name text,
+      contact_phone text,
+      email text,
+      phone text NOT NULL,
+      website text,
+      postal_code text NOT NULL,
+      street text NOT NULL,
+      number text NOT NULL,
+      complement text,
+      district text NOT NULL,
+      city text NOT NULL,
+      state text NOT NULL,
+      country text NOT NULL DEFAULT 'Brasil',
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+  `);
+
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS clients_document_idx
+    ON clients (document);
+  `);
+
+  await pool.query(`
+    ALTER TABLE clients
+    ALTER COLUMN email DROP NOT NULL;
+  `);
+
+  await pool.query(`
+    ALTER TABLE clients
+    ADD COLUMN IF NOT EXISTS contact_name text;
+  `);
+
+  await pool.query(`
+    ALTER TABLE clients
+    ADD COLUMN IF NOT EXISTS contact_phone text;
+  `);
+}
+
+function normalizeUserAccessState(row?: Partial<UserAccessRow> | null): UserAccessState {
+  return {
+    isActive: row?.is_active ?? true,
+    reason: row?.reason ?? null,
+  };
 }
 
 async function seedPermissions() {
@@ -312,6 +508,80 @@ function mapRoleRow(row: RoleRow): RoleRecord {
   };
 }
 
+function mapEquipmentTypeRow(
+  row: EquipmentTypeRow & { equipment_count?: string | number },
+) {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    equipmentCount: Number(row.equipment_count ?? 0),
+  };
+}
+
+function mapEquipmentRow(row: EquipmentRow) {
+  return {
+    id: row.id,
+    typeId: row.type_id,
+    typeName: row.type_name,
+    licenseRequired: row.license_required,
+    name: row.name,
+    model: row.model,
+    brand: row.brand,
+    year: row.year,
+    plate: row.plate,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapCompanyRow(row: CompanyRow) {
+  return {
+    id: row.id,
+    legalName: row.legal_name,
+    tradeName: row.trade_name,
+    cnpj: row.cnpj,
+  email: row.email,
+    phone: row.phone,
+    website: row.website,
+    postalCode: row.postal_code,
+    street: row.street,
+    number: row.number,
+    complement: row.complement,
+    district: row.district,
+    city: row.city,
+    state: row.state,
+    country: row.country,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapClientRow(row: ClientRow) {
+  return {
+    id: row.id,
+    personType: row.person_type,
+    legalName: row.legal_name,
+    tradeName: row.trade_name,
+    document: row.document,
+    contactName: row.contact_name,
+    contactPhone: row.contact_phone,
+    email: row.email,
+    phone: row.phone,
+    website: row.website,
+    postalCode: row.postal_code,
+    street: row.street,
+    number: row.number,
+    complement: row.complement,
+    district: row.district,
+    city: row.city,
+    state: row.state,
+    country: row.country,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 export async function listAssignableRoles() {
   await bootstrapRbac();
   const result = await pool.query<RoleRow>(
@@ -323,6 +593,652 @@ export async function listAssignableRoles() {
   );
 
   return result.rows.map(mapRoleRow);
+}
+
+export async function getCompany() {
+  await bootstrapRbac();
+  const result = await pool.query<CompanyRow>(
+    `
+      SELECT
+        id,
+        legal_name,
+        trade_name,
+        cnpj,
+        email,
+        phone,
+        website,
+        postal_code,
+        street,
+        number,
+        complement,
+        district,
+        city,
+        state,
+        country,
+        created_at,
+        updated_at
+      FROM company
+      WHERE singleton_key = true
+      LIMIT 1
+    `,
+  );
+
+  const row = result.rows[0];
+  return row ? mapCompanyRow(row) : null;
+}
+
+export async function upsertCompany(input: {
+  legalName: string;
+  tradeName?: string;
+  cnpj: string;
+  email: string;
+  phone: string;
+  website?: string;
+  postalCode: string;
+  street: string;
+  number: string;
+  complement?: string;
+  district: string;
+  city: string;
+  state: string;
+  country: string;
+}) {
+  await bootstrapRbac();
+  const existing = await getCompany();
+
+  if (existing) {
+    await pool.query(
+      `
+        UPDATE company
+        SET legal_name = $2,
+            trade_name = $3,
+            cnpj = $4,
+            email = $5,
+            phone = $6,
+            website = $7,
+            postal_code = $8,
+            street = $9,
+            number = $10,
+            complement = $11,
+            district = $12,
+            city = $13,
+            state = $14,
+            country = $15,
+            updated_at = now()
+        WHERE id = $1
+      `,
+      [
+        existing.id,
+        input.legalName.trim(),
+        input.tradeName?.trim() || null,
+        input.cnpj,
+        input.email.trim().toLowerCase(),
+        input.phone.trim(),
+        input.website?.trim() || null,
+        input.postalCode,
+        input.street.trim(),
+        input.number.trim(),
+        input.complement?.trim() || null,
+        input.district.trim(),
+        input.city.trim(),
+        input.state.trim(),
+        input.country.trim() || "Brasil",
+      ],
+    );
+
+    return existing.id;
+  }
+
+  const id = randomUUID();
+  await pool.query(
+    `
+      INSERT INTO company (
+        id,
+        singleton_key,
+        legal_name,
+        trade_name,
+        cnpj,
+        email,
+        phone,
+        website,
+        postal_code,
+        street,
+        number,
+        complement,
+        district,
+        city,
+        state,
+        country
+      )
+      VALUES ($1, true, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+    `,
+    [
+      id,
+      input.legalName.trim(),
+      input.tradeName?.trim() || null,
+      input.cnpj,
+      input.email.trim().toLowerCase(),
+      input.phone.trim(),
+      input.website?.trim() || null,
+      input.postalCode,
+      input.street.trim(),
+      input.number.trim(),
+      input.complement?.trim() || null,
+      input.district.trim(),
+      input.city.trim(),
+      input.state.trim(),
+      input.country.trim() || "Brasil",
+    ],
+  );
+
+  return id;
+}
+
+export async function listClients() {
+  await bootstrapRbac();
+  const result = await pool.query<ClientRow>(
+    `
+      SELECT
+        id,
+        person_type,
+        legal_name,
+        trade_name,
+        document,
+        contact_name,
+        contact_phone,
+        email,
+        phone,
+        website,
+        postal_code,
+        street,
+        number,
+        complement,
+        district,
+        city,
+        state,
+        country,
+        created_at,
+        updated_at
+      FROM clients
+      ORDER BY updated_at DESC, legal_name ASC
+    `,
+  );
+
+  return result.rows.map(mapClientRow);
+}
+
+export async function getClientById(clientId: string) {
+  await bootstrapRbac();
+  const result = await pool.query<ClientRow>(
+    `
+      SELECT
+        id,
+        person_type,
+        legal_name,
+        trade_name,
+        document,
+        contact_name,
+        contact_phone,
+        email,
+        phone,
+        website,
+        postal_code,
+        street,
+        number,
+        complement,
+        district,
+        city,
+        state,
+        country,
+        created_at,
+        updated_at
+      FROM clients
+      WHERE id = $1
+      LIMIT 1
+    `,
+    [clientId],
+  );
+
+  const row = result.rows[0];
+  return row ? mapClientRow(row) : null;
+}
+
+export async function createClient(input: {
+  personType: "PF" | "PJ";
+  legalName: string;
+  tradeName?: string;
+  document: string;
+  contactName?: string;
+  contactPhone?: string;
+  email?: string;
+  phone: string;
+  website?: string;
+  postalCode: string;
+  street: string;
+  number: string;
+  complement?: string;
+  district: string;
+  city: string;
+  state: string;
+  country: string;
+}) {
+  await bootstrapRbac();
+  const duplicate = await pool.query<{ id: string }>(
+    `SELECT id FROM clients WHERE document = $1 LIMIT 1`,
+    [input.document],
+  );
+
+  if (duplicate.rows[0]) {
+    throw new Error("A client with this document already exists.");
+  }
+
+  const id = randomUUID();
+  await pool.query(
+    `
+      INSERT INTO clients (
+        id,
+        person_type,
+        legal_name,
+        trade_name,
+        document,
+        contact_name,
+        contact_phone,
+        email,
+        phone,
+        website,
+        postal_code,
+        street,
+        number,
+        complement,
+        district,
+        city,
+        state,
+        country
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+    `,
+    [
+      id,
+      input.personType,
+      input.legalName.trim(),
+      input.tradeName?.trim() || null,
+      input.document,
+      input.contactName?.trim() || null,
+      input.contactPhone?.trim() || null,
+      input.email?.trim().toLowerCase() || null,
+      input.phone.trim(),
+      input.website?.trim() || null,
+      input.postalCode,
+      input.street.trim(),
+      input.number.trim(),
+      input.complement?.trim() || null,
+      input.district.trim(),
+      input.city.trim(),
+      input.state.trim(),
+      input.country.trim() || "Brasil",
+    ],
+  );
+
+  return id;
+}
+
+export async function updateClient(
+  clientId: string,
+  input: {
+    personType: "PF" | "PJ";
+    legalName: string;
+    tradeName?: string;
+    document: string;
+    contactName?: string;
+    contactPhone?: string;
+    email?: string;
+    phone: string;
+    website?: string;
+    postalCode: string;
+    street: string;
+    number: string;
+    complement?: string;
+    district: string;
+    city: string;
+    state: string;
+    country: string;
+  },
+) {
+  await bootstrapRbac();
+  const current = await getClientById(clientId);
+
+  if (!current) {
+    throw new Error("Client not found.");
+  }
+
+  const duplicate = await pool.query<{ id: string }>(
+    `SELECT id FROM clients WHERE document = $1 AND id <> $2 LIMIT 1`,
+    [input.document, clientId],
+  );
+
+  if (duplicate.rows[0]) {
+    throw new Error("A client with this document already exists.");
+  }
+
+  await pool.query(
+    `
+      UPDATE clients
+      SET person_type = $2,
+          legal_name = $3,
+          trade_name = $4,
+          document = $5,
+          contact_name = $6,
+          contact_phone = $7,
+          email = $8,
+          phone = $9,
+          website = $10,
+          postal_code = $11,
+          street = $12,
+          number = $13,
+          complement = $14,
+          district = $15,
+          city = $16,
+          state = $17,
+          country = $18,
+          updated_at = now()
+      WHERE id = $1
+    `,
+    [
+      clientId,
+      input.personType,
+      input.legalName.trim(),
+      input.tradeName?.trim() || null,
+      input.document,
+      input.contactName?.trim() || null,
+      input.contactPhone?.trim() || null,
+      input.email?.trim().toLowerCase() || null,
+      input.phone.trim(),
+      input.website?.trim() || null,
+      input.postalCode,
+      input.street.trim(),
+      input.number.trim(),
+      input.complement?.trim() || null,
+      input.district.trim(),
+      input.city.trim(),
+      input.state.trim(),
+      input.country.trim() || "Brasil",
+    ],
+  );
+}
+
+export async function deleteClient(clientId: string) {
+  await bootstrapRbac();
+  const current = await getClientById(clientId);
+
+  if (!current) {
+    throw new Error("Client not found.");
+  }
+
+  await pool.query(`DELETE FROM clients WHERE id = $1`, [clientId]);
+}
+
+export async function listEquipmentTypes() {
+  await bootstrapRbac();
+  const result = await pool.query<EquipmentTypeRow & { equipment_count: string }>(
+    `
+      SELECT et.id, et.name, et.description, et.created_at, et.updated_at, COUNT(e.id)::text AS equipment_count
+      FROM equipment_types et
+      LEFT JOIN equipment e ON e.type_id = et.id
+      GROUP BY et.id, et.name, et.description, et.created_at, et.updated_at
+      ORDER BY et.name ASC
+    `,
+  );
+
+  return result.rows.map(mapEquipmentTypeRow);
+}
+
+export async function getEquipmentTypeById(typeId: string) {
+  await bootstrapRbac();
+  const result = await pool.query<EquipmentTypeRow>(
+    `
+      SELECT id, name, description, created_at, updated_at
+      FROM equipment_types
+      WHERE id = $1
+      LIMIT 1
+    `,
+    [typeId],
+  );
+
+  const row = result.rows[0];
+  return row ? mapEquipmentTypeRow(row) : null;
+}
+
+export async function createEquipmentType(input: {
+  name: string;
+  description?: string;
+}) {
+  await bootstrapRbac();
+  const duplicate = await pool.query<{ id: string }>(
+    `SELECT id FROM equipment_types WHERE lower(name) = lower($1) LIMIT 1`,
+    [input.name],
+  );
+
+  if (duplicate.rows[0]) {
+    throw new Error("An equipment type with this name already exists.");
+  }
+
+  const id = randomUUID();
+  await pool.query(
+    `
+      INSERT INTO equipment_types (id, name, description)
+      VALUES ($1, $2, $3)
+    `,
+    [id, input.name.trim(), input.description?.trim() || null],
+  );
+
+  return id;
+}
+
+export async function updateEquipmentType(
+  typeId: string,
+  input: {
+    name: string;
+    description?: string;
+  },
+) {
+  await bootstrapRbac();
+  const current = await getEquipmentTypeById(typeId);
+
+  if (!current) {
+    throw new Error("Equipment type not found.");
+  }
+
+  const duplicate = await pool.query<{ id: string }>(
+    `SELECT id FROM equipment_types WHERE lower(name) = lower($1) AND id <> $2 LIMIT 1`,
+    [input.name, typeId],
+  );
+
+  if (duplicate.rows[0]) {
+    throw new Error("An equipment type with this name already exists.");
+  }
+
+  await pool.query(
+    `
+      UPDATE equipment_types
+      SET name = $2,
+          description = $3,
+          updated_at = now()
+      WHERE id = $1
+    `,
+    [typeId, input.name.trim(), input.description?.trim() || null],
+  );
+}
+
+export async function deleteEquipmentType(typeId: string) {
+  await bootstrapRbac();
+  const current = await getEquipmentTypeById(typeId);
+
+  if (!current) {
+    throw new Error("Equipment type not found.");
+  }
+
+  const inUse = await pool.query<{ total: string }>(
+    `SELECT COUNT(*)::text AS total FROM equipment WHERE type_id = $1`,
+    [typeId],
+  );
+
+  if (Number(inUse.rows[0]?.total ?? "0") > 0) {
+    throw new Error("Remove equipment linked to this type before deleting it.");
+  }
+
+  await pool.query(`DELETE FROM equipment_types WHERE id = $1`, [typeId]);
+}
+
+export async function listEquipment() {
+  await bootstrapRbac();
+  const result = await pool.query<EquipmentRow>(
+    `
+      SELECT
+        e.id,
+        e.type_id,
+        et.name AS type_name,
+        e.license_required,
+        e.name,
+        e.model,
+        e.brand,
+        e.year,
+        e.plate,
+        e.created_at,
+        e.updated_at
+      FROM equipment e
+      INNER JOIN equipment_types et ON et.id = e.type_id
+      ORDER BY e.updated_at DESC, e.name ASC
+    `,
+  );
+
+  return result.rows.map(mapEquipmentRow);
+}
+
+export async function getEquipmentById(equipmentId: string) {
+  await bootstrapRbac();
+  const result = await pool.query<EquipmentRow>(
+    `
+      SELECT
+        e.id,
+        e.type_id,
+        et.name AS type_name,
+        e.license_required,
+        e.name,
+        e.model,
+        e.brand,
+        e.year,
+        e.plate,
+        e.created_at,
+        e.updated_at
+      FROM equipment e
+      INNER JOIN equipment_types et ON et.id = e.type_id
+      WHERE e.id = $1
+      LIMIT 1
+    `,
+    [equipmentId],
+  );
+
+  const row = result.rows[0];
+  return row ? mapEquipmentRow(row) : null;
+}
+
+export async function createEquipment(input: {
+  typeId: string;
+  licenseRequired: "A" | "B" | "C" | "D" | "E";
+  name: string;
+  model: string;
+  brand: string;
+  year: number;
+  plate?: string;
+}) {
+  await bootstrapRbac();
+  const type = await getEquipmentTypeById(input.typeId);
+
+  if (!type) {
+    throw new Error("Equipment type not found.");
+  }
+
+  const id = randomUUID();
+  await pool.query(
+    `
+      INSERT INTO equipment (id, type_id, license_required, name, model, brand, year, plate)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `,
+    [
+      id,
+      input.typeId,
+      input.licenseRequired,
+      input.name.trim(),
+      input.model.trim(),
+      input.brand.trim(),
+      input.year,
+      input.plate?.trim() || null,
+    ],
+  );
+
+  return id;
+}
+
+export async function updateEquipment(
+  equipmentId: string,
+  input: {
+    typeId: string;
+    licenseRequired: "A" | "B" | "C" | "D" | "E";
+    name: string;
+    model: string;
+    brand: string;
+    year: number;
+    plate?: string;
+  },
+) {
+  await bootstrapRbac();
+  const current = await getEquipmentById(equipmentId);
+
+  if (!current) {
+    throw new Error("Equipment not found.");
+  }
+
+  const type = await getEquipmentTypeById(input.typeId);
+
+  if (!type) {
+    throw new Error("Equipment type not found.");
+  }
+
+  await pool.query(
+    `
+      UPDATE equipment
+      SET type_id = $2,
+          license_required = $3,
+          name = $4,
+          model = $5,
+          brand = $6,
+          year = $7,
+          plate = $8,
+          updated_at = now()
+      WHERE id = $1
+    `,
+    [
+      equipmentId,
+      input.typeId,
+      input.licenseRequired,
+      input.name.trim(),
+      input.model.trim(),
+      input.brand.trim(),
+      input.year,
+      input.plate?.trim() || null,
+    ],
+  );
+}
+
+export async function deleteEquipment(equipmentId: string) {
+  await bootstrapRbac();
+  const current = await getEquipmentById(equipmentId);
+
+  if (!current) {
+    throw new Error("Equipment not found.");
+  }
+
+  await pool.query(`DELETE FROM equipment WHERE id = $1`, [equipmentId]);
 }
 
 export async function listRolesWithDetails(): Promise<RoleWithDetails[]> {
@@ -510,6 +1426,75 @@ export async function getUserRoleAssignments(userId: string, legacyRole?: string
   return getUserRoleAssignments(userId);
 }
 
+export async function getUserAccessState(userId: string): Promise<UserAccessState | null> {
+  await bootstrapRbac();
+  const result = await pool.query<UserAccessRow>(
+    `
+      SELECT uas.user_id, uas.is_active, uas.reason
+      FROM "user" u
+      LEFT JOIN user_access_status uas ON uas.user_id = u.id
+      WHERE u.id = $1
+      LIMIT 1
+    `,
+    [userId],
+  );
+
+  const row = result.rows[0];
+  return row ? normalizeUserAccessState(row) : null;
+}
+
+export async function getUserAccessStateByEmail(email: string): Promise<UserAccessState | null> {
+  await bootstrapRbac();
+  const result = await pool.query<UserAccessRow>(
+    `
+      SELECT uas.user_id, uas.is_active, uas.reason
+      FROM "user" u
+      LEFT JOIN user_access_status uas ON uas.user_id = u.id
+      WHERE lower(u.email) = lower($1)
+      LIMIT 1
+    `,
+    [email.trim()],
+  );
+
+  const row = result.rows[0];
+  return row ? normalizeUserAccessState(row) : null;
+}
+
+export async function getUserAccessStateBatch(userIds: string[]): Promise<Map<string, UserAccessState>> {
+  await bootstrapRbac();
+
+  if (userIds.length === 0) {
+    return new Map();
+  }
+
+  const uniqueUserIds = [...new Set(userIds)];
+  const result = await pool.query<UserAccessRow>(
+    `
+      SELECT user_id, is_active, reason
+      FROM user_access_status
+      WHERE user_id = ANY($1::text[])
+    `,
+    [uniqueUserIds],
+  );
+
+  return new Map(result.rows.map((row) => [row.user_id, normalizeUserAccessState(row)]));
+}
+
+export async function setUserAccessState(userId: string, isActive: boolean, reason?: string | null) {
+  await bootstrapRbac();
+  await pool.query(
+    `
+      INSERT INTO user_access_status (user_id, is_active, reason)
+      VALUES ($1, $2, $3)
+      ON CONFLICT (user_id) DO UPDATE
+      SET is_active = EXCLUDED.is_active,
+          reason = EXCLUDED.reason,
+          updated_at = now()
+    `,
+    [userId, isActive, isActive ? null : reason?.trim() || "Marked as inactive by administrator"],
+  );
+}
+
 export async function getUserRoleAssignmentsBatch(
   users: Array<{ id: string; legacyRole?: string | null }>,
 ): Promise<Map<string, UserRoleSummary[]>> {
@@ -684,6 +1669,23 @@ export async function getCurrentSessionState(request: Request) {
     role: session.user.role,
   });
 
+  const accessState = await getUserAccessState(session.user.id);
+  const isBanned = Boolean(session.user.banned);
+
+  if (isBanned || accessState?.isActive === false) {
+    return {
+      session,
+      roles: [],
+      permissions: [],
+      accessState: {
+        isActive: false,
+        reason: isBanned
+          ? session.user.banReason || "Your account is banned."
+          : accessState?.reason || "Your account is inactive.",
+      },
+    };
+  }
+
   const roles = await getUserRoleAssignments(session.user.id, session.user.role);
   const permissions = await getUserPermissionKeys(session.user.id, session.user.role);
 
@@ -691,6 +1693,10 @@ export async function getCurrentSessionState(request: Request) {
     session,
     roles,
     permissions,
+    accessState: {
+      isActive: true,
+      reason: null,
+    },
   };
 }
 
@@ -699,6 +1705,13 @@ export async function requirePermission(request: Request, permission: Permission
 
   if (!state) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
+  if (!state.accessState.isActive) {
+    return NextResponse.json(
+      { error: state.accessState.reason || "Your account is inactive." },
+      { status: 403 },
+    );
   }
 
   if (!state.permissions.includes(permission)) {

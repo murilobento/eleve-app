@@ -1,7 +1,9 @@
 "use client"
 
 import { useState, useCallback } from "react"
+import { toast } from "sonner"
 import { type CalendarEvent } from "./types"
+import { useI18n } from "@/i18n/provider"
 
 export interface UseCalendarState {
   selectedDate: Date
@@ -27,6 +29,7 @@ export interface UseCalendarActions {
 export interface UseCalendarReturn extends UseCalendarState, UseCalendarActions {}
 
 export function useCalendar(initialEvents: CalendarEvent[] = []): UseCalendarReturn {
+  const { t } = useI18n()
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [showEventForm, setShowEventForm] = useState(false)
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
@@ -52,16 +55,18 @@ export function useCalendar(initialEvents: CalendarEvent[] = []): UseCalendarRet
   const handleSaveEvent = useCallback((eventData: Partial<CalendarEvent>) => {
     console.log("Saving event:", eventData)
     // In a real app, this would save to a backend
+    toast.success(t("common.eventSaveSuccess"))
     setShowEventForm(false)
     setEditingEvent(null)
-  }, [])
+  }, [t])
 
   const handleDeleteEvent = useCallback((eventId: number) => {
     console.log("Deleting event:", eventId)
     // In a real app, this would delete from backend
+    toast.success(t("common.eventDeleteSuccess"))
     setShowEventForm(false)
     setEditingEvent(null)
-  }, [])
+  }, [t])
 
   const handleEditEvent = useCallback((event: CalendarEvent) => {
     setEditingEvent(event)

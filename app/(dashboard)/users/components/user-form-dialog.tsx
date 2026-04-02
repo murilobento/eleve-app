@@ -26,13 +26,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import {
   createManagedUserSchema,
   type CreateManagedUserInput,
@@ -73,7 +67,7 @@ export function UserFormDialog({
       email: "",
       password: "",
       roleIds: [],
-      status: "pending",
+      status: "active",
     },
   });
 
@@ -94,7 +88,7 @@ export function UserFormDialog({
       email: user?.email ?? "",
       password: "",
       roleIds: defaultRoleIds,
-      status: user?.status ?? "pending",
+      status: user?.status ?? "active",
     });
   }, [availableRoles, form, open, user]);
 
@@ -115,24 +109,44 @@ export function UserFormDialog({
         </DialogTrigger>
       ) : null}
       <DialogContent className="sm:max-w-xl">
-        <DialogHeader>
-          <DialogTitle>{isEdit ? t("users.editUser") : t("users.createUser")}</DialogTitle>
-          <DialogDescription>
-            {isEdit
-              ? t("users.editDescription")
-              : t("users.createDescription")}
-          </DialogDescription>
-        </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            <DialogHeader className="gap-3">
+              <div className="flex items-center justify-between gap-4">
+                <DialogTitle>{isEdit ? t("users.editUser") : t("users.createUser")}</DialogTitle>
+                <FormField
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center gap-3 space-y-0 rounded-md border px-3 py-2">
+                      <FormLabel className="cursor-pointer text-sm font-medium">
+                        {field.value === "active" ? t("users.active") : t("users.inactive")}
+                      </FormLabel>
+                      <FormControl>
+                        <Switch
+                          checked={field.value === "active"}
+                          onCheckedChange={(checked) => field.onChange(checked ? "active" : "inactive")}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <DialogDescription>
+                {isEdit
+                  ? t("users.editDescription")
+                  : t("users.createDescription")}
+              </DialogDescription>
+            </DialogHeader>
+
             <FormField
               control={form.control}
               name="name"
               render={({ field }) => (
                 <FormItem>
-                    <FormLabel>{t("users.name")}</FormLabel>
-                    <FormControl>
-                      <Input placeholder={t("users.fullName")} {...field} />
+                  <FormLabel>{t("users.name")}</FormLabel>
+                  <FormControl>
+                    <Input placeholder={t("users.fullName")} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -144,7 +158,7 @@ export function UserFormDialog({
               name="email"
               render={({ field }) => (
                 <FormItem>
-                    <FormLabel>{t("users.email")}</FormLabel>
+                  <FormLabel>{t("users.email")}</FormLabel>
                   <FormControl>
                     <Input type="email" placeholder="name@example.com" {...field} />
                   </FormControl>
@@ -172,75 +186,50 @@ export function UserFormDialog({
               )}
             />
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FormField
-                control={form.control}
-                name="roleIds"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("users.roles")}</FormLabel>
-                    <FormControl>
-                      <ScrollArea className="h-40 rounded-md border p-3">
-                        <div className="space-y-3">
-                          {availableRoles.map((role) => {
-                            const checked = field.value?.includes(role.id) ?? false;
+            <FormField
+              control={form.control}
+              name="roleIds"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t("users.roles")}</FormLabel>
+                  <FormControl>
+                    <ScrollArea className="h-40 w-full rounded-md border p-3">
+                      <div className="space-y-3">
+                        {availableRoles.map((role) => {
+                          const checked = field.value?.includes(role.id) ?? false;
 
-                            return (
-                              <label key={role.id} className="flex cursor-pointer items-start gap-3">
-                                <Checkbox
-                                  checked={checked}
-                                  onCheckedChange={(value) => {
-                                    const nextValue = new Set(field.value ?? []);
+                          return (
+                            <label key={role.id} className="flex cursor-pointer items-start gap-3">
+                              <Checkbox
+                                checked={checked}
+                                onCheckedChange={(value) => {
+                                  const nextValue = new Set(field.value ?? []);
 
-                                    if (value) {
-                                      nextValue.add(role.id);
-                                    } else {
-                                      nextValue.delete(role.id);
-                                    }
+                                  if (value) {
+                                    nextValue.add(role.id);
+                                  } else {
+                                    nextValue.delete(role.id);
+                                  }
 
-                                    field.onChange([...nextValue]);
-                                  }}
-                                />
-                                <div className="space-y-1">
-                                  <div className="text-sm font-medium">{role.name}</div>
-                                  <div className="text-xs text-muted-foreground">
-                                    {role.description || role.slug}
-                                  </div>
+                                  field.onChange([...nextValue]);
+                                }}
+                              />
+                              <div className="space-y-1">
+                                <div className="text-sm font-medium">{role.name}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {role.description || role.slug}
                                 </div>
-                              </label>
-                            );
-                          })}
-                        </div>
-                      </ScrollArea>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("users.status")}</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger className="cursor-pointer w-full">
-                          <SelectValue placeholder={t("users.selectStatus")} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="active">{t("users.active")}</SelectItem>
-                        <SelectItem value="pending">{t("users.pending")}</SelectItem>
-                        <SelectItem value="banned">{t("users.banned")}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </ScrollArea>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <DialogFooter>
               <Button type="submit" className="cursor-pointer" disabled={isSubmitting}>
