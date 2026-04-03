@@ -26,7 +26,6 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Textarea } from "@/components/ui/textarea";
 import {
   createRoleSchema,
   type CreateRoleInput,
@@ -60,12 +59,57 @@ export function RoleFormDialog({
   const isEdit = mode === "edit";
   const schema = isEdit ? updateRoleSchema : createRoleSchema;
 
+  const getResourceLabel = (resource: string) => {
+    switch (resource) {
+      case "dashboard":
+        return t("roles.resourceDashboard");
+      case "calendar":
+        return t("roles.resourceCalendar");
+      case "company":
+        return t("roles.resourceCompany");
+      case "clients":
+        return t("roles.resourceClients");
+      case "equipment":
+        return t("roles.resourceEquipment");
+      case "equipment-types":
+        return t("roles.resourceEquipmentTypes");
+      case "users":
+        return t("roles.resourceUsers");
+      case "roles":
+        return t("roles.resourceRoles");
+      default:
+        return resource;
+    }
+  };
+
+  const getResourceTitleLabel = (resource: string) => {
+    const label = getResourceLabel(resource);
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  };
+
+  const getPermissionTitle = (action: string, resource: string) => {
+    const label = getResourceTitleLabel(resource);
+
+    switch (action) {
+      case "read":
+        return t("roles.permissionReadTitle", { resource: label });
+      case "create":
+        return t("roles.permissionCreateTitle", { resource: label });
+      case "update":
+        return t("roles.permissionUpdateTitle", { resource: label });
+      case "delete":
+        return t("roles.permissionDeleteTitle", { resource: label });
+      case "assign":
+        return t("roles.permissionAssignTitle", { resource: label });
+      default:
+        return label;
+    }
+  };
+
   const form = useForm<CreateRoleInput | UpdateRoleInput>({
     resolver: zodResolver(schema),
     defaultValues: {
       name: "",
-      slug: "",
-      description: "",
       permissionKeys: [],
     },
   });
@@ -77,8 +121,6 @@ export function RoleFormDialog({
 
     form.reset({
       name: role?.name ?? "",
-      slug: role?.slug ?? "",
-      description: role?.description ?? "",
       permissionKeys: role?.permissionKeys ?? [],
     });
   }, [form, open, role]);
@@ -112,49 +154,14 @@ export function RoleFormDialog({
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("roles.name")}</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Operations Manager" {...field} disabled={isDisabled} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="slug"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("roles.slug")}</FormLabel>
-                    <FormControl>
-                      <Input placeholder="operations-manager" {...field} disabled={isDisabled} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
             <FormField
               control={form.control}
-              name="description"
+              name="name"
               render={({ field }) => (
                 <FormItem>
-                <FormLabel>{t("roles.descriptionLabel")}</FormLabel>
+                  <FormLabel>{t("roles.name")}</FormLabel>
                   <FormControl>
-                    <Textarea
-                      placeholder="Describe what this role is responsible for."
-                      {...field}
-                      value={field.value ?? ""}
-                      disabled={isDisabled}
-                    />
+                    <Input placeholder={t("roles.namePlaceholder")} {...field} disabled={isDisabled} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -172,12 +179,7 @@ export function RoleFormDialog({
                       <div className="space-y-4">
                         {permissionGroups.map((group) => (
                           <div key={group.resource} className="space-y-3">
-                            <div>
-                              <div className="text-sm font-medium">{group.label}</div>
-                              <div className="text-xs text-muted-foreground">
-                                {t("roles.permissionsAvailable", { resource: group.resource })}
-                              </div>
-                            </div>
+                            <div className="text-sm font-medium">{getResourceLabel(group.resource)}</div>
                             <div className="grid gap-3 sm:grid-cols-2">
                               {group.permissions.map((permission) => {
                                 const checked = field.value?.includes(permission.key) ?? false;
@@ -199,9 +201,10 @@ export function RoleFormDialog({
                                         field.onChange([...nextValue]);
                                       }}
                                     />
-                                    <div className="space-y-1">
-                                      <div className="text-sm font-medium">{permission.key}</div>
-                                      <div className="text-xs text-muted-foreground">{permission.description}</div>
+                                    <div>
+                                      <div className="text-sm font-medium">
+                                        {getPermissionTitle(permission.action, permission.resource)}
+                                      </div>
                                     </div>
                                   </label>
                                 );

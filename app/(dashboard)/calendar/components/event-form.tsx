@@ -45,11 +45,11 @@ interface EventFormProps {
 }
 
 const eventTypes = [
-  { value: "meeting", label: "Meeting", color: "bg-blue-500" },
-  { value: "event", label: "Event", color: "bg-green-500" },
-  { value: "personal", label: "Personal", color: "bg-pink-500" },
-  { value: "task", label: "Task", color: "bg-orange-500" },
-  { value: "reminder", label: "Reminder", color: "bg-purple-500" }
+  { value: "meeting", color: "bg-chart-1" },
+  { value: "event", color: "bg-chart-2" },
+  { value: "personal", color: "bg-chart-3" },
+  { value: "task", color: "bg-chart-4" },
+  { value: "reminder", color: "bg-chart-5" }
 ]
 
 const timeSlots = [
@@ -59,9 +59,7 @@ const timeSlots = [
   "6:00 PM", "6:30 PM", "7:00 PM", "7:30 PM", "8:00 PM", "8:30 PM"
 ]
 
-const durationOptions = [
-  "15 min", "30 min", "45 min", "1 hour", "1.5 hours", "2 hours", "3 hours", "All day"
-]
+const durationOptions = ["15 min", "30 min", "45 min", "1 hour", "1.5 hours", "2 hours", "3 hours", "All day"]
 
 export function EventForm({ event, open, onOpenChange, onSave, onDelete }: EventFormProps) {
   const { t } = useI18n()
@@ -103,7 +101,7 @@ export function EventForm({ event, open, onOpenChange, onSave, onDelete }: Event
     const eventData: Partial<CalendarEvent> = {
       ...formData,
       id: event?.id,
-      color: eventTypes.find(t => t.value === formData.type)?.color || "bg-blue-500"
+      color: eventTypes.find(t => t.value === formData.type)?.color || "bg-chart-1"
     }
     onSave(eventData)
     onOpenChange(false)
@@ -135,6 +133,45 @@ export function EventForm({ event, open, onOpenChange, onSave, onDelete }: Event
   }
 
   const selectedEventType = eventTypes.find(t => t.value === formData.type)
+  const getEventTypeLabel = (value: string) => {
+    switch (value) {
+      case "meeting":
+        return t("calendar.scheduleMeeting")
+      case "event":
+        return t("calendar.event")
+      case "personal":
+        return t("calendar.personal")
+      case "task":
+        return t("calendar.task")
+      case "reminder":
+        return t("calendar.reminderType")
+      default:
+        return value
+    }
+  }
+
+  const getDurationLabel = (value: string) => {
+    switch (value) {
+      case "15 min":
+        return t("calendar.min15")
+      case "30 min":
+        return t("calendar.min30")
+      case "45 min":
+        return t("calendar.min45")
+      case "1 hour":
+        return t("calendar.hour1")
+      case "1.5 hours":
+        return t("calendar.hour1_5")
+      case "2 hours":
+        return t("calendar.hours2")
+      case "3 hours":
+        return t("calendar.hours3")
+      case "All day":
+        return t("calendar.allDay")
+      default:
+        return value
+    }
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -142,10 +179,10 @@ export function EventForm({ event, open, onOpenChange, onSave, onDelete }: Event
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <div className={cn("w-3 h-3 rounded-full", selectedEventType?.color)} />
-            {event ? "Edit Event" : "Create New Event"}
+            {event ? t("calendar.editEvent") : t("calendar.createNewEvent")}
           </DialogTitle>
           <DialogDescription>
-            {event ? "Make changes to this event" : "Add a new event to your calendar"}
+            {event ? t("calendar.editEventHelp") : t("calendar.createEventHelp")}
           </DialogDescription>
         </DialogHeader>
 
@@ -154,11 +191,11 @@ export function EventForm({ event, open, onOpenChange, onSave, onDelete }: Event
           <div className="space-y-2">
             <Label htmlFor="title" className="flex items-center gap-2">
               <Type className="w-4 h-4" />
-              Event Title
+              {t("calendar.eventTitle")}
             </Label>
             <Input
               id="title"
-              placeholder="Enter event title..."
+              placeholder={t("calendar.enterEventTitle")}
               value={formData.title}
               onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
               className="text-lg font-medium"
@@ -170,7 +207,7 @@ export function EventForm({ event, open, onOpenChange, onSave, onDelete }: Event
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
                 <Tag className="w-4 h-4" />
-                Event Type
+                {t("calendar.eventType")}
               </Label>
               <Select value={formData.type} onValueChange={(value) => setFormData(prev => ({ ...prev, type: value as CalendarEvent["type"] }))}>
                 <SelectTrigger className="w-full">
@@ -181,7 +218,7 @@ export function EventForm({ event, open, onOpenChange, onSave, onDelete }: Event
                     <SelectItem key={type.value} value={type.value}>
                       <div className="flex items-center gap-2">
                         <div className={cn("w-3 h-3 rounded-full", type.color)} />
-                        {type.label}
+                        {getEventTypeLabel(type.value)}
                       </div>
                     </SelectItem>
                   ))}
@@ -195,7 +232,7 @@ export function EventForm({ event, open, onOpenChange, onSave, onDelete }: Event
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
                 <CalendarIcon className="w-4 h-4" />
-                Date
+                {t("calendar.date")}
               </Label>
               <Popover open={showCalendar} onOpenChange={setShowCalendar}>
                 <PopoverTrigger asChild>
@@ -222,7 +259,7 @@ export function EventForm({ event, open, onOpenChange, onSave, onDelete }: Event
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
                 <Clock className="w-4 h-4" />
-                Time
+                {t("calendar.time")}
               </Label>
               <Select value={formData.time} onValueChange={(value) => setFormData(prev => ({ ...prev, time: value }))}>
                 <SelectTrigger className="w-full">
@@ -240,21 +277,21 @@ export function EventForm({ event, open, onOpenChange, onSave, onDelete }: Event
           {/* Duration and All Day */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Duration</Label>
+              <Label>{t("calendar.duration")}</Label>
               <Select value={formData.duration} onValueChange={(value) => setFormData(prev => ({ ...prev, duration: value }))}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {durationOptions.map(duration => (
-                    <SelectItem key={duration} value={duration}>{duration}</SelectItem>
+                    <SelectItem key={duration} value={duration}>{getDurationLabel(duration)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <Label>Options</Label>
+              <Label>{t("calendar.options")}</Label>
               <div className="flex items-center space-x-4 h-10">
                 <div className="flex items-center space-x-2">
                   <Switch
@@ -262,7 +299,7 @@ export function EventForm({ event, open, onOpenChange, onSave, onDelete }: Event
                     checked={formData.allDay}
                     onCheckedChange={(checked) => setFormData(prev => ({ ...prev, allDay: checked }))}
                   />
-                  <Label htmlFor="all-day" className="text-sm">All day</Label>
+                  <Label htmlFor="all-day" className="text-sm">{t("calendar.allDay")}</Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <Switch
@@ -270,7 +307,7 @@ export function EventForm({ event, open, onOpenChange, onSave, onDelete }: Event
                     checked={formData.reminder}
                     onCheckedChange={(checked) => setFormData(prev => ({ ...prev, reminder: checked }))}
                   />
-                  <Label htmlFor="reminder" className="text-sm">Reminder</Label>
+                  <Label htmlFor="reminder" className="text-sm">{t("calendar.reminder")}</Label>
                 </div>
               </div>
             </div>
@@ -280,11 +317,11 @@ export function EventForm({ event, open, onOpenChange, onSave, onDelete }: Event
           <div className="space-y-2">
             <Label htmlFor="location" className="flex items-center gap-2">
               <MapPin className="w-4 h-4" />
-              Location
+              {t("calendar.location")}
             </Label>
             <Input
               id="location"
-              placeholder="Add location..."
+              placeholder={t("calendar.addLocation")}
               value={formData.location}
               onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
             />
@@ -294,16 +331,16 @@ export function EventForm({ event, open, onOpenChange, onSave, onDelete }: Event
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <Users className="w-4 h-4" />
-              Attendees
+              {t("calendar.attendees")}
             </Label>
             <div className="flex gap-2">
               <Input
-                placeholder="Add attendee..."
+                placeholder={t("calendar.addAttendee")}
                 value={newAttendee}
                 onChange={(e) => setNewAttendee(e.target.value)}
                 onKeyPress={(e) => e.key === "Enter" && addAttendee()}
               />
-              <Button onClick={addAttendee} variant="outline" className="cursor-pointer">Add</Button>
+              <Button onClick={addAttendee} variant="outline" className="cursor-pointer">{t("calendar.add")}</Button>
             </div>
             {formData.attendees.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-2">
@@ -330,10 +367,10 @@ export function EventForm({ event, open, onOpenChange, onSave, onDelete }: Event
 
           {/* Description */}
           <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
+            <Label htmlFor="description">{t("calendar.descriptionLabel")}</Label>
             <Textarea
               id="description"
-              placeholder="Add description..."
+              placeholder={t("calendar.addDescription")}
               value={formData.description}
               onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
               rows={3}
@@ -343,15 +380,15 @@ export function EventForm({ event, open, onOpenChange, onSave, onDelete }: Event
           {/* Actions */}
           <div className="flex gap-3 pt-6">
             <Button onClick={handleSave} className="flex-1 cursor-pointer">
-              {event ? "Update Event" : "Create Event"}
+              {event ? t("calendar.updateEvent") : t("calendar.createEvent")}
             </Button>
             {event && onDelete && (
               <Button onClick={() => setShowDeleteConfirm(true)} variant="destructive" className="cursor-pointer">
-                Delete
+                {t("calendar.delete")}
               </Button>
             )}
             <Button onClick={() => onOpenChange(false)} variant="outline" className="cursor-pointer">
-              Cancel
+              {t("common.cancel")}
             </Button>
           </div>
         </div>

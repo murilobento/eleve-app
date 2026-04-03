@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -112,13 +111,13 @@ export function UserFormDialog({
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
             <DialogHeader className="gap-3">
-              <div className="flex items-center justify-between gap-4">
+              <div className="flex flex-wrap items-center gap-3 pr-8">
                 <DialogTitle>{isEdit ? t("users.editUser") : t("users.createUser")}</DialogTitle>
                 <FormField
                   control={form.control}
                   name="status"
                   render={({ field }) => (
-                    <FormItem className="flex flex-row items-center gap-3 space-y-0 rounded-md border px-3 py-2">
+                    <FormItem className="flex shrink-0 flex-row items-center gap-3 space-y-0 rounded-md border px-3 py-2">
                       <FormLabel className="cursor-pointer text-sm font-medium">
                         {field.value === "active" ? t("users.active") : t("users.inactive")}
                       </FormLabel>
@@ -132,11 +131,6 @@ export function UserFormDialog({
                   )}
                 />
               </div>
-              <DialogDescription>
-                {isEdit
-                  ? t("users.editDescription")
-                  : t("users.createDescription")}
-              </DialogDescription>
             </DialogHeader>
 
             <FormField
@@ -214,12 +208,7 @@ export function UserFormDialog({
                                   field.onChange([...nextValue]);
                                 }}
                               />
-                              <div className="space-y-1">
-                                <div className="text-sm font-medium">{role.name}</div>
-                                <div className="text-xs text-muted-foreground">
-                                  {role.description || role.slug}
-                                </div>
-                              </div>
+                              <div className="text-sm font-medium">{role.name}</div>
                             </label>
                           );
                         })}

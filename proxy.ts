@@ -9,7 +9,7 @@ import {
   stripLocaleFromPath,
 } from "@/i18n/config";
 
-export default function proxy(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const pathLocale = extractLocaleFromPath(pathname);
   const cookieLocale = request.cookies.get(localeCookieName)?.value;
@@ -38,6 +38,8 @@ export default function proxy(request: NextRequest) {
 
   return NextResponse.next();
 }
+
+export default proxy;
 
 export const config = {
   matcher: ["/((?!_next|.*\\..*).*)"],

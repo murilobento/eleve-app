@@ -25,6 +25,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -91,6 +92,7 @@ export function ClientFormDialog({
     resolver: zodResolver(schema),
     defaultValues: {
       personType: "PF",
+      status: "active",
       legalName: "",
       tradeName: "",
       document: "",
@@ -119,6 +121,7 @@ export function ClientFormDialog({
 
     form.reset({
       personType: client?.personType ?? "PF",
+      status: client?.status ?? "active",
       legalName: client?.legalName ?? "",
       tradeName: client?.tradeName ?? "",
       document: client?.document ?? "",
@@ -230,12 +233,32 @@ export function ClientFormDialog({
         </DialogTrigger>
       ) : null}
       <DialogContent className="sm:max-w-5xl">
-        <DialogHeader>
-          <DialogTitle>{isEdit ? t("clients.editClient") : t("clients.createClient")}</DialogTitle>
-          <DialogDescription>{t("clients.createDescription")}</DialogDescription>
-        </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-3">
+            <DialogHeader>
+              <div className="flex flex-wrap items-center gap-3 pr-8">
+                <DialogTitle>{isEdit ? t("clients.editClient") : t("clients.createClient")}</DialogTitle>
+                <FormField
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem className="flex shrink-0 flex-row items-center gap-3 space-y-0 rounded-md border px-3 py-2">
+                      <FormLabel className="cursor-pointer text-sm font-medium">
+                        {field.value === "active" ? t("clients.active") : t("clients.inactive")}
+                      </FormLabel>
+                      <FormControl>
+                        <Switch
+                          checked={field.value === "active"}
+                          onCheckedChange={(checked) => field.onChange(checked ? "active" : "inactive")}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <DialogDescription>{t("clients.createDescription")}</DialogDescription>
+            </DialogHeader>
+
             <div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)]">
               <FormField
                 control={form.control}

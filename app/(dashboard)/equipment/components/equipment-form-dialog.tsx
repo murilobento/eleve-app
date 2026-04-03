@@ -24,6 +24,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -72,6 +73,7 @@ export function EquipmentFormDialog({
     resolver: zodResolver(schema),
     defaultValues: {
       typeId: "",
+      status: "active",
       licenseRequired: "B",
       name: "",
       model: "",
@@ -88,6 +90,7 @@ export function EquipmentFormDialog({
 
     form.reset({
       typeId: equipment?.typeId ?? equipmentTypes[0]?.id ?? "",
+      status: equipment?.status ?? "active",
       licenseRequired: equipment?.licenseRequired ?? "B",
       name: equipment?.name ?? "",
       model: equipment?.model ?? "",
@@ -119,14 +122,34 @@ export function EquipmentFormDialog({
         </DialogTrigger>
       ) : null}
       <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>{isEdit ? t("equipment.editEquipment") : t("equipment.createEquipment")}</DialogTitle>
-          <DialogDescription>
-            {creationDisabled ? t("equipment.createBlockedNoTypes") : t("equipment.createDescription")}
-          </DialogDescription>
-        </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            <DialogHeader>
+              <div className="flex flex-wrap items-center gap-3 pr-8">
+                <DialogTitle>{isEdit ? t("equipment.editEquipment") : t("equipment.createEquipment")}</DialogTitle>
+                <FormField
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem className="flex shrink-0 flex-row items-center gap-3 space-y-0 rounded-md border px-3 py-2">
+                      <FormLabel className="cursor-pointer text-sm font-medium">
+                        {field.value === "active" ? t("equipment.active") : t("equipment.inactive")}
+                      </FormLabel>
+                      <FormControl>
+                        <Switch
+                          checked={field.value === "active"}
+                          onCheckedChange={(checked) => field.onChange(checked ? "active" : "inactive")}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <DialogDescription>
+                {creationDisabled ? t("equipment.createBlockedNoTypes") : t("equipment.createDescription")}
+              </DialogDescription>
+            </DialogHeader>
+
             <div className="grid gap-4 sm:grid-cols-2">
               <FormField
                 control={form.control}

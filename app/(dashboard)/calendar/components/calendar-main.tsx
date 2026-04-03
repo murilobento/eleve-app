@@ -100,6 +100,23 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
     }
   }
 
+  const getEventTypeLabel = (value: string) => {
+    switch (value) {
+      case "meeting":
+        return t("calendar.scheduleMeeting")
+      case "event":
+        return t("calendar.event")
+      case "personal":
+        return t("calendar.personal")
+      case "task":
+        return t("calendar.task")
+      case "reminder":
+        return t("calendar.reminderType")
+      default:
+        return value
+    }
+  }
+
   const renderCalendarGrid = () => {
     const weekDays = messages.calendar.weekdays
 
@@ -332,7 +349,7 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant="secondary" className={cn("text-white", selectedEvent.color)}>
-                  {selectedEvent.type}
+                  {getEventTypeLabel(selectedEvent.type)}
                 </Badge>
               </div>
               <div className="flex gap-2 pt-4">

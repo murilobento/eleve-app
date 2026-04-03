@@ -50,7 +50,7 @@ export function StatCards({ stats }: StatCardsProps) {
                 <Badge
                   variant="outline"
                   className={cn(
-                    "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/20 dark:text-green-400",
+                    "border-primary/30 bg-primary/10 text-primary",
                   )}
                 >
                   <TrendingUp className="me-1 size-3" /> {percentage}%

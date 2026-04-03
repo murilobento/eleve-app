@@ -11,7 +11,7 @@ export function SiteFooter() {
         <div className="flex flex-col items-center justify-center space-y-2 text-center">
           <div className="flex items-center space-x-2 text-sm text-muted-foreground">
             <span>{t("dashboard.madeWith")}</span>
-            <Heart className="h-4 w-4 fill-red-500 text-red-500" />
+            <Heart className="h-4 w-4 fill-primary text-primary" />
             <span>{t("dashboard.by")}</span>
             <a
               href="https://shadcnstore.com"

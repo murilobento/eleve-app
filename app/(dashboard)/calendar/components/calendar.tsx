@@ -6,6 +6,7 @@ import { EventForm } from "./event-form"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { type CalendarEvent } from "../types"
 import { useCalendar } from "../use-calendar"
+import { useI18n } from "@/i18n/provider"
 
 interface CalendarProps {
   events: CalendarEvent[]
@@ -13,6 +14,7 @@ interface CalendarProps {
 }
 
 export function Calendar({ events, eventDates }: CalendarProps) {
+  const { t } = useI18n()
   const calendar = useCalendar(events)
 
   return (
@@ -47,9 +49,9 @@ export function Calendar({ events, eventDates }: CalendarProps) {
         <Sheet open={calendar.showCalendarSheet} onOpenChange={calendar.setShowCalendarSheet}>
           <SheetContent side="left" className="w-80 p-0" style={{ position: 'absolute' }}>
             <SheetHeader className="p-4 pb-2">
-              <SheetTitle>Calendar</SheetTitle>
+              <SheetTitle>{t("calendar.calendar")}</SheetTitle>
               <SheetDescription>
-                Browse dates and manage your calendar events
+                {t("calendar.browseAndManage")}
               </SheetDescription>
             </SheetHeader>
             <CalendarSidebar

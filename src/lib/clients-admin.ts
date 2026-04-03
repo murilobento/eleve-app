@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 const personTypeSchema = z.enum(["PF", "PJ"]);
+const clientStatusSchema = z.enum(["active", "inactive"]);
 
 const clientTextSchema = z
   .string()
@@ -81,6 +82,7 @@ const addressNumberSchema = z
 
 const baseClientSchema = z.object({
   personType: personTypeSchema,
+  status: clientStatusSchema,
   legalName: clientTextSchema,
   tradeName: optionalTextSchema,
   document: documentSchema,
@@ -140,6 +142,7 @@ export type UpdateClientInput = z.infer<typeof updateClientSchema>;
 export type ManagedClient = {
   id: string;
   personType: "PF" | "PJ";
+  status: "active" | "inactive";
   legalName: string;
   tradeName: string | null;
   document: string;

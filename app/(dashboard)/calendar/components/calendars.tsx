@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
+import { useI18n } from "@/i18n/provider"
 
 interface CalendarItem {
   id: string
@@ -46,24 +47,24 @@ const enhancedCalendars: CalendarGroup[] = [
   {
     name: "My Calendars",
     items: [
-      { id: "personal", name: "Personal", color: "bg-blue-500", visible: true, type: "personal" },
-      { id: "work", name: "Work", color: "bg-green-500", visible: true, type: "work" },
-      { id: "family", name: "Family", color: "bg-pink-500", visible: true, type: "personal" }
+      { id: "personal", name: "Personal", color: "bg-chart-1", visible: true, type: "personal" },
+      { id: "work", name: "Work", color: "bg-chart-2", visible: true, type: "work" },
+      { id: "family", name: "Family", color: "bg-chart-3", visible: true, type: "personal" }
     ]
   },
   {
     name: "Favorites",
     items: [
-      { id: "holidays", name: "Holidays", color: "bg-red-500", visible: true, type: "shared" },
-      { id: "birthdays", name: "Birthdays", color: "bg-purple-500", visible: true, type: "personal" }
+      { id: "holidays", name: "Holidays", color: "bg-chart-4", visible: true, type: "shared" },
+      { id: "birthdays", name: "Birthdays", color: "bg-chart-5", visible: true, type: "personal" }
     ]
   },
   {
     name: "Other",
     items: [
-      { id: "travel", name: "Travel", color: "bg-orange-500", visible: false, type: "personal" },
-      { id: "reminders", name: "Reminders", color: "bg-yellow-500", visible: true, type: "personal" },
-      { id: "deadlines", name: "Deadlines", color: "bg-red-600", visible: true, type: "work" }
+      { id: "travel", name: "Travel", color: "bg-accent", visible: false, type: "personal" },
+      { id: "reminders", name: "Reminders", color: "bg-chart-1", visible: true, type: "personal" },
+      { id: "deadlines", name: "Deadlines", color: "bg-destructive", visible: true, type: "work" }
     ]
   }
 ]
@@ -74,7 +75,25 @@ export function Calendars({
   onCalendarDelete,
   onNewCalendar
 }: CalendarsProps) {
+  const { t } = useI18n()
   const [calendarData, setCalendarData] = useState(enhancedCalendars)
+
+  const groupLabelMap: Record<string, string> = {
+    "My Calendars": t("calendar.myCalendars"),
+    Favorites: t("calendar.favorites"),
+    Other: t("calendar.other"),
+  }
+
+  const calendarLabelMap: Record<string, string> = {
+    personal: t("calendar.calendarPersonal"),
+    work: t("calendar.calendarWork"),
+    family: t("calendar.calendarFamily"),
+    holidays: t("calendar.calendarHolidays"),
+    birthdays: t("calendar.calendarBirthdays"),
+    travel: t("calendar.calendarTravel"),
+    reminders: t("calendar.calendarReminders"),
+    deadlines: t("calendar.calendarDeadlines"),
+  }
 
   const handleToggleVisibility = (calendarId: string) => {
     setCalendarData(prev => prev.map(group => ({
@@ -101,7 +120,7 @@ export function Calendars({
             className="group/collapsible"
           >
             <CollapsibleTrigger className="flex items-center justify-between w-full p-2 hover:bg-accent hover:text-accent-foreground rounded-md cursor-pointer">
-              <span className="text-sm font-medium">{calendar.name}</span>
+              <span className="text-sm font-medium">{groupLabelMap[calendar.name] ?? calendar.name}</span>
               <div className="flex items-center gap-1">
                 {index === 0 && (
                   <div
@@ -145,7 +164,7 @@ export function Calendars({
                           )}
                           onClick={() => handleToggleVisibility(item.id)}
                         >
-                          {item.name}
+                          {calendarLabelMap[item.id] ?? item.name}
                         </span>
 
                         {/* Visibility Icon */}
@@ -172,20 +191,20 @@ export function Calendars({
                               onClick={() => onCalendarEdit?.(item.id)}
                               className="cursor-pointer"
                             >
-                              Edit calendar
+                              {t("calendar.editCalendar")}
                             </DropdownMenuItem>
                             <DropdownMenuItem 
                               onClick={() => handleToggleVisibility(item.id)}
                               className="cursor-pointer"
                             >
-                              {item.visible ? "Hide" : "Show"} calendar
+                              {item.visible ? t("calendar.hideCalendar") : t("calendar.showCalendar")}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem 
                               onClick={() => onCalendarDelete?.(item.id)}
                               className="cursor-pointer text-destructive"
                             >
-                              Delete calendar
+                              {t("calendar.deleteCalendar")}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>

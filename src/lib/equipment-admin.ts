@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const equipmentLicenseSchema = z.enum(["A", "B", "C", "D", "E"]);
+export const equipmentStatusSchema = z.enum(["active", "inactive"]);
 
 const currentYear = new Date().getFullYear();
 
@@ -34,6 +35,7 @@ const plateSchema = z
 
 export const createEquipmentSchema = z.object({
   typeId: z.string().uuid("Select a valid equipment type."),
+  status: equipmentStatusSchema,
   licenseRequired: equipmentLicenseSchema,
   name: textFieldSchema,
   model: textFieldSchema,
@@ -52,6 +54,7 @@ export type ManagedEquipment = {
   id: string;
   typeId: string;
   typeName: string;
+  status: "active" | "inactive";
   licenseRequired: EquipmentLicense;
   name: string;
   model: string;

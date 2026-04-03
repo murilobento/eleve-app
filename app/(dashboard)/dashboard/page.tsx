@@ -1,15 +1,26 @@
 "use client"
 
+import { lazy, Suspense } from "react"
 
-import { ChartAreaInteractive } from "./components/chart-area-interactive"
-import { DataTable } from "./components/data-table"
-import { SectionCards } from "./components/section-cards"
-
-import data from "./data/data.json"
-import pastPerformanceData from "./data/past-performance-data.json"
-import keyPersonnelData from "./data/key-personnel-data.json"
-import focusDocumentsData from "./data/focus-documents-data.json"
 import { useI18n } from "@/i18n/provider"
+
+const SectionCards = lazy(() =>
+  import("./components/section-cards").then((module) => ({
+    default: module.SectionCards,
+  }))
+)
+
+const ChartAreaInteractive = lazy(() =>
+  import("./components/chart-area-interactive").then((module) => ({
+    default: module.ChartAreaInteractive,
+  }))
+)
+
+const DashboardTableSection = lazy(() =>
+  import("./components/dashboard-table-section").then((module) => ({
+    default: module.DashboardTableSection,
+  }))
+)
 
 export default function Page() {
   const { t } = useI18n()
@@ -23,17 +34,18 @@ export default function Page() {
         </div>
       </div>
       <div className="@container/main px-4 lg:px-6 space-y-6">
+        <Suspense fallback={<div className="h-52 w-full rounded-lg bg-muted/40" />}>
           <SectionCards />
+        </Suspense>
+        <Suspense fallback={<div className="h-[250px] w-full rounded-lg bg-muted/40" />}>
           <ChartAreaInteractive />
-        </div>
-        <div className="@container/main">
-          <DataTable 
-            data={data} 
-            pastPerformanceData={pastPerformanceData}
-            keyPersonnelData={keyPersonnelData}
-            focusDocumentsData={focusDocumentsData}
-          />
-        </div>
+        </Suspense>
+      </div>
+      <div className="@container/main">
+        <Suspense fallback={<div className="h-96 w-full rounded-lg bg-muted/40" />}>
+          <DashboardTableSection />
+        </Suspense>
+      </div>
     </>
   )
 }

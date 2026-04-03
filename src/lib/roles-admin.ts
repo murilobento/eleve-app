@@ -12,24 +12,8 @@ const nameSchema = z
   .min(2, "Name must be at least 2 characters.")
   .max(80, "Name must be at most 80 characters.");
 
-const slugSchema = z
-  .string()
-  .trim()
-  .min(2, "Slug must be at least 2 characters.")
-  .max(80, "Slug must be at most 80 characters.")
-  .regex(/^[a-z0-9-]+$/, "Slug must contain only lowercase letters, numbers and hyphens.");
-
-const descriptionSchema = z
-  .string()
-  .trim()
-  .max(160, "Description must be at most 160 characters.")
-  .optional()
-  .transform((value) => (value && value.length > 0 ? value : undefined));
-
 export const createRoleSchema = z.object({
   name: nameSchema,
-  slug: slugSchema,
-  description: descriptionSchema,
   permissionKeys: z.array(permissionKeySchema).min(1, "Select at least one permission."),
 });
 
@@ -41,8 +25,6 @@ export type UpdateRoleInput = z.infer<typeof updateRoleSchema>;
 export type ManagedRole = {
   id: string;
   name: string;
-  slug: string;
-  description?: string | null;
   permissionKeys: PermissionKey[];
   permissionsCount: number;
   usersCount: number;

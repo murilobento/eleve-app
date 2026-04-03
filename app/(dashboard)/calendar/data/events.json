@@ -8,7 +8,7 @@
     "type": "meeting",
     "attendees": ["JD", "SM", "AR"],
     "location": "Conference Room A",
-    "color": "bg-blue-500",
+    "color": "bg-chart-1",
     "description": "Daily team standup meeting to discuss progress and blockers"
   },
   {
@@ -20,7 +20,7 @@
     "type": "meeting",
     "attendees": ["ER", "LC"],
     "location": "Virtual",
-    "color": "bg-purple-500",
+    "color": "bg-chart-5",
     "description": "Review new UI designs and provide feedback"
   },
   {
@@ -32,7 +32,7 @@
     "type": "event",
     "attendees": ["TL", "ST"],
     "location": "Main Hall",
-    "color": "bg-green-500",
+    "color": "bg-chart-2",
     "description": "Official product launch event with stakeholders"
   },
   {
@@ -44,7 +44,7 @@
     "type": "meeting",
     "attendees": ["AT", "SM"],
     "location": "Client Office",
-    "color": "bg-orange-500",
+    "color": "bg-chart-4",
     "description": "Present project progress to client stakeholders"
   },
   {
@@ -56,7 +56,7 @@
     "type": "personal",
     "attendees": ["PB", "VB"],
     "location": "Home",
-    "color": "bg-pink-500",
+    "color": "bg-chart-3",
     "description": "Birthday celebration with friends and family"
   }
 ]

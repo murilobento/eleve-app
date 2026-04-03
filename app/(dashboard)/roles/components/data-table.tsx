@@ -12,15 +12,25 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { Pencil, Search, ShieldCheck, Trash2 } from "lucide-react";
+import { ChevronDown, Pencil, Search, ShieldCheck, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { SortableHeader } from "@/components/sortable-header";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { CreateRoleInput, ManagedRole, UpdateRoleInput } from "@/lib/roles-admin";
+import { usePersistentColumnVisibility } from "@/hooks/use-persistent-column-visibility";
 import { useI18n } from "@/i18n/provider";
+import type { CreateRoleInput, ManagedRole, UpdateRoleInput } from "@/lib/roles-admin";
 
 import { RoleFormDialog } from "./role-form-dialog";
 
@@ -29,6 +39,7 @@ type DataTableProps = {
   onCreateRole: (values: CreateRoleInput) => Promise<void>;
   onUpdateRole: (id: string, values: UpdateRoleInput) => Promise<void>;
   onDeleteRole: (id: string) => Promise<void>;
+  onDeleteRoles: (ids: string[]) => Promise<void>;
   isMutating: boolean;
 };
 
@@ -37,11 +48,14 @@ export function DataTable({
   onCreateRole,
   onUpdateRole,
   onDeleteRole,
+  onDeleteRoles,
   isMutating,
 }: DataTableProps) {
   const { t } = useI18n();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const { columnVisibility, setColumnVisibility } = usePersistentColumnVisibility("table:roles:columns");
+  const [rowSelection, setRowSelection] = useState({});
   const [globalFilter, setGlobalFilter] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<ManagedRole | null>(null);
@@ -49,37 +63,54 @@ export function DataTable({
 
   const columns = useMemo<ColumnDef<ManagedRole>[]>(() => [
     {
-      accessorKey: "name",
-      header: t("roles.role"),
-      cell: ({ row }) => (
-        <div className="space-y-1">
-          <div className="font-medium">{row.original.name}</div>
-          <div className="text-sm text-muted-foreground">{row.original.slug}</div>
+      id: "select",
+      header: ({ table }) => (
+        <div className="flex items-center justify-center px-2">
+          <Checkbox
+            checked={table.getIsAllPageRowsSelected() || (table.getIsSomePageRowsSelected() && "indeterminate")}
+            onCheckedChange={(value) => {
+              table.getRowModel().rows.forEach((row) => {
+                if (!row.original.isSystem) {
+                  row.toggleSelected(!!value);
+                }
+              });
+            }}
+            aria-label={t("common.selectAll")}
+          />
         </div>
       ),
+      cell: ({ row }) => (
+        <div className="flex items-center justify-center px-2">
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            aria-label={t("common.selectRow")}
+            disabled={row.original.isSystem}
+          />
+        </div>
+      ),
+      enableSorting: false,
+      enableHiding: false,
+      size: 50,
     },
     {
-      accessorKey: "description",
-      header: t("roles.descriptionLabel"),
-      cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground">
-          {row.original.description || t("roles.noDescription")}
-        </span>
-      ),
+      accessorKey: "name",
+      header: ({ column }) => <SortableHeader column={column} title={t("roles.role")} className="-ml-3" />,
+      enableHiding: false,
     },
     {
       accessorKey: "permissionsCount",
-      header: t("roles.permissions"),
+      header: ({ column }) => <SortableHeader column={column} title={t("roles.permissions")} className="-ml-3" />,
       cell: ({ row }) => <Badge variant="secondary">{row.original.permissionsCount}</Badge>,
     },
     {
       accessorKey: "usersCount",
-      header: t("roles.users"),
+      header: ({ column }) => <SortableHeader column={column} title={t("roles.users")} className="-ml-3" />,
       cell: ({ row }) => <span className="text-sm">{row.original.usersCount}</span>,
     },
     {
       accessorKey: "isSystem",
-      header: t("roles.type"),
+      header: ({ column }) => <SortableHeader column={column} title={t("roles.type")} className="-ml-3" />,
       cell: ({ row }) => (
         row.original.isSystem ? (
           <Badge variant="secondary" className="gap-1">
@@ -90,10 +121,13 @@ export function DataTable({
           <Badge variant="outline">{t("roles.custom")}</Badge>
         )
       ),
+      sortingFn: "basic",
     },
     {
       id: "actions",
       header: t("roles.actions"),
+      enableSorting: false,
+      enableHiding: false,
       cell: ({ row }) => {
         const role = row.original;
         const isProtected = role.isSystem;
@@ -113,7 +147,7 @@ export function DataTable({
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 cursor-pointer text-red-600"
+              className="h-8 w-8 cursor-pointer text-destructive"
               onClick={() => setDeletingRole(role)}
               disabled={isMutating || isProtected}
             >
@@ -124,30 +158,31 @@ export function DataTable({
         );
       },
     },
-  ], [isMutating, onDeleteRole, t]);
+  ], [isMutating, t]);
 
   const table = useReactTable({
     data: roles,
     columns,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
+    onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange: setRowSelection,
     onGlobalFilterChange: setGlobalFilter,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    enableRowSelection: (row) => !row.original.isSystem,
     globalFilterFn: (row, _columnId, filterValue) => {
       const value = String(filterValue).toLowerCase();
 
-      return [
-        row.original.name,
-        row.original.slug,
-        row.original.description ?? "",
-      ].some((item) => item.toLowerCase().includes(value));
+      return row.original.name.toLowerCase().includes(value);
     },
     state: {
       sorting,
       columnFilters,
+      columnVisibility,
+      rowSelection,
       globalFilter,
     },
     initialState: {
@@ -157,27 +192,104 @@ export function DataTable({
     },
   });
 
+  const selectedCount = table.getFilteredSelectedRowModel().rows.length;
+
   return (
     <div className="w-full space-y-4">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder={t("roles.searchPlaceholder")}
-            value={globalFilter}
-            onChange={(event) => setGlobalFilter(event.target.value)}
-            className="pl-9"
-          />
-        </div>
+      <div className="rounded-xl border bg-card/40 p-3">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="relative min-w-[240px] flex-1">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder={t("roles.searchPlaceholder")}
+              value={globalFilter}
+              onChange={(event) => setGlobalFilter(event.target.value)}
+              className="h-10 rounded-lg border-muted-foreground/20 bg-background pl-9"
+            />
+          </div>
 
-        <RoleFormDialog
-          mode="create"
-          open={createOpen}
-          onOpenChange={setCreateOpen}
-          onSubmit={onCreateRole}
-          isSubmitting={isMutating}
-        />
+          <div className="ml-auto">
+            <div className="min-w-[170px] space-y-2">
+              <Label htmlFor="roles-column-visibility" className="text-sm font-medium">
+                {t("common.columnVisibility")}
+              </Label>
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  id="roles-column-visibility"
+                  className="inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-lg border bg-background px-3 text-sm font-medium shadow-xs hover:bg-accent hover:text-accent-foreground"
+                >
+                  {t("common.columns")} <ChevronDown className="ml-2 size-4" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {table
+                    .getAllColumns()
+                    .filter((column) => column.getCanHide())
+                    .map((column) => (
+                      <DropdownMenuCheckboxItem
+                        key={column.id}
+                        className="capitalize"
+                        checked={column.getIsVisible()}
+                        onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                      >
+                        {column.id}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+
+          <div>
+            <RoleFormDialog
+              mode="create"
+              open={createOpen}
+              onOpenChange={setCreateOpen}
+              onSubmit={onCreateRole}
+              isSubmitting={isMutating}
+            />
+          </div>
+        </div>
       </div>
+
+      {selectedCount > 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/30 px-3 py-2">
+          <span className="text-sm text-muted-foreground">
+            {t("common.selectedCount", { count: selectedCount })}
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="cursor-pointer"
+              onClick={() => table.resetRowSelection()}
+              disabled={isMutating}
+            >
+              {t("common.clearSelection")}
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              className="cursor-pointer"
+              onClick={async () => {
+                const ids = table.getSelectedRowModel().rows
+                  .map((row) => row.original)
+                  .filter((role) => !role.isSystem)
+                  .map((role) => role.id);
+
+                if (!ids.length) {
+                  return;
+                }
+
+                await onDeleteRoles(ids);
+                table.resetRowSelection();
+              }}
+              disabled={isMutating}
+            >
+              {t("common.deleteSelected")}
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="rounded-md border">
         <Table>
@@ -195,7 +307,7 @@ export function DataTable({
           <TableBody>
             {table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
+                <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}

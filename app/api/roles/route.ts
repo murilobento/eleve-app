@@ -16,8 +16,6 @@ function serializeRole(role: Awaited<ReturnType<typeof listRolesWithDetails>>[nu
   return {
     id: role.id,
     name: role.name,
-    slug: role.slug,
-    description: role.description,
     permissionKeys: role.permissions,
     permissionsCount: role.permissionsCount,
     usersCount: role.usersCount,

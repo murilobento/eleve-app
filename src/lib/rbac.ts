@@ -46,6 +46,7 @@ type EquipmentRow = {
   id: string;
   type_id: string;
   type_name: string;
+  status: "active" | "inactive";
   license_required: "A" | "B" | "C" | "D" | "E";
   name: string;
   model: string;
@@ -79,6 +80,7 @@ type CompanyRow = {
 type ClientRow = {
   id: string;
   person_type: "PF" | "PJ";
+  status: "active" | "inactive";
   legal_name: string;
   trade_name: string | null;
   document: string;
@@ -196,6 +198,7 @@ async function ensureSchema() {
     CREATE TABLE IF NOT EXISTS equipment (
       id text PRIMARY KEY,
       type_id text NOT NULL REFERENCES equipment_types(id) ON DELETE RESTRICT,
+      status text NOT NULL DEFAULT 'active',
       license_required text NOT NULL,
       name text NOT NULL,
       model text NOT NULL,
@@ -239,6 +242,7 @@ async function ensureSchema() {
     CREATE TABLE IF NOT EXISTS clients (
       id text PRIMARY KEY,
       person_type text NOT NULL,
+      status text NOT NULL DEFAULT 'active',
       legal_name text NOT NULL,
       trade_name text,
       document text NOT NULL,
@@ -258,6 +262,16 @@ async function ensureSchema() {
       created_at timestamptz NOT NULL DEFAULT now(),
       updated_at timestamptz NOT NULL DEFAULT now()
     );
+  `);
+
+  await pool.query(`
+    ALTER TABLE equipment
+    ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'active';
+  `);
+
+  await pool.query(`
+    ALTER TABLE clients
+    ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'active';
   `);
 
   await pool.query(`
@@ -286,6 +300,51 @@ function normalizeUserAccessState(row?: Partial<UserAccessRow> | null): UserAcce
     isActive: row?.is_active ?? true,
     reason: row?.reason ?? null,
   };
+}
+
+function normalizeRoleName(name: string) {
+  return name.trim().replace(/\s+/g, " ");
+}
+
+function slugifyRoleName(name: string) {
+  const base = normalizeRoleName(name)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return base || "role";
+}
+
+async function findConflictingRoleByName(name: string, excludeRoleId?: string) {
+  const params = excludeRoleId ? [name, excludeRoleId] : [name];
+  const query = excludeRoleId
+    ? `SELECT id FROM roles WHERE lower(name) = lower($1) AND id <> $2 LIMIT 1`
+    : `SELECT id FROM roles WHERE lower(name) = lower($1) LIMIT 1`;
+  const result = await pool.query<{ id: string }>(query, params);
+  return result.rows[0]?.id ?? null;
+}
+
+async function generateUniqueRoleSlug(name: string, excludeRoleId?: string) {
+  const baseSlug = slugifyRoleName(name);
+  let candidate = baseSlug;
+  let suffix = 2;
+
+  while (true) {
+    const params = excludeRoleId ? [candidate, excludeRoleId] : [candidate];
+    const query = excludeRoleId
+      ? `SELECT id FROM roles WHERE slug = $1 AND id <> $2 LIMIT 1`
+      : `SELECT id FROM roles WHERE slug = $1 LIMIT 1`;
+    const result = await pool.query<{ id: string }>(query, params);
+
+    if (!result.rows[0]) {
+      return candidate;
+    }
+
+    candidate = `${baseSlug}-${suffix}`;
+    suffix += 1;
+  }
 }
 
 async function seedPermissions() {
@@ -524,6 +583,7 @@ function mapEquipmentRow(row: EquipmentRow) {
     id: row.id,
     typeId: row.type_id,
     typeName: row.type_name,
+    status: row.status,
     licenseRequired: row.license_required,
     name: row.name,
     model: row.model,
@@ -561,6 +621,7 @@ function mapClientRow(row: ClientRow) {
   return {
     id: row.id,
     personType: row.person_type,
+    status: row.status,
     legalName: row.legal_name,
     tradeName: row.trade_name,
     document: row.document,
@@ -741,6 +802,7 @@ export async function listClients() {
       SELECT
         id,
         person_type,
+        status,
         legal_name,
         trade_name,
         document,
@@ -774,6 +836,7 @@ export async function getClientById(clientId: string) {
       SELECT
         id,
         person_type,
+        status,
         legal_name,
         trade_name,
         document,
@@ -805,6 +868,7 @@ export async function getClientById(clientId: string) {
 
 export async function createClient(input: {
   personType: "PF" | "PJ";
+  status: "active" | "inactive";
   legalName: string;
   tradeName?: string;
   document: string;
@@ -838,6 +902,7 @@ export async function createClient(input: {
       INSERT INTO clients (
         id,
         person_type,
+        status,
         legal_name,
         trade_name,
         document,
@@ -855,11 +920,12 @@ export async function createClient(input: {
         state,
         country
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
     `,
     [
       id,
       input.personType,
+      input.status,
       input.legalName.trim(),
       input.tradeName?.trim() || null,
       input.document,
@@ -886,6 +952,7 @@ export async function updateClient(
   clientId: string,
   input: {
     personType: "PF" | "PJ";
+    status: "active" | "inactive";
     legalName: string;
     tradeName?: string;
     document: string;
@@ -924,28 +991,30 @@ export async function updateClient(
     `
       UPDATE clients
       SET person_type = $2,
-          legal_name = $3,
-          trade_name = $4,
-          document = $5,
-          contact_name = $6,
-          contact_phone = $7,
-          email = $8,
-          phone = $9,
-          website = $10,
-          postal_code = $11,
-          street = $12,
-          number = $13,
-          complement = $14,
-          district = $15,
-          city = $16,
-          state = $17,
-          country = $18,
+          status = $3,
+          legal_name = $4,
+          trade_name = $5,
+          document = $6,
+          contact_name = $7,
+          contact_phone = $8,
+          email = $9,
+          phone = $10,
+          website = $11,
+          postal_code = $12,
+          street = $13,
+          number = $14,
+          complement = $15,
+          district = $16,
+          city = $17,
+          state = $18,
+          country = $19,
           updated_at = now()
       WHERE id = $1
     `,
     [
       clientId,
       input.personType,
+      input.status,
       input.legalName.trim(),
       input.tradeName?.trim() || null,
       input.document,
@@ -1097,6 +1166,7 @@ export async function listEquipment() {
         e.id,
         e.type_id,
         et.name AS type_name,
+        e.status,
         e.license_required,
         e.name,
         e.model,
@@ -1122,6 +1192,7 @@ export async function getEquipmentById(equipmentId: string) {
         e.id,
         e.type_id,
         et.name AS type_name,
+        e.status,
         e.license_required,
         e.name,
         e.model,
@@ -1144,6 +1215,7 @@ export async function getEquipmentById(equipmentId: string) {
 
 export async function createEquipment(input: {
   typeId: string;
+  status: "active" | "inactive";
   licenseRequired: "A" | "B" | "C" | "D" | "E";
   name: string;
   model: string;
@@ -1161,12 +1233,13 @@ export async function createEquipment(input: {
   const id = randomUUID();
   await pool.query(
     `
-      INSERT INTO equipment (id, type_id, license_required, name, model, brand, year, plate)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      INSERT INTO equipment (id, type_id, status, license_required, name, model, brand, year, plate)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     `,
     [
       id,
       input.typeId,
+      input.status,
       input.licenseRequired,
       input.name.trim(),
       input.model.trim(),
@@ -1183,6 +1256,7 @@ export async function updateEquipment(
   equipmentId: string,
   input: {
     typeId: string;
+    status: "active" | "inactive";
     licenseRequired: "A" | "B" | "C" | "D" | "E";
     name: string;
     model: string;
@@ -1208,18 +1282,20 @@ export async function updateEquipment(
     `
       UPDATE equipment
       SET type_id = $2,
-          license_required = $3,
-          name = $4,
-          model = $5,
-          brand = $6,
-          year = $7,
-          plate = $8,
+          status = $3,
+          license_required = $4,
+          name = $5,
+          model = $6,
+          brand = $7,
+          year = $8,
+          plate = $9,
           updated_at = now()
       WHERE id = $1
     `,
     [
       equipmentId,
       input.typeId,
+      input.status,
       input.licenseRequired,
       input.name.trim(),
       input.model.trim(),
@@ -1291,16 +1367,15 @@ export async function listRolesWithDetails(): Promise<RoleWithDetails[]> {
 
 export async function createRole(input: {
   name: string;
-  slug: string;
-  description?: string;
   permissionKeys: PermissionKey[];
 }) {
   await bootstrapRbac();
-  const existing = await getRoleBySlug(input.slug);
-
-  if (existing) {
-    throw new Error("A role with this slug already exists.");
+  const name = normalizeRoleName(input.name);
+  const existingRoleId = await findConflictingRoleByName(name);
+  if (existingRoleId) {
+    throw new Error("A role with this name already exists.");
   }
+  const slug = await generateUniqueRoleSlug(name);
 
   const id = randomUUID();
   await pool.query(
@@ -1308,7 +1383,7 @@ export async function createRole(input: {
       INSERT INTO roles (id, name, slug, description, is_system)
       VALUES ($1, $2, $3, $4, false)
     `,
-    [id, input.name, input.slug, input.description?.trim() || null],
+    [id, name, slug, null],
   );
 
   await syncRolePermissions(id, input.permissionKeys);
@@ -1320,8 +1395,6 @@ export async function updateRole(
   roleId: string,
   input: {
     name: string;
-    slug: string;
-    description?: string;
     permissionKeys: PermissionKey[];
   },
 ) {
@@ -1335,15 +1408,12 @@ export async function updateRole(
   if (current.isSystem) {
     throw new Error("System roles cannot be edited.");
   }
-
-  const conflicting = await pool.query<RoleRow>(
-    `SELECT id, name, slug, description, is_system FROM roles WHERE slug = $1 AND id <> $2 LIMIT 1`,
-    [input.slug, roleId],
-  );
-
-  if (conflicting.rows[0]) {
-    throw new Error("A role with this slug already exists.");
+  const name = normalizeRoleName(input.name);
+  const existingRoleId = await findConflictingRoleByName(name, roleId);
+  if (existingRoleId) {
+    throw new Error("A role with this name already exists.");
   }
+  const slug = await generateUniqueRoleSlug(name, roleId);
 
   await pool.query(
     `
@@ -1354,7 +1424,7 @@ export async function updateRole(
           updated_at = now()
       WHERE id = $1
     `,
-    [roleId, input.name, input.slug, input.description?.trim() || null],
+    [roleId, name, slug, null],
   );
 
   await syncRolePermissions(roleId, input.permissionKeys);

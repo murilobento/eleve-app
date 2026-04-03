@@ -2,35 +2,35 @@
   {
     "id": "personal",
     "name": "Personal",
-    "color": "bg-blue-500",
+    "color": "bg-chart-1",
     "visible": true,
     "type": "personal"
   },
   {
     "id": "work",
     "name": "Work",
-    "color": "bg-green-500",
+    "color": "bg-chart-2",
     "visible": true,
     "type": "work"
   },
   {
     "id": "shared",
     "name": "Team Calendar",
-    "color": "bg-purple-500",
+    "color": "bg-chart-5",
     "visible": true,
     "type": "shared"
   },
   {
     "id": "meetings",
     "name": "Meetings",
-    "color": "bg-orange-500",
+    "color": "bg-chart-4",
     "visible": true,
     "type": "work"
   },
   {
     "id": "events",
     "name": "Events",
-    "color": "bg-pink-500",
+    "color": "bg-chart-3",
     "visible": true,
     "type": "shared"
   }

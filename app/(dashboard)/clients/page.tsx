@@ -114,6 +114,44 @@ export default function ClientsPage() {
     }, t("common.clientDeleteSuccess"), t("clients.updateError"));
   };
 
+  const handleDeleteClients = async (ids: string[]) => {
+    if (!ids.length) {
+      return;
+    }
+
+    setIsMutating(true);
+    setError(null);
+
+    try {
+      const results = await Promise.allSettled(
+        ids.map(async (id) => {
+          await parseResponse(
+            await fetch(`/api/clients/${id}`, {
+              method: "DELETE",
+            }),
+          );
+        }),
+      );
+
+      const successCount = results.filter((result) => result.status === "fulfilled").length;
+      const failedCount = ids.length - successCount;
+
+      await loadClients();
+
+      if (successCount > 0) {
+        toast.success(t("common.bulkDeleteSuccess", { count: successCount }));
+      }
+
+      if (failedCount > 0) {
+        const message = t("common.bulkDeletePartialError", { failed: failedCount, total: ids.length });
+        setError(message);
+        toast.error(message);
+      }
+    } finally {
+      setIsMutating(false);
+    }
+  };
+
   return (
     <>
       <div className="px-4 lg:px-6">
@@ -125,7 +163,7 @@ export default function ClientsPage() {
 
       <div className="@container/main mt-2 px-4 lg:mt-4 lg:px-6">
         {error ? (
-          <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
+          <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             {error}
           </div>
         ) : null}
@@ -140,6 +178,7 @@ export default function ClientsPage() {
             onCreateClient={handleCreateClient}
             onUpdateClient={handleUpdateClient}
             onDeleteClient={handleDeleteClient}
+            onDeleteClients={handleDeleteClients}
             isMutating={isMutating}
           />
         )}

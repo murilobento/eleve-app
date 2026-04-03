@@ -6,6 +6,7 @@ import { Calendars } from "./calendars"
 import { DatePicker } from "./date-picker"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
+import { useI18n } from "@/i18n/provider"
 
 interface CalendarSidebarProps {
   selectedDate?: Date
@@ -24,6 +25,8 @@ export function CalendarSidebar({
   events = [],
   className 
 }: CalendarSidebarProps) {
+  const { t } = useI18n()
+
   return (
     <div className={`flex flex-col h-full bg-background rounded-lg ${className}`}>
       {/* Add New Event Button */}
@@ -33,7 +36,7 @@ export function CalendarSidebar({
           onClick={onNewEvent}
         >
           <Plus className="w-4 h-4 mr-2" />
-          Add New Event
+          {t("calendar.addNewEvent")}
         </Button>
       </div>
 
@@ -70,7 +73,7 @@ export function CalendarSidebar({
           onClick={onNewCalendar}
         >
           <Plus className="w-4 h-4 mr-2" />
-          New Calendar
+          {t("calendar.newCalendar")}
         </Button>
       </div>
     </div>
