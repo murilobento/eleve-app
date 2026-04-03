@@ -12,7 +12,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { ChevronDown, Pencil, Search, Trash2 } from "lucide-react";
+import { ChevronDown, EllipsisVertical, Pencil, Search, Trash2 } from "lucide-react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +23,7 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -84,7 +85,10 @@ export function DataTable({
   const locale = useLocale();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const { columnVisibility, setColumnVisibility } = usePersistentColumnVisibility("table:users:columns");
+  const { columnVisibility, setColumnVisibility } = usePersistentColumnVisibility("table:users:columns:v2", {
+    joinedDate: false,
+    updatedDate: false,
+  });
   const [rowSelection, setRowSelection] = useState({});
   const [globalFilter, setGlobalFilter] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
@@ -162,6 +166,16 @@ export function DataTable({
         },
       },
       {
+        accessorKey: "joinedDate",
+        header: ({ column }) => <SortableHeader column={column} title={t("users.joined")} className="-ml-3" />,
+        cell: ({ row }) => <span className="text-sm">{formatDate(row.original.joinedDate, locale)}</span>,
+      },
+      {
+        accessorKey: "updatedDate",
+        header: ({ column }) => <SortableHeader column={column} title={t("users.updated")} className="-ml-3" />,
+        cell: ({ row }) => <span className="text-sm">{formatDate(row.original.updatedDate, locale)}</span>,
+      },
+      {
         accessorKey: "statusLabel",
         header: ({ column }) => <SortableHeader column={column} title={t("users.status")} className="-ml-3" />,
         cell: ({ row }) => {
@@ -180,25 +194,6 @@ export function DataTable({
         filterFn: "equals",
       },
       {
-        accessorKey: "emailVerified",
-        header: ({ column }) => <SortableHeader column={column} title={t("users.verification")} className="-ml-3" />,
-        cell: ({ row }) => (
-          <span className="text-sm">
-            {row.original.emailVerified ? t("common.verified") : t("common.unverified")}
-          </span>
-        ),
-      },
-      {
-        accessorKey: "joinedDate",
-        header: ({ column }) => <SortableHeader column={column} title={t("users.joined")} className="-ml-3" />,
-        cell: ({ row }) => <span className="text-sm">{formatDate(row.original.joinedDate, locale)}</span>,
-      },
-      {
-        accessorKey: "updatedDate",
-        header: ({ column }) => <SortableHeader column={column} title={t("users.updated")} className="-ml-3" />,
-        cell: ({ row }) => <span className="text-sm">{formatDate(row.original.updatedDate, locale)}</span>,
-      },
-      {
         id: "actions",
         header: t("users.actions"),
         enableSorting: false,
@@ -207,33 +202,42 @@ export function DataTable({
           const user = row.original;
 
           return (
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 cursor-pointer"
-                onClick={() => setEditingUser(user)}
-                disabled={isMutating}
-              >
-                <Pencil className="size-4" />
-                <span className="sr-only">{t("users.editUser")}</span>
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 cursor-pointer text-destructive"
-                onClick={() => setDeletingUser(user)}
-                disabled={isMutating}
-              >
-                <Trash2 className="size-4" />
-                <span className="sr-only">{t("common.delete")}</span>
-              </Button>
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer" disabled={isMutating}>
+                  <EllipsisVertical className="size-4" />
+                  <span className="sr-only">{t("users.actions")}</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem className="cursor-pointer" onClick={() => setEditingUser(user)}>
+                  <Pencil className="mr-2 size-4" />
+                  {t("users.editUser")}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  variant="destructive"
+                  className="cursor-pointer"
+                  onClick={() => setDeletingUser(user)}
+                >
+                  <Trash2 className="mr-2 size-4" />
+                  {t("common.delete")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           );
         },
       },
     ],
     [isMutating, locale, onDeleteUser, t],
+  );
+  const columnVisibilityLabels = useMemo<Record<string, string>>(
+    () => ({
+      roles: t("users.roles"),
+      statusLabel: t("users.status"),
+      joinedDate: t("users.joined"),
+      updatedDate: t("users.updated"),
+    }),
+    [t],
   );
 
   const table = useReactTable({
@@ -347,11 +351,10 @@ export function DataTable({
                     .map((column) => (
                       <DropdownMenuCheckboxItem
                         key={column.id}
-                        className="capitalize"
                         checked={column.getIsVisible()}
                         onCheckedChange={(value) => column.toggleVisibility(!!value)}
                       >
-                        {column.id}
+                        {columnVisibilityLabels[column.id] ?? column.id}
                       </DropdownMenuCheckboxItem>
                     ))}
                 </DropdownMenuContent>

@@ -33,6 +33,23 @@ const plateSchema = z
     return normalized.length > 0 ? normalized : undefined;
   });
 
+const liftingCapacityTonsSchema = z.preprocess(
+  (value) => {
+    if (value === "" || value === null || value === undefined) {
+      return undefined;
+    }
+
+    return value;
+  },
+  z.coerce
+    .number({
+      invalid_type_error: "Lifting capacity must be a number.",
+    })
+    .positive("Lifting capacity must be greater than zero.")
+    .max(10000, "Lifting capacity must be 10000 tons or less.")
+    .optional(),
+);
+
 export const createEquipmentSchema = z.object({
   typeId: z.string().uuid("Select a valid equipment type."),
   status: equipmentStatusSchema,
@@ -42,6 +59,7 @@ export const createEquipmentSchema = z.object({
   brand: textFieldSchema,
   year: yearSchema,
   plate: plateSchema,
+  liftingCapacityTons: liftingCapacityTonsSchema,
 });
 
 export const updateEquipmentSchema = createEquipmentSchema;
@@ -61,6 +79,7 @@ export type ManagedEquipment = {
   brand: string;
   year: number;
   plate: string | null;
+  liftingCapacityTons: number | null;
   createdAt: string;
   updatedAt: string;
 };

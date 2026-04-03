@@ -6,8 +6,8 @@ import { getPreferredLocaleFromCookie } from "@/i18n/server";
 import "@/index.css";
 
 export const metadata: Metadata = {
-  title: "Shadcn Dashboard",
-  description: "A dashboard template using Vinext",
+  title: "Dashboard",
+  description: "Operational dashboard",
 };
 
 export default function RootLayout({

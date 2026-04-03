@@ -12,7 +12,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { ChevronDown, Pencil, Search, Trash2 } from "lucide-react";
+import { ChevronDown, EllipsisVertical, Pencil, Search, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -85,7 +86,9 @@ export function DataTable({
   const locale = useLocale();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const { columnVisibility, setColumnVisibility } = usePersistentColumnVisibility("table:clients:columns");
+  const { columnVisibility, setColumnVisibility } = usePersistentColumnVisibility("table:clients:columns:v3", {
+    updatedAt: false,
+  });
   const [rowSelection, setRowSelection] = useState({});
   const [globalFilter, setGlobalFilter] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
@@ -135,26 +138,9 @@ export function DataTable({
       header: ({ column }) => <SortableHeader column={column} title={t("clients.personType")} className="-ml-3" />,
       cell: ({ row }) => (
         <Badge variant={row.original.personType === "PJ" ? "default" : "secondary"}>
-          {row.original.personType === "PJ" ? t("clients.legalEntity") : t("clients.individual")}
+          {row.original.personType}
         </Badge>
       ),
-      filterFn: "equals",
-    },
-    {
-      accessorKey: "status",
-      header: ({ column }) => <SortableHeader column={column} title={t("clients.status")} className="-ml-3" />,
-      cell: ({ row }) => {
-        const isActive = row.original.status === "active";
-        const className = isActive
-          ? "text-primary bg-primary/10"
-          : "text-destructive bg-destructive/10";
-
-        return (
-          <Badge variant="secondary" className={className}>
-            {isActive ? t("clients.active") : t("clients.inactive")}
-          </Badge>
-        );
-      },
       filterFn: "equals",
     },
     {
@@ -196,6 +182,23 @@ export function DataTable({
       cell: ({ row }) => <span className="text-sm">{formatDate(row.original.updatedAt, locale)}</span>,
     },
     {
+      accessorKey: "status",
+      header: ({ column }) => <SortableHeader column={column} title={t("clients.status")} className="-ml-3" />,
+      cell: ({ row }) => {
+        const isActive = row.original.status === "active";
+        const className = isActive
+          ? "text-primary bg-primary/10"
+          : "text-destructive bg-destructive/10";
+
+        return (
+          <Badge variant="secondary" className={className}>
+            {isActive ? t("clients.active") : t("clients.inactive")}
+          </Badge>
+        );
+      },
+      filterFn: "equals",
+    },
+    {
       id: "actions",
       header: t("clients.actions"),
       enableSorting: false,
@@ -204,32 +207,45 @@ export function DataTable({
         const client = row.original;
 
         return (
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 cursor-pointer"
-              onClick={() => setEditingClient(client)}
-              disabled={isMutating}
-            >
-              <Pencil className="size-4" />
-              <span className="sr-only">{t("clients.editClient")}</span>
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 cursor-pointer text-destructive"
-              onClick={() => setDeletingClient(client)}
-              disabled={isMutating}
-            >
-              <Trash2 className="size-4" />
-              <span className="sr-only">{t("common.delete")}</span>
-            </Button>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer" disabled={isMutating}>
+                <EllipsisVertical className="size-4" />
+                <span className="sr-only">{t("clients.actions")}</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem className="cursor-pointer" onClick={() => setEditingClient(client)}>
+                <Pencil className="mr-2 size-4" />
+                {t("clients.editClient")}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                variant="destructive"
+                className="cursor-pointer"
+                onClick={() => setDeletingClient(client)}
+              >
+                <Trash2 className="mr-2 size-4" />
+                {t("common.delete")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         );
       },
     },
   ], [isMutating, locale, t]);
+
+  const columnVisibilityLabels = useMemo<Record<string, string>>(
+    () => ({
+      personType: t("clients.personType"),
+      status: t("clients.status"),
+      document: t("clients.document"),
+      contactName: t("clients.contactName"),
+      email: t("clients.email"),
+      location: t("clients.location"),
+      updatedAt: t("clients.updated"),
+    }),
+    [t]
+  );
 
   const table = useReactTable({
     data: clients,
@@ -350,11 +366,10 @@ export function DataTable({
                     .map((column) => (
                       <DropdownMenuCheckboxItem
                         key={column.id}
-                        className="capitalize"
                         checked={column.getIsVisible()}
                         onCheckedChange={(value) => column.toggleVisibility(!!value)}
                       >
-                        {column.id}
+                        {columnVisibilityLabels[column.id] ?? column.id}
                       </DropdownMenuCheckboxItem>
                     ))}
                 </DropdownMenuContent>

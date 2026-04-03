@@ -72,6 +72,7 @@ const addressNumberSchema = z
   .max(20, "Number must be at most 20 characters.");
 
 export const updateCompanySchema = z.object({
+  appName: optionalTextSchema,
   legalName: companyTextSchema,
   tradeName: optionalTextSchema,
   cnpj: cnpjSchema,
@@ -81,7 +82,6 @@ export const updateCompanySchema = z.object({
   postalCode: postalCodeSchema,
   street: addressTextSchema,
   number: addressNumberSchema,
-  complement: optionalTextSchema,
   district: addressTextSchema,
   city: addressTextSchema,
   state: stateSchema,
@@ -96,6 +96,7 @@ export type UpdateCompanyInput = z.infer<typeof updateCompanySchema>;
 
 export type ManagedCompany = {
   id: string;
+  appName: string | null;
   legalName: string;
   tradeName: string | null;
   cnpj: string;

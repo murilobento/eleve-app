@@ -12,7 +12,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { ChevronDown, Pencil, Search, Trash2 } from "lucide-react";
+import { ChevronDown, EllipsisVertical, Pencil, Search, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -76,7 +77,9 @@ export function DataTable({
   const locale = useLocale();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const { columnVisibility, setColumnVisibility } = usePersistentColumnVisibility("table:equipment:columns");
+  const { columnVisibility, setColumnVisibility } = usePersistentColumnVisibility("table:equipment:columns:v2", {
+    updatedAt: false,
+  });
   const [rowSelection, setRowSelection] = useState({});
   const [globalFilter, setGlobalFilter] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
@@ -140,6 +143,48 @@ export function DataTable({
       filterFn: "equals",
     },
     {
+      accessorKey: "brand",
+      header: ({ column }) => <SortableHeader column={column} title={t("equipment.brand")} className="-ml-3" />,
+      cell: ({ row }) => <span className="text-sm">{row.original.brand}</span>,
+    },
+    {
+      accessorKey: "model",
+      header: ({ column }) => <SortableHeader column={column} title={t("equipment.model")} className="-ml-3" />,
+      cell: ({ row }) => <span className="text-sm">{row.original.model}</span>,
+    },
+    {
+      accessorKey: "year",
+      header: ({ column }) => <SortableHeader column={column} title={t("equipment.year")} className="-ml-3" />,
+      cell: ({ row }) => <span className="text-sm">{row.original.year}</span>,
+    },
+    {
+      accessorKey: "liftingCapacityTons",
+      header: ({ column }) => (
+        <SortableHeader column={column} title={t("equipment.liftingCapacityTons")} className="-ml-3" />
+      ),
+      cell: ({ row }) => (
+        <span className="text-sm">
+          {row.original.liftingCapacityTons != null
+            ? `${row.original.liftingCapacityTons.toLocaleString(locale)} t`
+            : "-"}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "plate",
+      header: ({ column }) => <SortableHeader column={column} title={t("equipment.plate")} className="-ml-3" />,
+      cell: ({ row }) => (
+        <span className="text-sm">
+          {row.original.plate || t("equipment.noPlate")}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "updatedAt",
+      header: ({ column }) => <SortableHeader column={column} title={t("equipment.updated")} className="-ml-3" />,
+      cell: ({ row }) => <span className="text-sm">{formatDate(row.original.updatedAt, locale)}</span>,
+    },
+    {
       accessorKey: "status",
       header: ({ column }) => <SortableHeader column={column} title={t("equipment.status")} className="-ml-3" />,
       cell: ({ row }) => {
@@ -157,35 +202,6 @@ export function DataTable({
       filterFn: "equals",
     },
     {
-      accessorKey: "brand",
-      header: ({ column }) => <SortableHeader column={column} title={t("equipment.brand")} className="-ml-3" />,
-      cell: ({ row }) => <span className="text-sm">{row.original.brand}</span>,
-    },
-    {
-      accessorKey: "model",
-      header: ({ column }) => <SortableHeader column={column} title={t("equipment.model")} className="-ml-3" />,
-      cell: ({ row }) => <span className="text-sm">{row.original.model}</span>,
-    },
-    {
-      accessorKey: "year",
-      header: ({ column }) => <SortableHeader column={column} title={t("equipment.year")} className="-ml-3" />,
-      cell: ({ row }) => <span className="text-sm">{row.original.year}</span>,
-    },
-    {
-      accessorKey: "plate",
-      header: ({ column }) => <SortableHeader column={column} title={t("equipment.plate")} className="-ml-3" />,
-      cell: ({ row }) => (
-        <span className="text-sm">
-          {row.original.plate || t("equipment.noPlate")}
-        </span>
-      ),
-    },
-    {
-      accessorKey: "updatedAt",
-      header: ({ column }) => <SortableHeader column={column} title={t("equipment.updated")} className="-ml-3" />,
-      cell: ({ row }) => <span className="text-sm">{formatDate(row.original.updatedAt, locale)}</span>,
-    },
-    {
       id: "actions",
       header: t("equipment.actions"),
       enableSorting: false,
@@ -194,32 +210,46 @@ export function DataTable({
         const equipmentItem = row.original;
 
         return (
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 cursor-pointer"
-              onClick={() => setEditingEquipment(equipmentItem)}
-              disabled={isMutating}
-            >
-              <Pencil className="size-4" />
-              <span className="sr-only">{t("equipment.editEquipment")}</span>
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 cursor-pointer text-destructive"
-              onClick={() => setDeletingEquipment(equipmentItem)}
-              disabled={isMutating}
-            >
-              <Trash2 className="size-4" />
-              <span className="sr-only">{t("common.delete")}</span>
-            </Button>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer" disabled={isMutating}>
+                <EllipsisVertical className="size-4" />
+                <span className="sr-only">{t("equipment.actions")}</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem className="cursor-pointer" onClick={() => setEditingEquipment(equipmentItem)}>
+                <Pencil className="mr-2 size-4" />
+                {t("equipment.editEquipment")}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                variant="destructive"
+                className="cursor-pointer"
+                onClick={() => setDeletingEquipment(equipmentItem)}
+              >
+                <Trash2 className="mr-2 size-4" />
+                {t("common.delete")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         );
       },
     },
   ], [isMutating, locale, t]);
+  const columnVisibilityLabels = useMemo<Record<string, string>>(
+    () => ({
+      typeName: t("equipment.type"),
+      licenseRequired: t("equipment.licenseRequired"),
+      status: t("equipment.status"),
+      brand: t("equipment.brand"),
+      model: t("equipment.model"),
+      year: t("equipment.year"),
+      liftingCapacityTons: t("equipment.liftingCapacityTons"),
+      plate: t("equipment.plate"),
+      updatedAt: t("equipment.updated"),
+    }),
+    [t],
+  );
 
   const table = useReactTable({
     data: equipment,
@@ -241,6 +271,7 @@ export function DataTable({
         row.original.typeName,
         row.original.brand,
         row.original.model,
+        String(row.original.liftingCapacityTons ?? ""),
         row.original.plate ?? "",
       ].some((item) => item.toLowerCase().includes(value));
     },
@@ -365,11 +396,10 @@ export function DataTable({
                     .map((column) => (
                       <DropdownMenuCheckboxItem
                         key={column.id}
-                        className="capitalize"
                         checked={column.getIsVisible()}
                         onCheckedChange={(value) => column.toggleVisibility(!!value)}
                       >
-                        {column.id}
+                        {columnVisibilityLabels[column.id] ?? column.id}
                       </DropdownMenuCheckboxItem>
                     ))}
                 </DropdownMenuContent>

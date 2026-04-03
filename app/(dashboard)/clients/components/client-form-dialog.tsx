@@ -45,7 +45,7 @@ import {
   updateClientSchema,
 } from "@/lib/clients-admin";
 import { useI18n } from "@/i18n/provider";
-import { formatPhone, formatPostalCode } from "@/lib/utils";
+import { formatCnpj, formatCpf, formatPhone, formatPostalCode } from "@/lib/utils";
 
 type ClientFormDialogProps = {
   mode: "create" | "edit";
@@ -87,6 +87,13 @@ export function ClientFormDialog({
   const schema = isEdit ? updateClientSchema : createClientSchema;
   const [isLookingUpDocument, setIsLookingUpDocument] = useState(false);
   const [isLookingUpPostalCode, setIsLookingUpPostalCode] = useState(false);
+  function showErrorToast(message: string) {
+    toast.error(message);
+  }
+
+  function showSuccessToast(message: string) {
+    toast.success(message);
+  }
 
   const form = useForm<CreateClientInput | UpdateClientInput>({
     resolver: zodResolver(schema),
@@ -119,12 +126,15 @@ export function ClientFormDialog({
       return;
     }
 
+    const selectedPersonType = client?.personType ?? "PF";
     form.reset({
-      personType: client?.personType ?? "PF",
+      personType: selectedPersonType,
       status: client?.status ?? "active",
       legalName: client?.legalName ?? "",
       tradeName: client?.tradeName ?? "",
-      document: client?.document ?? "",
+      document: selectedPersonType === "PJ"
+        ? formatCnpj(client?.document ?? "")
+        : formatCpf(client?.document ?? ""),
       contactName: client?.contactName ?? "",
       contactPhone: client?.contactPhone ? formatPhone(client.contactPhone) : "",
       email: client?.email ?? "",
@@ -148,8 +158,10 @@ export function ClientFormDialog({
       return;
     }
 
+    form.clearErrors("document");
+
     if (document.length !== 14) {
-      form.setError("document", { message: t("clients.cnpjInvalid") });
+      showErrorToast(t("clients.cnpjInvalid"));
       return;
     }
 
@@ -161,7 +173,7 @@ export function ClientFormDialog({
         }),
       );
 
-      form.setValue("document", payload.document.document, { shouldDirty: true, shouldValidate: true });
+      form.setValue("document", formatCnpj(payload.document.document), { shouldDirty: true, shouldValidate: true });
       form.setValue("legalName", payload.document.legalName, { shouldDirty: true, shouldValidate: true });
       form.setValue("tradeName", payload.document.tradeName, { shouldDirty: true });
       form.setValue("email", payload.document.email, { shouldDirty: true, shouldValidate: true });
@@ -174,11 +186,10 @@ export function ClientFormDialog({
       form.setValue("city", payload.document.city, { shouldDirty: true, shouldValidate: true });
       form.setValue("state", payload.document.state, { shouldDirty: true, shouldValidate: true });
 
-      toast.success(t("clients.cnpjLookupSuccess"));
+      showSuccessToast(t("clients.cnpjLookupSuccess"));
     } catch (lookupError) {
       const message = lookupError instanceof Error ? lookupError.message : t("clients.cnpjLookupError");
-      form.setError("document", { message });
-      toast.error(message);
+      showErrorToast(message);
     } finally {
       setIsLookingUpDocument(false);
     }
@@ -189,6 +200,7 @@ export function ClientFormDialog({
 
     if (postalCode.length !== 8) {
       form.setError("postalCode", { message: t("clients.postalCodeInvalid") });
+      showErrorToast(t("clients.postalCodeInvalid"));
       return;
     }
 
@@ -206,11 +218,11 @@ export function ClientFormDialog({
       form.setValue("city", payload.postalCode.city, { shouldDirty: true, shouldValidate: true });
       form.setValue("state", payload.postalCode.state, { shouldDirty: true, shouldValidate: true });
 
-      toast.success(t("clients.postalCodeLookupSuccess"));
+      showSuccessToast(t("clients.postalCodeLookupSuccess"));
     } catch (lookupError) {
       const message = lookupError instanceof Error ? lookupError.message : t("clients.postalCodeLookupError");
       form.setError("postalCode", { message });
-      toast.error(message);
+      showErrorToast(message);
     } finally {
       setIsLookingUpPostalCode(false);
     }
@@ -300,6 +312,11 @@ export function ClientFormDialog({
                         <Input
                           placeholder={personType === "PJ" ? "00.000.000/0000-00" : "000.000.000-00"}
                           {...field}
+                          value={field.value ?? ""}
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            field.onChange(personType === "PJ" ? formatCnpj(value) : formatCpf(value));
+                          }}
                         />
                       </FormControl>
                       {personType === "PJ" ? (
@@ -314,18 +331,17 @@ export function ClientFormDialog({
                         </Button>
                       ) : null}
                     </div>
-                    <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
 
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-4">
               <FormField
                 control={form.control}
                 name="legalName"
                 render={({ field }) => (
-                  <FormItem className="md:col-span-2">
+                  <FormItem className="md:col-span-2 lg:col-span-2">
                     <FormLabel>{personType === "PJ" ? t("clients.legalName") : t("clients.fullName")}</FormLabel>
                     <FormControl>
                       <Input
@@ -342,7 +358,7 @@ export function ClientFormDialog({
                 control={form.control}
                 name="tradeName"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="md:col-span-1">
                     <FormLabel>{t("clients.tradeName")}</FormLabel>
                     <FormControl>
                       <Input
@@ -355,14 +371,11 @@ export function ClientFormDialog({
                   </FormItem>
                 )}
               />
-            </div>
-
-            <div className="grid gap-3 md:grid-cols-4">
               <FormField
                 control={form.control}
                 name="contactName"
                 render={({ field }) => (
-                  <FormItem className="md:col-span-2">
+                  <FormItem className="md:col-span-1">
                     <FormLabel>{t("clients.contactName")}</FormLabel>
                     <FormControl>
                       <Input
@@ -375,7 +388,9 @@ export function ClientFormDialog({
                   </FormItem>
                 )}
               />
+            </div>
 
+            <div className="grid gap-3 md:grid-cols-3">
               <FormField
                 control={form.control}
                 name="contactPhone"
@@ -394,6 +409,7 @@ export function ClientFormDialog({
                   </FormItem>
                 )}
               />
+
               <FormField
                 control={form.control}
                 name="email"
@@ -407,7 +423,6 @@ export function ClientFormDialog({
                   </FormItem>
                 )}
               />
-
               <FormField
                 control={form.control}
                 name="phone"
@@ -428,21 +443,32 @@ export function ClientFormDialog({
               />
             </div>
 
-            <div className="grid gap-3 md:grid-cols-[160px_minmax(0,1fr)_140px]">
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
               <FormField
                 control={form.control}
                 name="postalCode"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t("clients.postalCode")}</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="00000-000"
-                        {...field}
-                        value={field.value ?? ""}
-                        onChange={(event) => field.onChange(formatPostalCode(event.target.value))}
-                      />
-                    </FormControl>
+                    <div className="flex gap-2">
+                      <FormControl>
+                        <Input
+                          placeholder="00000-000"
+                          {...field}
+                          value={field.value ?? ""}
+                          onChange={(event) => field.onChange(formatPostalCode(event.target.value))}
+                        />
+                      </FormControl>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="shrink-0 cursor-pointer"
+                        onClick={() => void handlePostalCodeLookup()}
+                        disabled={isLookingUpPostalCode || isSubmitting}
+                      >
+                        {isLookingUpPostalCode ? t("common.loading") : t("clients.lookupPostalCode")}
+                      </Button>
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -461,18 +487,6 @@ export function ClientFormDialog({
                   </FormItem>
                 )}
               />
-
-              <div className="flex items-end md:pb-0.5">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full cursor-pointer"
-                  onClick={() => void handlePostalCodeLookup()}
-                  disabled={isLookingUpPostalCode || isSubmitting}
-                >
-                  {isLookingUpPostalCode ? t("common.loading") : t("clients.lookupPostalCode")}
-                </Button>
-              </div>
             </div>
 
             <div className="grid gap-3 md:grid-cols-[minmax(0,1.4fr)_120px_180px_minmax(0,1fr)]">

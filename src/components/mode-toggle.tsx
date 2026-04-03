@@ -51,11 +51,10 @@ export function ModeToggle({ variant = "outline" }: ModeToggleProps) {
       onClick={handleToggle}
       className="cursor-pointer mode-toggle-button relative overflow-hidden"
     >
-      {/* Show the icon for the mode you can switch TO */}
       {isDarkMode ? (
-        <Sun className="h-[1.2rem] w-[1.2rem] transition-transform duration-300 rotate-0 scale-100" />
-      ) : (
         <Moon className="h-[1.2rem] w-[1.2rem] transition-transform duration-300 rotate-0 scale-100" />
+      ) : (
+        <Sun className="h-[1.2rem] w-[1.2rem] transition-transform duration-300 rotate-0 scale-100" />
       )}
       <span className="sr-only">
         {isDarkMode ? t("common.switchToLightMode") : t("common.switchToDarkMode")}

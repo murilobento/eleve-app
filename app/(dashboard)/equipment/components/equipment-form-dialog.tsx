@@ -80,6 +80,7 @@ export function EquipmentFormDialog({
       brand: "",
       year: new Date().getFullYear(),
       plate: "",
+      liftingCapacityTons: undefined,
     },
   });
 
@@ -97,13 +98,20 @@ export function EquipmentFormDialog({
       brand: equipment?.brand ?? "",
       year: equipment?.year ?? new Date().getFullYear(),
       plate: equipment?.plate ?? "",
+      liftingCapacityTons: equipment?.liftingCapacityTons ?? undefined,
     });
   }, [equipment, equipmentTypes, form, open]);
 
   async function handleSubmit(values: CreateEquipmentInput | UpdateEquipmentInput) {
+    const liftingCapacityTons =
+      values.liftingCapacityTons === undefined
+        ? undefined
+        : Number(values.liftingCapacityTons);
+
     await onSubmit({
       ...values,
       year: Number(values.year),
+      liftingCapacityTons,
     });
     form.reset();
     onOpenChange(false);
@@ -232,7 +240,7 @@ export function EquipmentFormDialog({
               />
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <FormField
                 control={form.control}
                 name="model"
@@ -257,6 +265,29 @@ export function EquipmentFormDialog({
                       <Input
                         type="number"
                         placeholder="2024"
+                        {...field}
+                        value={field.value ?? ""}
+                        disabled={creationDisabled}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="liftingCapacityTons"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("equipment.liftingCapacityTons")}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        inputMode="decimal"
+                        step="0.01"
+                        min="0"
+                        placeholder="8.5"
                         {...field}
                         value={field.value ?? ""}
                         disabled={creationDisabled}

@@ -9,6 +9,7 @@ import { getAppUrl } from "@/lib/utils"
 import { NavMain } from "@/components/nav-main"
 import { NavUser } from "@/components/nav-user"
 import { useAppNavigation } from "@/components/app-navigation"
+import { useCompanyDisplayName } from "@/hooks/use-company-display-name"
 import {
   Sidebar,
   SidebarContent,
@@ -23,6 +24,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const locale = useLocale()
   const { t } = useI18n()
   const { navGroups } = useAppNavigation()
+  const { displayName, isLoading } = useCompanyDisplayName()
+  const companyName = displayName ?? (isLoading ? t("common.loadingCompany") : t("navigation.company"))
 
   return (
     <Sidebar {...props}>
@@ -35,7 +38,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   <Logo size={24} className="text-current" />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">ShadcnStore</span>
+                  <span className="truncate font-medium">{companyName}</span>
                   <span className="truncate text-xs">{t("navigation.adminDashboard")}</span>
                 </div>
               </Link>

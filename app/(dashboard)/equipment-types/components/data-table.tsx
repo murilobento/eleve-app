@@ -12,7 +12,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { ChevronDown, Pencil, Search, Trash2 } from "lucide-react";
+import { ChevronDown, EllipsisVertical, Pencil, Search, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -119,32 +120,38 @@ export function DataTable({
         const equipmentType = row.original;
 
         return (
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 cursor-pointer"
-              onClick={() => setEditingEquipmentType(equipmentType)}
-              disabled={isMutating}
-            >
-              <Pencil className="size-4" />
-              <span className="sr-only">{t("equipmentTypes.editType")}</span>
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 cursor-pointer text-destructive"
-              onClick={() => setDeletingEquipmentType(equipmentType)}
-              disabled={isMutating}
-            >
-              <Trash2 className="size-4" />
-              <span className="sr-only">{t("common.delete")}</span>
-            </Button>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer" disabled={isMutating}>
+                <EllipsisVertical className="size-4" />
+                <span className="sr-only">{t("equipmentTypes.actions")}</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem className="cursor-pointer" onClick={() => setEditingEquipmentType(equipmentType)}>
+                <Pencil className="mr-2 size-4" />
+                {t("equipmentTypes.editType")}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                variant="destructive"
+                className="cursor-pointer"
+                onClick={() => setDeletingEquipmentType(equipmentType)}
+              >
+                <Trash2 className="mr-2 size-4" />
+                {t("common.delete")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         );
       },
     },
   ], [isMutating, t]);
+  const columnVisibilityLabels = useMemo<Record<string, string>>(
+    () => ({
+      equipmentCount: t("equipmentTypes.linkedEquipment"),
+    }),
+    [t],
+  );
 
   const table = useReactTable({
     data: equipmentTypes,
@@ -214,11 +221,10 @@ export function DataTable({
                     .map((column) => (
                       <DropdownMenuCheckboxItem
                         key={column.id}
-                        className="capitalize"
                         checked={column.getIsVisible()}
                         onCheckedChange={(value) => column.toggleVisibility(!!value)}
                       >
-                        {column.id}
+                        {columnVisibilityLabels[column.id] ?? column.id}
                       </DropdownMenuCheckboxItem>
                     ))}
                 </DropdownMenuContent>

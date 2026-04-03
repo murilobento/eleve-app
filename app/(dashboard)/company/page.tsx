@@ -45,6 +45,7 @@ async function parseResponse<T>(response: Response): Promise<T> {
 }
 
 const EMPTY_VALUES: UpdateCompanyInput = {
+  appName: "",
   legalName: "",
   tradeName: "",
   cnpj: "",
@@ -54,7 +55,6 @@ const EMPTY_VALUES: UpdateCompanyInput = {
   postalCode: "",
   street: "",
   number: "",
-  complement: "",
   district: "",
   city: "",
   state: "",
@@ -67,6 +67,7 @@ function mapCompanyToFormValues(company: ManagedCompany | null): UpdateCompanyIn
   }
 
   return {
+    appName: company.appName ?? "",
     legalName: company.legalName,
     tradeName: company.tradeName ?? "",
     cnpj: formatCnpj(company.cnpj),
@@ -76,7 +77,6 @@ function mapCompanyToFormValues(company: ManagedCompany | null): UpdateCompanyIn
     postalCode: formatPostalCode(company.postalCode),
     street: company.street,
     number: company.number,
-    complement: company.complement ?? "",
     district: company.district,
     city: company.city,
     state: company.state,
@@ -160,8 +160,6 @@ export default function CompanyPage() {
       if (payload.cnpj.number) {
         form.setValue("number", payload.cnpj.number, { shouldValidate: true });
       }
-
-      form.setValue("complement", payload.cnpj.complement, { shouldValidate: true });
 
       if (payload.cnpj.district) {
         form.setValue("district", payload.cnpj.district, { shouldValidate: true });
@@ -274,70 +272,88 @@ export default function CompanyPage() {
             <CardContent>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <FormField
-                      control={form.control}
-                      name="legalName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{t("company.legalName")}</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Empresa Exemplo Ltda" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="tradeName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{t("company.tradeName")}</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Empresa Exemplo" {...field} value={field.value ?? ""} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <div className="grid gap-3 md:col-span-2 md:grid-cols-[minmax(0,1fr)_auto]">
+                  <div className="grid gap-3">
+                    <div className="grid gap-3 xl:grid-cols-[220px_minmax(320px,1fr)]">
                       <FormField
                         control={form.control}
-                        name="cnpj"
+                        name="appName"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>{t("company.cnpj")}</FormLabel>
+                            <FormLabel>{t("company.appName")}</FormLabel>
                             <FormControl>
-                              <Input
-                                placeholder="00.000.000/0000-00"
-                                {...field}
-                                value={field.value ?? ""}
-                                onChange={(event) => field.onChange(formatCnpj(event.target.value))}
-                              />
+                              <Input placeholder="ELVE" {...field} value={field.value ?? ""} />
+                            </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                      <div className="grid gap-3 md:grid-cols-[minmax(280px,1fr)_auto]">
+                        <FormField
+                          control={form.control}
+                          name="cnpj"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>{t("company.cnpj")}</FormLabel>
+                              <FormControl>
+                                <Input
+                                  placeholder="00.000.000/0000-00"
+                                  {...field}
+                                  value={field.value ?? ""}
+                                  onChange={(event) => field.onChange(formatCnpj(event.target.value))}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <div className="flex items-end">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full cursor-pointer md:w-auto"
+                            onClick={handleCnpjLookup}
+                            disabled={isLookingUpCnpj || isLookingUpPostalCode || isSaving}
+                          >
+                            <Search className="mr-2 size-4" />
+                            {isLookingUpCnpj ? t("common.loading") : t("company.lookupCnpj")}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3 xl:grid-cols-2">
+                      <FormField
+                        control={form.control}
+                        name="legalName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t("company.legalName")}</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Empresa Exemplo Ltda" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
 
-                      <div className="flex items-end">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="w-full cursor-pointer md:w-auto"
-                          onClick={handleCnpjLookup}
-                          disabled={isLookingUpCnpj || isLookingUpPostalCode || isSaving}
-                        >
-                          <Search className="mr-2 size-4" />
-                          {isLookingUpCnpj ? t("common.loading") : t("company.lookupCnpj")}
-                        </Button>
-                      </div>
+                      <FormField
+                        control={form.control}
+                        name="tradeName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t("company.tradeName")}</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Empresa Exemplo" {...field} value={field.value ?? ""} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </div>
 
-                    <div className="grid gap-3 md:col-span-2 md:grid-cols-3">
+                    <div className="grid gap-3 xl:grid-cols-3">
                       <FormField
                         control={form.control}
                         name="email"
@@ -388,7 +404,7 @@ export default function CompanyPage() {
                   </div>
 
                   <div className="grid gap-3">
-                    <div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)_auto]">
+                    <div className="grid gap-3 xl:grid-cols-[160px_140px_minmax(0,1fr)_96px]">
                       <FormField
                         control={form.control}
                         name="postalCode"
@@ -408,6 +424,19 @@ export default function CompanyPage() {
                         )}
                       />
 
+                      <div className="flex items-end">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full cursor-pointer"
+                          onClick={handlePostalCodeLookup}
+                          disabled={isLookingUpCnpj || isLookingUpPostalCode || isSaving}
+                        >
+                          <Search className="mr-2 size-4" />
+                          {isLookingUpPostalCode ? t("common.loading") : t("company.lookupPostalCode")}
+                        </Button>
+                      </div>
+
                       <FormField
                         control={form.control}
                         name="street"
@@ -422,21 +451,6 @@ export default function CompanyPage() {
                         )}
                       />
 
-                      <div className="flex items-end">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="w-full cursor-pointer md:w-auto"
-                          onClick={handlePostalCodeLookup}
-                          disabled={isLookingUpCnpj || isLookingUpPostalCode || isSaving}
-                        >
-                          <Search className="mr-2 size-4" />
-                          {isLookingUpPostalCode ? t("common.loading") : t("company.lookupPostalCode")}
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="grid gap-3 md:grid-cols-[120px_220px_minmax(0,1fr)]">
                       <FormField
                         control={form.control}
                         name="number"
@@ -450,21 +464,9 @@ export default function CompanyPage() {
                           </FormItem>
                         )}
                       />
+                    </div>
 
-                      <FormField
-                        control={form.control}
-                        name="complement"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>{t("company.complement")}</FormLabel>
-                            <FormControl>
-                              <Input placeholder={t("company.complementPlaceholder")} {...field} value={field.value ?? ""} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
+                    <div className="grid gap-3 xl:grid-cols-[minmax(220px,1fr)_minmax(220px,1fr)_120px_120px]">
                       <FormField
                         control={form.control}
                         name="district"
@@ -478,9 +480,6 @@ export default function CompanyPage() {
                           </FormItem>
                         )}
                       />
-                    </div>
-
-                    <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_140px_180px]">
                       <FormField
                         control={form.control}
                         name="city"

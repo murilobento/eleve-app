@@ -53,12 +53,14 @@ type EquipmentRow = {
   brand: string;
   year: number;
   plate: string | null;
+  lifting_capacity_tons: number | null;
   created_at: string;
   updated_at: string;
 };
 
 type CompanyRow = {
   id: string;
+  app_name: string | null;
   legal_name: string;
   trade_name: string | null;
   cnpj: string;
@@ -214,6 +216,7 @@ async function ensureSchema() {
     CREATE TABLE IF NOT EXISTS company (
       id text PRIMARY KEY,
       singleton_key boolean NOT NULL DEFAULT true UNIQUE,
+      app_name text,
       legal_name text NOT NULL,
       trade_name text,
       cnpj text NOT NULL,
@@ -231,6 +234,11 @@ async function ensureSchema() {
       created_at timestamptz NOT NULL DEFAULT now(),
       updated_at timestamptz NOT NULL DEFAULT now()
     );
+  `);
+
+  await pool.query(`
+    ALTER TABLE company
+    ADD COLUMN IF NOT EXISTS app_name text;
   `);
 
   await pool.query(`
@@ -267,6 +275,11 @@ async function ensureSchema() {
   await pool.query(`
     ALTER TABLE equipment
     ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'active';
+  `);
+
+  await pool.query(`
+    ALTER TABLE equipment
+    ADD COLUMN IF NOT EXISTS lifting_capacity_tons double precision;
   `);
 
   await pool.query(`
@@ -590,6 +603,7 @@ function mapEquipmentRow(row: EquipmentRow) {
     brand: row.brand,
     year: row.year,
     plate: row.plate,
+    liftingCapacityTons: row.lifting_capacity_tons,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -598,6 +612,7 @@ function mapEquipmentRow(row: EquipmentRow) {
 function mapCompanyRow(row: CompanyRow) {
   return {
     id: row.id,
+    appName: row.app_name,
     legalName: row.legal_name,
     tradeName: row.trade_name,
     cnpj: row.cnpj,
@@ -662,6 +677,7 @@ export async function getCompany() {
     `
       SELECT
         id,
+        app_name,
         legal_name,
         trade_name,
         cnpj,
@@ -689,6 +705,7 @@ export async function getCompany() {
 }
 
 export async function upsertCompany(input: {
+  appName?: string;
   legalName: string;
   tradeName?: string;
   cnpj: string;
@@ -711,25 +728,27 @@ export async function upsertCompany(input: {
     await pool.query(
       `
         UPDATE company
-        SET legal_name = $2,
-            trade_name = $3,
-            cnpj = $4,
-            email = $5,
-            phone = $6,
-            website = $7,
-            postal_code = $8,
-            street = $9,
-            number = $10,
-            complement = $11,
-            district = $12,
-            city = $13,
-            state = $14,
-            country = $15,
+        SET app_name = $2,
+            legal_name = $3,
+            trade_name = $4,
+            cnpj = $5,
+            email = $6,
+            phone = $7,
+            website = $8,
+            postal_code = $9,
+            street = $10,
+            number = $11,
+            complement = $12,
+            district = $13,
+            city = $14,
+            state = $15,
+            country = $16,
             updated_at = now()
         WHERE id = $1
       `,
       [
         existing.id,
+        input.appName?.trim() || null,
         input.legalName.trim(),
         input.tradeName?.trim() || null,
         input.cnpj,
@@ -756,6 +775,7 @@ export async function upsertCompany(input: {
       INSERT INTO company (
         id,
         singleton_key,
+        app_name,
         legal_name,
         trade_name,
         cnpj,
@@ -771,10 +791,11 @@ export async function upsertCompany(input: {
         state,
         country
       )
-      VALUES ($1, true, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+      VALUES ($1, true, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
     `,
     [
       id,
+      input.appName?.trim() || null,
       input.legalName.trim(),
       input.tradeName?.trim() || null,
       input.cnpj,
@@ -1173,6 +1194,7 @@ export async function listEquipment() {
         e.brand,
         e.year,
         e.plate,
+        e.lifting_capacity_tons,
         e.created_at,
         e.updated_at
       FROM equipment e
@@ -1199,6 +1221,7 @@ export async function getEquipmentById(equipmentId: string) {
         e.brand,
         e.year,
         e.plate,
+        e.lifting_capacity_tons,
         e.created_at,
         e.updated_at
       FROM equipment e
@@ -1222,6 +1245,7 @@ export async function createEquipment(input: {
   brand: string;
   year: number;
   plate?: string;
+  liftingCapacityTons?: number;
 }) {
   await bootstrapRbac();
   const type = await getEquipmentTypeById(input.typeId);
@@ -1233,8 +1257,8 @@ export async function createEquipment(input: {
   const id = randomUUID();
   await pool.query(
     `
-      INSERT INTO equipment (id, type_id, status, license_required, name, model, brand, year, plate)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      INSERT INTO equipment (id, type_id, status, license_required, name, model, brand, year, plate, lifting_capacity_tons)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
     `,
     [
       id,
@@ -1246,6 +1270,7 @@ export async function createEquipment(input: {
       input.brand.trim(),
       input.year,
       input.plate?.trim() || null,
+      input.liftingCapacityTons ?? null,
     ],
   );
 
@@ -1263,6 +1288,7 @@ export async function updateEquipment(
     brand: string;
     year: number;
     plate?: string;
+    liftingCapacityTons?: number;
   },
 ) {
   await bootstrapRbac();
@@ -1289,6 +1315,7 @@ export async function updateEquipment(
           brand = $7,
           year = $8,
           plate = $9,
+          lifting_capacity_tons = $10,
           updated_at = now()
       WHERE id = $1
     `,
@@ -1302,6 +1329,7 @@ export async function updateEquipment(
       input.brand.trim(),
       input.year,
       input.plate?.trim() || null,
+      input.liftingCapacityTons ?? null,
     ],
   );
 }

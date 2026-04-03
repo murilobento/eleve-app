@@ -4,6 +4,7 @@ import * as React from "react"
 import { AppSidebar } from "@/components/app-sidebar"
 import { AppTopbar } from "@/components/app-navigation"
 import { SiteHeader } from "@/components/site-header"
+import { CompanyDisplayNameProvider } from "@/hooks/use-company-display-name"
 import { useSidebarConfig } from "@/hooks/use-sidebar-config"
 import { SidebarConfigProvider } from "@/contexts/sidebar-context"
 import {
@@ -80,60 +81,62 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const showTopbar = config.navigationMode === "topbar" && !isMobile
 
   return (
-    <UISidebarProvider
-      style={
-        {
-          "--sidebar-width": "16rem",
-          "--sidebar-width-icon": "3rem", 
-          "--header-height": "calc(var(--spacing) * 14)",
-        } as React.CSSProperties
-      }
-      className={config.collapsible === "none" ? "sidebar-none-mode" : ""}
-    >
-      {config.side === "left" ? (
-        <>
-          {showSidebar ? (
-            <AppSidebar 
-              variant={config.variant} 
-              collapsible={config.collapsible} 
-              side={config.side} 
-            />
-          ) : null}
-          <SidebarInset>
-            <SiteHeader />
-            {showTopbar ? <AppTopbar /> : null}
-            <div className="flex flex-1 flex-col">
-              <div className="@container/main flex flex-1 flex-col gap-2">
-                <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-                  {children}
+    <CompanyDisplayNameProvider>
+      <UISidebarProvider
+        style={
+          {
+            "--sidebar-width": "16rem",
+            "--sidebar-width-icon": "3rem",
+            "--header-height": "calc(var(--spacing) * 14)",
+          } as React.CSSProperties
+        }
+        className={config.collapsible === "none" ? "sidebar-none-mode" : ""}
+      >
+        {config.side === "left" ? (
+          <>
+            {showSidebar ? (
+              <AppSidebar
+                variant={config.variant}
+                collapsible={config.collapsible}
+                side={config.side}
+              />
+            ) : null}
+            <SidebarInset>
+              <SiteHeader />
+              {showTopbar ? <AppTopbar /> : null}
+              <div className="flex flex-1 flex-col">
+                <div className="@container/main flex flex-1 flex-col gap-2">
+                  <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+                    {children}
+                  </div>
                 </div>
               </div>
-            </div>
-          </SidebarInset>
-        </>
-      ) : (
-        <>
-          <SidebarInset>
-            <SiteHeader />
-            {showTopbar ? <AppTopbar /> : null}
-            <div className="flex flex-1 flex-col">
-              <div className="@container/main flex flex-1 flex-col gap-2">
-                <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-                  {children}
+            </SidebarInset>
+          </>
+        ) : (
+          <>
+            <SidebarInset>
+              <SiteHeader />
+              {showTopbar ? <AppTopbar /> : null}
+              <div className="flex flex-1 flex-col">
+                <div className="@container/main flex flex-1 flex-col gap-2">
+                  <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+                    {children}
+                  </div>
                 </div>
               </div>
-            </div>
-          </SidebarInset>
-          {showSidebar ? (
-            <AppSidebar 
-              variant={config.variant} 
-              collapsible={config.collapsible} 
-              side={config.side} 
-            />
-          ) : null}
-        </>
-      )}
-    </UISidebarProvider>
+            </SidebarInset>
+            {showSidebar ? (
+              <AppSidebar
+                variant={config.variant}
+                collapsible={config.collapsible}
+                side={config.side}
+              />
+            ) : null}
+          </>
+        )}
+      </UISidebarProvider>
+    </CompanyDisplayNameProvider>
   )
 }
 
