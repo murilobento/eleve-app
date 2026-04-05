@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
   type ColumnDef,
@@ -16,6 +17,11 @@ import { ChevronDown, EllipsisVertical, Pencil, Search, Trash2 } from "lucide-re
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  AdminListPaginationFooter,
+  AdminListTableCard,
+  AdminListToolbar,
+} from "@/components/admin-list-layout";
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -42,8 +48,10 @@ import type {
   UpdateEquipmentInput,
 } from "@/lib/equipment-admin";
 import type { ManagedEquipmentType } from "@/lib/equipment-types-admin";
+import { useRbac } from "@/hooks/use-rbac";
 import { usePersistentColumnVisibility } from "@/hooks/use-persistent-column-visibility";
 import { useI18n, useLocale } from "@/i18n/provider";
+import { getAppUrl } from "@/lib/utils";
 
 import { EquipmentFormDialog } from "./equipment-form-dialog";
 
@@ -75,6 +83,7 @@ export function DataTable({
 }: DataTableProps) {
   const { t } = useI18n();
   const locale = useLocale();
+  const { hasPermission } = useRbac();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const { columnVisibility, setColumnVisibility } = usePersistentColumnVisibility("table:equipment:columns:v2", {
@@ -293,11 +302,17 @@ export function DataTable({
   const licenseFilter = (table.getColumn("licenseRequired")?.getFilterValue() as string) || "all";
   const statusFilter = (table.getColumn("status")?.getFilterValue() as string) || "all";
   const selectedCount = table.getFilteredSelectedRowModel().rows.length;
+  const hasActiveFilters = Boolean(globalFilter.trim()) || columnFilters.length > 0;
+
+  const handleClearFilters = () => {
+    setGlobalFilter("");
+    setColumnFilters([]);
+    table.setPageIndex(0);
+  };
 
   return (
     <div className="w-full space-y-4">
-      <div className="rounded-xl border bg-card/40 p-3">
-        <div className="flex flex-wrap items-end gap-3">
+      <AdminListToolbar>
           <div className="relative min-w-[240px] flex-1">
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -378,16 +393,20 @@ export function DataTable({
           </div>
 
           <div className="ml-auto">
-            <div className="min-w-[170px] space-y-2">
+            <div className="min-w-[180px] space-y-2">
               <Label htmlFor="equipment-column-visibility" className="text-sm font-medium">
                 {t("common.columnVisibility")}
               </Label>
               <DropdownMenu>
-                <DropdownMenuTrigger
-                  id="equipment-column-visibility"
-                  className="inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-lg border bg-background px-3 text-sm font-medium shadow-xs hover:bg-accent hover:text-accent-foreground"
-                >
-                  {t("common.columns")} <ChevronDown className="ml-2 size-4" />
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    id="equipment-column-visibility"
+                    variant="outline"
+                    size="lg"
+                    className="h-10 w-full cursor-pointer justify-between rounded-lg px-3"
+                  >
+                    {t("common.columns")} <ChevronDown className="size-4" />
+                  </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   {table
@@ -407,19 +426,43 @@ export function DataTable({
             </div>
           </div>
 
-          <div>
-            <EquipmentFormDialog
-              mode="create"
-              open={createOpen}
-              onOpenChange={setCreateOpen}
-              onSubmit={onCreateEquipment}
-              isSubmitting={isMutating}
-              equipmentTypes={equipmentTypes}
-              canCreate={equipmentTypes.length > 0}
-            />
+          <div className="w-full min-w-[160px] space-y-2 sm:w-auto">
+            <Label className="text-sm font-medium text-transparent">
+              {t("common.clearFilters")}
+            </Label>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 w-full cursor-pointer rounded-lg sm:w-auto"
+              onClick={handleClearFilters}
+              disabled={!hasActiveFilters}
+            >
+              {t("common.clearFilters")}
+            </Button>
           </div>
-        </div>
-      </div>
+
+          <div>
+            <div className="flex items-center gap-2">
+              {hasPermission("equipment-types.read") ? (
+                <Button asChild variant="outline" className="cursor-pointer">
+                  <Link href={getAppUrl("/equipment-types", locale)}>
+                    {t("navigation.equipmentTypes")}
+                  </Link>
+                </Button>
+              ) : null}
+
+              <EquipmentFormDialog
+                mode="create"
+                open={createOpen}
+                onOpenChange={setCreateOpen}
+                onSubmit={onCreateEquipment}
+                isSubmitting={isMutating}
+                equipmentTypes={equipmentTypes}
+                canCreate={equipmentTypes.length > 0}
+              />
+            </div>
+          </div>
+      </AdminListToolbar>
 
       {selectedCount > 0 ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/30 px-3 py-2">
@@ -456,7 +499,7 @@ export function DataTable({
         </div>
       ) : null}
 
-      <div className="rounded-md border">
+      <AdminListTableCard>
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -482,41 +525,24 @@ export function DataTable({
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
+                <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
                   {t("equipment.noEquipment")}
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
-      </div>
+      </AdminListTableCard>
 
-      <div className="flex items-center justify-between gap-4 py-4">
-        <div className="text-sm text-muted-foreground">
-          {t("equipment.equipmentCount", { count: table.getFilteredRowModel().rows.length })}
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
-            className="cursor-pointer"
-          >
-            {t("common.previous")}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
-            className="cursor-pointer"
-          >
-            {t("common.next")}
-          </Button>
-        </div>
-      </div>
+      <AdminListPaginationFooter
+        countLabel={t("equipment.equipmentCount", { count: table.getFilteredRowModel().rows.length })}
+        previousLabel={t("common.previous")}
+        nextLabel={t("common.next")}
+        onPreviousPage={() => table.previousPage()}
+        onNextPage={() => table.nextPage()}
+        canPreviousPage={table.getCanPreviousPage()}
+        canNextPage={table.getCanNextPage()}
+      />
 
       <EquipmentFormDialog
         mode="edit"

@@ -33,45 +33,62 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SortableHeader } from "@/components/sortable-header";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { usePersistentColumnVisibility } from "@/hooks/use-persistent-column-visibility";
-import { useI18n } from "@/i18n/provider";
 import type {
-  CreateEquipmentTypeInput,
-  ManagedEquipmentType,
-  UpdateEquipmentTypeInput,
-} from "@/lib/equipment-types-admin";
+  CreateOperatorInput,
+  ManagedOperator,
+  UpdateOperatorInput,
+} from "@/lib/operators-admin";
+import { usePersistentColumnVisibility } from "@/hooks/use-persistent-column-visibility";
+import { useI18n, useLocale } from "@/i18n/provider";
 
-import { EquipmentTypeFormDialog } from "./equipment-type-form-dialog";
+import { OperatorFormDialog } from "./operator-form-dialog";
 
 type DataTableProps = {
-  equipmentTypes: ManagedEquipmentType[];
-  onCreateEquipmentType: (values: CreateEquipmentTypeInput) => Promise<void>;
-  onUpdateEquipmentType: (id: string, values: UpdateEquipmentTypeInput) => Promise<void>;
-  onDeleteEquipmentType: (id: string) => Promise<void>;
-  onDeleteEquipmentTypes: (ids: string[]) => Promise<void>;
+  operators: ManagedOperator[];
+  onCreateOperator: (values: CreateOperatorInput) => Promise<void>;
+  onUpdateOperator: (id: string, values: UpdateOperatorInput) => Promise<void>;
+  onDeleteOperator: (id: string) => Promise<void>;
+  onDeleteOperators: (ids: string[]) => Promise<void>;
   isMutating: boolean;
 };
 
+function formatDate(value: string, locale: string) {
+  return new Intl.DateTimeFormat(locale, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
 export function DataTable({
-  equipmentTypes,
-  onCreateEquipmentType,
-  onUpdateEquipmentType,
-  onDeleteEquipmentType,
-  onDeleteEquipmentTypes,
+  operators,
+  onCreateOperator,
+  onUpdateOperator,
+  onDeleteOperator,
+  onDeleteOperators,
   isMutating,
 }: DataTableProps) {
   const { t } = useI18n();
+  const locale = useLocale();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const { columnVisibility, setColumnVisibility } = usePersistentColumnVisibility("table:equipment-types:columns");
+  const { columnVisibility, setColumnVisibility } = usePersistentColumnVisibility("table:operators:columns:v1", {
+    updatedAt: false,
+  });
   const [rowSelection, setRowSelection] = useState({});
   const [globalFilter, setGlobalFilter] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
-  const [editingEquipmentType, setEditingEquipmentType] = useState<ManagedEquipmentType | null>(null);
-  const [deletingEquipmentType, setDeletingEquipmentType] = useState<ManagedEquipmentType | null>(null);
+  const [editingOperator, setEditingOperator] = useState<ManagedOperator | null>(null);
+  const [deletingOperator, setDeletingOperator] = useState<ManagedOperator | null>(null);
 
-  const columns = useMemo<ColumnDef<ManagedEquipmentType>[]>(() => [
+  const columns = useMemo<ColumnDef<ManagedOperator>[]>(() => [
     {
       id: "select",
       header: ({ table }) => (
@@ -98,49 +115,68 @@ export function DataTable({
     },
     {
       accessorKey: "name",
-      header: ({ column }) => <SortableHeader column={column} title={t("equipmentTypes.name")} className="-ml-3" />,
+      header: ({ column }) => <SortableHeader column={column} title={t("operators.name")} className="-ml-3" />,
       enableHiding: false,
-      cell: ({ row }) => (
-        <div className="space-y-1">
-          <div className="font-medium">{row.original.name}</div>
-          <div className="text-sm text-muted-foreground">
-            {row.original.description || t("equipmentTypes.noDescription")}
-          </div>
-        </div>
-      ),
+      cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
     },
     {
-      accessorKey: "equipmentCount",
-      header: ({ column }) => (
-        <SortableHeader column={column} title={t("equipmentTypes.linkedEquipment")} className="-ml-3" />
-      ),
-      cell: ({ row }) => <Badge variant="secondary">{row.original.equipmentCount}</Badge>,
+      accessorKey: "phone",
+      header: ({ column }) => <SortableHeader column={column} title={t("operators.phone")} className="-ml-3" />,
+      cell: ({ row }) => <span className="text-sm">{row.original.phone}</span>,
+    },
+    {
+      accessorKey: "license",
+      header: ({ column }) => <SortableHeader column={column} title={t("operators.license")} className="-ml-3" />,
+      cell: ({ row }) => <Badge variant="outline">{row.original.license}</Badge>,
+      filterFn: "equals",
+    },
+    {
+      accessorKey: "updatedAt",
+      header: ({ column }) => <SortableHeader column={column} title={t("operators.updated")} className="-ml-3" />,
+      cell: ({ row }) => <span className="text-sm">{formatDate(row.original.updatedAt, locale)}</span>,
+    },
+    {
+      accessorKey: "status",
+      header: ({ column }) => <SortableHeader column={column} title={t("operators.status")} className="-ml-3" />,
+      cell: ({ row }) => {
+        const isActive = row.original.status === "active";
+        const className = isActive
+          ? "text-primary bg-primary/10"
+          : "text-destructive bg-destructive/10";
+
+        return (
+          <Badge variant="secondary" className={className}>
+            {isActive ? t("operators.active") : t("operators.inactive")}
+          </Badge>
+        );
+      },
+      filterFn: "equals",
     },
     {
       id: "actions",
-      header: t("equipmentTypes.actions"),
+      header: t("operators.actions"),
       enableSorting: false,
       enableHiding: false,
       cell: ({ row }) => {
-        const equipmentType = row.original;
+        const operator = row.original;
 
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer" disabled={isMutating}>
                 <EllipsisVertical className="size-4" />
-                <span className="sr-only">{t("equipmentTypes.actions")}</span>
+                <span className="sr-only">{t("operators.actions")}</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem className="cursor-pointer" onClick={() => setEditingEquipmentType(equipmentType)}>
+              <DropdownMenuItem className="cursor-pointer" onClick={() => setEditingOperator(operator)}>
                 <Pencil className="mr-2 size-4" />
-                {t("equipmentTypes.editType")}
+                {t("operators.editOperator")}
               </DropdownMenuItem>
               <DropdownMenuItem
                 variant="destructive"
                 className="cursor-pointer"
-                onClick={() => setDeletingEquipmentType(equipmentType)}
+                onClick={() => setDeletingOperator(operator)}
               >
                 <Trash2 className="mr-2 size-4" />
                 {t("common.delete")}
@@ -150,16 +186,20 @@ export function DataTable({
         );
       },
     },
-  ], [isMutating, t]);
+  ], [isMutating, locale, t]);
+
   const columnVisibilityLabels = useMemo<Record<string, string>>(
     () => ({
-      equipmentCount: t("equipmentTypes.linkedEquipment"),
+      phone: t("operators.phone"),
+      license: t("operators.license"),
+      status: t("operators.status"),
+      updatedAt: t("operators.updated"),
     }),
     [t],
   );
 
   const table = useReactTable({
-    data: equipmentTypes,
+    data: operators,
     columns,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
@@ -172,10 +212,10 @@ export function DataTable({
     getFilteredRowModel: getFilteredRowModel(),
     globalFilterFn: (row, _columnId, filterValue) => {
       const value = String(filterValue).toLowerCase();
-
-      return [row.original.name, row.original.description ?? ""].some((item) =>
-        item.toLowerCase().includes(value),
-      );
+      return [
+        row.original.name,
+        row.original.phone,
+      ].some((item) => item.toLowerCase().includes(value));
     },
     state: {
       sorting,
@@ -191,7 +231,16 @@ export function DataTable({
     },
   });
 
+  const licenseFilter = (table.getColumn("license")?.getFilterValue() as string) || "all";
+  const statusFilter = (table.getColumn("status")?.getFilterValue() as string) || "all";
   const selectedCount = table.getFilteredSelectedRowModel().rows.length;
+  const hasActiveFilters = Boolean(globalFilter.trim()) || columnFilters.length > 0;
+
+  const handleClearFilters = () => {
+    setGlobalFilter("");
+    setColumnFilters([]);
+    table.setPageIndex(0);
+  };
 
   return (
     <div className="w-full space-y-4">
@@ -199,22 +248,67 @@ export function DataTable({
           <div className="relative min-w-[240px] flex-1">
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder={t("equipmentTypes.searchPlaceholder")}
+              placeholder={t("operators.searchPlaceholder")}
               value={globalFilter}
               onChange={(event) => setGlobalFilter(event.target.value)}
               className="h-10 rounded-lg border-muted-foreground/20 bg-background pl-9"
             />
           </div>
 
+          <div className="min-w-[180px] space-y-2">
+            <Label htmlFor="operator-license-filter" className="text-sm font-medium">
+              {t("operators.license")}
+            </Label>
+            <Select
+              value={licenseFilter}
+              onValueChange={(value) =>
+                table.getColumn("license")?.setFilterValue(value === "all" ? undefined : value)
+              }
+            >
+              <SelectTrigger className="h-10 w-full cursor-pointer rounded-lg" id="operator-license-filter">
+                <SelectValue placeholder={t("operators.selectLicense")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("operators.allLicenses")}</SelectItem>
+                <SelectItem value="A">A</SelectItem>
+                <SelectItem value="B">B</SelectItem>
+                <SelectItem value="C">C</SelectItem>
+                <SelectItem value="D">D</SelectItem>
+                <SelectItem value="E">E</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="min-w-[180px] space-y-2">
+            <Label htmlFor="operator-status-filter" className="text-sm font-medium">
+              {t("operators.status")}
+            </Label>
+            <Select
+              value={statusFilter}
+              onValueChange={(value) =>
+                table.getColumn("status")?.setFilterValue(value === "all" ? undefined : value)
+              }
+            >
+              <SelectTrigger className="h-10 w-full cursor-pointer rounded-lg" id="operator-status-filter">
+                <SelectValue placeholder={t("operators.selectStatus")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("operators.allStatuses")}</SelectItem>
+                <SelectItem value="active">{t("operators.active")}</SelectItem>
+                <SelectItem value="inactive">{t("operators.inactive")}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="ml-auto">
             <div className="min-w-[180px] space-y-2">
-              <Label htmlFor="equipment-types-column-visibility" className="text-sm font-medium">
+              <Label htmlFor="operators-column-visibility" className="text-sm font-medium">
                 {t("common.columnVisibility")}
               </Label>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
-                    id="equipment-types-column-visibility"
+                    id="operators-column-visibility"
                     variant="outline"
                     size="lg"
                     className="h-10 w-full cursor-pointer justify-between rounded-lg px-3"
@@ -240,12 +334,27 @@ export function DataTable({
             </div>
           </div>
 
+          <div className="w-full min-w-[160px] space-y-2 sm:w-auto">
+            <Label className="text-sm font-medium text-transparent">
+              {t("common.clearFilters")}
+            </Label>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 w-full cursor-pointer rounded-lg sm:w-auto"
+              onClick={handleClearFilters}
+              disabled={!hasActiveFilters}
+            >
+              {t("common.clearFilters")}
+            </Button>
+          </div>
+
           <div>
-            <EquipmentTypeFormDialog
+            <OperatorFormDialog
               mode="create"
               open={createOpen}
               onOpenChange={setCreateOpen}
-              onSubmit={onCreateEquipmentType}
+              onSubmit={onCreateOperator}
               isSubmitting={isMutating}
             />
           </div>
@@ -275,7 +384,7 @@ export function DataTable({
                 if (!ids.length) {
                   return;
                 }
-                await onDeleteEquipmentTypes(ids);
+                await onDeleteOperators(ids);
                 table.resetRowSelection();
               }}
               disabled={isMutating}
@@ -313,7 +422,7 @@ export function DataTable({
             ) : (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
-                  {t("equipmentTypes.noTypes")}
+                  {t("operators.noOperators")}
                 </TableCell>
               </TableRow>
             )}
@@ -322,7 +431,7 @@ export function DataTable({
       </AdminListTableCard>
 
       <AdminListPaginationFooter
-        countLabel={t("equipmentTypes.typeCount", { count: table.getFilteredRowModel().rows.length })}
+        countLabel={t("operators.operatorCount", { count: table.getFilteredRowModel().rows.length })}
         previousLabel={t("common.previous")}
         nextLabel={t("common.next")}
         onPreviousPage={() => table.previousPage()}
@@ -331,44 +440,40 @@ export function DataTable({
         canNextPage={table.getCanNextPage()}
       />
 
-      <EquipmentTypeFormDialog
+      <OperatorFormDialog
         mode="edit"
-        open={Boolean(editingEquipmentType)}
+        open={Boolean(editingOperator)}
         onOpenChange={(open) => {
           if (!open) {
-            setEditingEquipmentType(null);
+            setEditingOperator(null);
           }
         }}
         onSubmit={async (values) => {
-          if (!editingEquipmentType) {
+          if (!editingOperator) {
             return;
           }
 
-          await onUpdateEquipmentType(editingEquipmentType.id, values as UpdateEquipmentTypeInput);
+          await onUpdateOperator(editingOperator.id, values as UpdateOperatorInput);
         }}
         isSubmitting={isMutating}
-        equipmentType={editingEquipmentType}
+        operator={editingOperator}
       />
 
       <ConfirmDeleteDialog
-        open={Boolean(deletingEquipmentType)}
+        open={Boolean(deletingOperator)}
         onOpenChange={(open) => {
           if (!open) {
-            setDeletingEquipmentType(null);
+            setDeletingOperator(null);
           }
         }}
-        description={
-          deletingEquipmentType
-            ? t("equipmentTypes.confirmDelete", { name: deletingEquipmentType.name })
-            : ""
-        }
+        description={deletingOperator ? t("operators.confirmDelete", { name: deletingOperator.name }) : ""}
         onConfirm={async () => {
-          if (!deletingEquipmentType) {
+          if (!deletingOperator) {
             return;
           }
 
-          await onDeleteEquipmentType(deletingEquipmentType.id);
-          setDeletingEquipmentType(null);
+          await onDeleteOperator(deletingOperator.id);
+          setDeletingOperator(null);
         }}
         isLoading={isMutating}
       />

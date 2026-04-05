@@ -22,9 +22,12 @@ import { useIsMobile } from "@/hooks/use-mobile"
 const routePermissions = [
   { path: "/dashboard", permission: "dashboard.read" },
   { path: "/calendar", permission: "calendar.read" },
+  { path: "/budgets", permission: "budgets.read" },
   { path: "/company", permission: "company.read" },
   { path: "/clients", permission: "clients.read" },
+  { path: "/operators", permission: "operators.read" },
   { path: "/equipment-types", permission: "equipment-types.read" },
+  { path: "/service-types", permission: "service-types.read" },
   { path: "/equipment", permission: "equipment.read" },
   { path: "/users", permission: "users.read" },
   { path: "/roles", permission: "roles.read" },

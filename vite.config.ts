@@ -9,6 +9,20 @@ export default defineConfig({
     tailwindcss(),
     vinext(),
   ],
+  ssr: {
+    external: [
+      "puppeteer-core",
+      "@puppeteer/browsers",
+      "semver",
+    ],
+  },
+  optimizeDeps: {
+    exclude: [
+      "puppeteer-core",
+      "@puppeteer/browsers",
+      "semver",
+    ],
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

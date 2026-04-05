@@ -19,6 +19,10 @@ type ConfirmDeleteDialogProps = {
   description: string;
   onConfirm: () => Promise<void>;
   isLoading?: boolean;
+  title?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  confirmVariant?: React.ComponentProps<typeof Button>["variant"];
 };
 
 export function ConfirmDeleteDialog({
@@ -27,6 +31,10 @@ export function ConfirmDeleteDialog({
   description,
   onConfirm,
   isLoading = false,
+  title,
+  confirmLabel,
+  cancelLabel,
+  confirmVariant = "destructive",
 }: ConfirmDeleteDialogProps) {
   const { t } = useI18n();
   const [isConfirming, setIsConfirming] = useState(false);
@@ -37,6 +45,8 @@ export function ConfirmDeleteDialog({
     try {
       await onConfirm();
       onOpenChange(false);
+    } catch {
+      return;
     } finally {
       setIsConfirming(false);
     }
@@ -48,7 +58,7 @@ export function ConfirmDeleteDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{t("common.confirmDeleteTitle")}</DialogTitle>
+          <DialogTitle>{title ?? t("common.confirmDeleteTitle")}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -59,16 +69,16 @@ export function ConfirmDeleteDialog({
             onClick={() => onOpenChange(false)}
             disabled={disabled}
           >
-            {t("common.cancel")}
+            {cancelLabel ?? t("common.cancel")}
           </Button>
           <Button
             type="button"
-            variant="destructive"
+            variant={confirmVariant}
             className="cursor-pointer"
             onClick={() => void handleConfirm()}
             disabled={disabled}
           >
-            {disabled ? t("common.loading") : t("common.delete")}
+            {disabled ? t("common.loading") : confirmLabel ?? t("common.delete")}
           </Button>
         </DialogFooter>
       </DialogContent>

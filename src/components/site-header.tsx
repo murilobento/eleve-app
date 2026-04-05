@@ -45,9 +45,12 @@ export function SiteHeader() {
     const pageTitleMap: Record<string, string> = {
       "/dashboard": t("navigation.dashboard"),
       "/calendar": t("navigation.calendar"),
+      "/budgets": t("navigation.budgets"),
       "/company": t("navigation.company"),
       "/clients": t("navigation.clients"),
+      "/operators": t("navigation.operators"),
       "/equipment-types": t("navigation.equipmentTypes"),
+      "/service-types": t("navigation.serviceTypes"),
       "/equipment": t("navigation.equipment"),
       "/roles": t("navigation.roles"),
       "/users": t("navigation.users"),

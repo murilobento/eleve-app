@@ -16,6 +16,11 @@ import { ChevronDown, EllipsisVertical, Pencil, Search, ShieldCheck, Trash2 } fr
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  AdminListPaginationFooter,
+  AdminListTableCard,
+  AdminListToolbar,
+} from "@/components/admin-list-layout";
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -206,8 +211,7 @@ export function DataTable({
 
   return (
     <div className="w-full space-y-4">
-      <div className="rounded-xl border bg-card/40 p-3">
-        <div className="flex flex-wrap items-end gap-3">
+      <AdminListToolbar>
           <div className="relative min-w-[240px] flex-1">
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -219,16 +223,20 @@ export function DataTable({
           </div>
 
           <div className="ml-auto">
-            <div className="min-w-[170px] space-y-2">
+            <div className="min-w-[180px] space-y-2">
               <Label htmlFor="roles-column-visibility" className="text-sm font-medium">
                 {t("common.columnVisibility")}
               </Label>
               <DropdownMenu>
-                <DropdownMenuTrigger
-                  id="roles-column-visibility"
-                  className="inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-lg border bg-background px-3 text-sm font-medium shadow-xs hover:bg-accent hover:text-accent-foreground"
-                >
-                  {t("common.columns")} <ChevronDown className="ml-2 size-4" />
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    id="roles-column-visibility"
+                    variant="outline"
+                    size="lg"
+                    className="h-10 w-full cursor-pointer justify-between rounded-lg px-3"
+                  >
+                    {t("common.columns")} <ChevronDown className="size-4" />
+                  </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   {table
@@ -257,8 +265,7 @@ export function DataTable({
               isSubmitting={isMutating}
             />
           </div>
-        </div>
-      </div>
+      </AdminListToolbar>
 
       {selectedCount > 0 ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/30 px-3 py-2">
@@ -300,7 +307,7 @@ export function DataTable({
         </div>
       ) : null}
 
-      <div className="rounded-md border">
+      <AdminListTableCard>
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -326,41 +333,24 @@ export function DataTable({
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
+                <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
                   {t("roles.noRoles")}
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
-      </div>
+      </AdminListTableCard>
 
-      <div className="flex items-center justify-between gap-4 py-4">
-        <div className="text-sm text-muted-foreground">
-          {t("roles.roleCount", { count: table.getFilteredRowModel().rows.length })}
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
-            className="cursor-pointer"
-          >
-            {t("common.previous")}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
-            className="cursor-pointer"
-          >
-            {t("common.next")}
-          </Button>
-        </div>
-      </div>
+      <AdminListPaginationFooter
+        countLabel={t("roles.roleCount", { count: table.getFilteredRowModel().rows.length })}
+        previousLabel={t("common.previous")}
+        nextLabel={t("common.next")}
+        onPreviousPage={() => table.previousPage()}
+        onNextPage={() => table.nextPage()}
+        canPreviousPage={table.getCanPreviousPage()}
+        canNextPage={table.getCanNextPage()}
+      />
 
       <RoleFormDialog
         mode="edit"

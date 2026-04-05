@@ -83,3 +83,5 @@ export type ManagedEquipment = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type EquipmentOption = Pick<ManagedEquipment, "id" | "name" | "brand" | "model">;

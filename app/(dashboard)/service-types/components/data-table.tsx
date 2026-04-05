@@ -32,7 +32,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { SortableHeader } from "@/components/sortable-header";
 import {
   Select,
   SelectContent,
@@ -40,25 +39,39 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SortableHeader } from "@/components/sortable-header";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type {
-  CreateClientInput,
-  ManagedClient,
-  UpdateClientInput,
-} from "@/lib/clients-admin";
 import { usePersistentColumnVisibility } from "@/hooks/use-persistent-column-visibility";
 import { useI18n, useLocale } from "@/i18n/provider";
+import type { EquipmentOption } from "@/lib/equipment-admin";
+import type {
+  CreateServiceTypeInput,
+  ManagedServiceType,
+  UpdateServiceTypeInput,
+} from "@/lib/service-types-admin";
 
-import { ClientFormDialog } from "./client-form-dialog";
+import { ServiceTypeFormDialog } from "./service-type-form-dialog";
 
 type DataTableProps = {
-  clients: ManagedClient[];
-  onCreateClient: (values: CreateClientInput) => Promise<void>;
-  onUpdateClient: (id: string, values: UpdateClientInput) => Promise<void>;
-  onDeleteClient: (id: string) => Promise<void>;
-  onDeleteClients: (ids: string[]) => Promise<void>;
+  serviceTypes: ManagedServiceType[];
+  equipment: EquipmentOption[];
+  onCreateServiceType: (values: CreateServiceTypeInput) => Promise<void>;
+  onUpdateServiceType: (id: string, values: UpdateServiceTypeInput) => Promise<void>;
+  onDeleteServiceType: (id: string) => Promise<void>;
+  onDeleteServiceTypes: (ids: string[]) => Promise<void>;
   isMutating: boolean;
 };
+
+const billingUnits = [
+  "hour",
+  "daily",
+  "monthly",
+  "annual",
+  "km",
+  "freight",
+  "mobilization_demobilization",
+  "counterweight_transport",
+] as const;
 
 function formatDate(value: string, locale: string) {
   return new Intl.DateTimeFormat(locale, {
@@ -67,40 +80,37 @@ function formatDate(value: string, locale: string) {
   }).format(new Date(value));
 }
 
-function formatDocument(value: string, personType: "PF" | "PJ") {
-  if (personType === "PF" && value.length === 11) {
-    return value.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4");
-  }
-
-  if (personType === "PJ" && value.length === 14) {
-    return value.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
-  }
-
-  return value;
+function formatMoney(value: number, locale: string) {
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: "BRL",
+  }).format(value);
 }
 
 export function DataTable({
-  clients,
-  onCreateClient,
-  onUpdateClient,
-  onDeleteClient,
-  onDeleteClients,
+  serviceTypes,
+  equipment,
+  onCreateServiceType,
+  onUpdateServiceType,
+  onDeleteServiceType,
+  onDeleteServiceTypes,
   isMutating,
 }: DataTableProps) {
   const { t } = useI18n();
   const locale = useLocale();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const { columnVisibility, setColumnVisibility } = usePersistentColumnVisibility("table:clients:columns:v3", {
+  const { columnVisibility, setColumnVisibility } = usePersistentColumnVisibility("table:service-types:columns:v1", {
     updatedAt: false,
   });
   const [rowSelection, setRowSelection] = useState({});
   const [globalFilter, setGlobalFilter] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
-  const [editingClient, setEditingClient] = useState<ManagedClient | null>(null);
-  const [deletingClient, setDeletingClient] = useState<ManagedClient | null>(null);
+  const [editingServiceType, setEditingServiceType] = useState<ManagedServiceType | null>(null);
+  const [deletingServiceType, setDeletingServiceType] = useState<ManagedServiceType | null>(null);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
-  const columns = useMemo<ColumnDef<ManagedClient>[]>(() => [
+  const columns = useMemo<ColumnDef<ManagedServiceType>[]>(() => [
     {
       id: "select",
       header: ({ table }) => (
@@ -126,69 +136,49 @@ export function DataTable({
       size: 50,
     },
     {
-      accessorKey: "legalName",
-      header: ({ column }) => <SortableHeader column={column} title={t("clients.name")} className="-ml-3" />,
+      accessorKey: "name",
+      header: ({ column }) => <SortableHeader column={column} title={t("serviceTypes.name")} className="-ml-3" />,
       enableHiding: false,
       cell: ({ row }) => (
         <div className="space-y-1">
-          <div className="font-medium">{row.original.legalName}</div>
+          <div className="font-medium">{row.original.name}</div>
           <div className="text-sm text-muted-foreground">
-            {row.original.tradeName || row.original.contactName || row.original.email || "-"}
+            {row.original.description || t("serviceTypes.noDescription")}
           </div>
         </div>
       ),
     },
     {
-      accessorKey: "personType",
-      header: ({ column }) => <SortableHeader column={column} title={t("clients.personType")} className="-ml-3" />,
-      cell: ({ row }) => (
-        <Badge variant={row.original.personType === "PJ" ? "default" : "secondary"}>
-          {row.original.personType}
-        </Badge>
-      ),
+      accessorKey: "billingUnit",
+      header: ({ column }) => <SortableHeader column={column} title={t("serviceTypes.billingUnit")} className="-ml-3" />,
+      cell: ({ row }) => <Badge variant="outline">{t(`serviceTypes.billingUnits.${row.original.billingUnit}`)}</Badge>,
       filterFn: "equals",
     },
     {
-      accessorKey: "document",
-      header: ({ column }) => <SortableHeader column={column} title={t("clients.document")} className="-ml-3" />,
-      cell: ({ row }) => (
-        <span className="text-sm">
-          {formatDocument(row.original.document, row.original.personType)}
-        </span>
-      ),
+      accessorKey: "baseValue",
+      header: ({ column }) => <SortableHeader column={column} title={t("serviceTypes.baseValue")} className="-ml-3" />,
+      cell: ({ row }) => <span className="text-sm font-medium">{formatMoney(row.original.baseValue, locale)}</span>,
     },
     {
-      accessorKey: "contactName",
-      header: ({ column }) => <SortableHeader column={column} title={t("clients.contact")} className="-ml-3" />,
+      accessorKey: "equipmentCount",
+      header: ({ column }) => (
+        <SortableHeader column={column} title={t("serviceTypes.linkedEquipment")} className="-ml-3" />
+      ),
       cell: ({ row }) => (
-        <div className="text-sm">
-          <div>{row.original.contactName || "-"}</div>
-          <div className="text-muted-foreground">{row.original.contactPhone || "-"}</div>
+        <div className="space-y-1">
+          <Badge variant="secondary">{row.original.equipmentCount}</Badge>
+          {row.original.equipment.length > 0 ? (
+            <div className="text-xs text-muted-foreground">
+              {row.original.equipment.slice(0, 2).map((item) => item.name).join(", ")}
+              {row.original.equipment.length > 2 ? ` +${row.original.equipment.length - 2}` : ""}
+            </div>
+          ) : null}
         </div>
       ),
     },
     {
-      accessorKey: "email",
-      header: ({ column }) => <SortableHeader column={column} title={t("clients.email")} className="-ml-3" />,
-      cell: ({ row }) => <span className="text-sm">{row.original.email || "-"}</span>,
-    },
-    {
-      accessorKey: "location",
-      header: ({ column }) => <SortableHeader column={column} title={t("clients.location")} className="-ml-3" />,
-      cell: ({ row }) => (
-        <span className="text-sm">
-          {row.original.city} / {row.original.state}
-        </span>
-      ),
-    },
-    {
-      accessorKey: "updatedAt",
-      header: ({ column }) => <SortableHeader column={column} title={t("clients.updated")} className="-ml-3" />,
-      cell: ({ row }) => <span className="text-sm">{formatDate(row.original.updatedAt, locale)}</span>,
-    },
-    {
       accessorKey: "status",
-      header: ({ column }) => <SortableHeader column={column} title={t("clients.status")} className="-ml-3" />,
+      header: ({ column }) => <SortableHeader column={column} title={t("serviceTypes.status")} className="-ml-3" />,
       cell: ({ row }) => {
         const isActive = row.original.status === "active";
         const className = isActive
@@ -197,37 +187,42 @@ export function DataTable({
 
         return (
           <Badge variant="secondary" className={className}>
-            {isActive ? t("clients.active") : t("clients.inactive")}
+            {isActive ? t("serviceTypes.active") : t("serviceTypes.inactive")}
           </Badge>
         );
       },
       filterFn: "equals",
     },
     {
+      accessorKey: "updatedAt",
+      header: ({ column }) => <SortableHeader column={column} title={t("serviceTypes.updated")} className="-ml-3" />,
+      cell: ({ row }) => <span className="text-sm">{formatDate(row.original.updatedAt, locale)}</span>,
+    },
+    {
       id: "actions",
-      header: t("clients.actions"),
+      header: t("serviceTypes.actions"),
       enableSorting: false,
       enableHiding: false,
       cell: ({ row }) => {
-        const client = row.original;
+        const serviceType = row.original;
 
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer" disabled={isMutating}>
                 <EllipsisVertical className="size-4" />
-                <span className="sr-only">{t("clients.actions")}</span>
+                <span className="sr-only">{t("serviceTypes.actions")}</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem className="cursor-pointer" onClick={() => setEditingClient(client)}>
+              <DropdownMenuItem className="cursor-pointer" onClick={() => setEditingServiceType(serviceType)}>
                 <Pencil className="mr-2 size-4" />
-                {t("clients.editClient")}
+                {t("serviceTypes.editType")}
               </DropdownMenuItem>
               <DropdownMenuItem
                 variant="destructive"
                 className="cursor-pointer"
-                onClick={() => setDeletingClient(client)}
+                onClick={() => setDeletingServiceType(serviceType)}
               >
                 <Trash2 className="mr-2 size-4" />
                 {t("common.delete")}
@@ -241,19 +236,17 @@ export function DataTable({
 
   const columnVisibilityLabels = useMemo<Record<string, string>>(
     () => ({
-      personType: t("clients.personType"),
-      status: t("clients.status"),
-      document: t("clients.document"),
-      contactName: t("clients.contactName"),
-      email: t("clients.email"),
-      location: t("clients.location"),
-      updatedAt: t("clients.updated"),
+      billingUnit: t("serviceTypes.billingUnit"),
+      baseValue: t("serviceTypes.baseValue"),
+      equipmentCount: t("serviceTypes.linkedEquipment"),
+      status: t("serviceTypes.status"),
+      updatedAt: t("serviceTypes.updated"),
     }),
-    [t]
+    [t],
   );
 
   const table = useReactTable({
-    data: clients,
+    data: serviceTypes,
     columns,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
@@ -268,14 +261,9 @@ export function DataTable({
       const value = String(filterValue).toLowerCase();
 
       return [
-        row.original.legalName,
-        row.original.tradeName ?? "",
-        row.original.contactName ?? "",
-        row.original.contactPhone ?? "",
-        row.original.document,
-        row.original.email ?? "",
-        row.original.city,
-        row.original.state,
+        row.original.name,
+        row.original.description ?? "",
+        ...row.original.equipment.map((item) => `${item.name} ${item.brand} ${item.model}`),
       ].some((item) => item.toLowerCase().includes(value));
     },
     state: {
@@ -292,8 +280,6 @@ export function DataTable({
     },
   });
 
-  const personTypeFilter = (table.getColumn("personType")?.getFilterValue() as string) || "all";
-  const statusFilter = (table.getColumn("status")?.getFilterValue() as string) || "all";
   const selectedCount = table.getFilteredSelectedRowModel().rows.length;
   const hasActiveFilters = Boolean(globalFilter.trim()) || columnFilters.length > 0;
 
@@ -309,64 +295,71 @@ export function DataTable({
           <div className="relative min-w-[240px] flex-1">
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder={t("clients.searchPlaceholder")}
+              placeholder={t("serviceTypes.searchPlaceholder")}
               value={globalFilter}
               onChange={(event) => setGlobalFilter(event.target.value)}
               className="h-10 rounded-lg border-muted-foreground/20 bg-background pl-9"
             />
           </div>
 
-          <div className="min-w-[180px] space-y-2">
-            <Label htmlFor="client-person-type-filter" className="text-sm font-medium">
-              {t("clients.personType")}
-            </Label>
-            <Select
-              value={personTypeFilter}
-              onValueChange={(value) =>
-                table.getColumn("personType")?.setFilterValue(value === "all" ? undefined : value)
-              }
-            >
-              <SelectTrigger className="h-10 w-full cursor-pointer rounded-lg" id="client-person-type-filter">
-                <SelectValue placeholder={t("clients.selectPersonType")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("clients.allPersonTypes")}</SelectItem>
-                <SelectItem value="PF">{t("clients.individual")}</SelectItem>
-                <SelectItem value="PJ">{t("clients.legalEntity")}</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="w-full min-w-[180px] sm:w-auto">
+            <div className="space-y-2">
+              <Label htmlFor="service-type-unit-filter" className="text-sm font-medium">
+                {t("serviceTypes.billingUnit")}
+              </Label>
+              <Select
+                value={(table.getColumn("billingUnit")?.getFilterValue() as string | undefined) ?? "all"}
+                onValueChange={(value) =>
+                  table.getColumn("billingUnit")?.setFilterValue(value === "all" ? undefined : value)
+                }
+              >
+                <SelectTrigger className="h-10 w-full cursor-pointer rounded-lg" id="service-type-unit-filter">
+                  <SelectValue placeholder={t("serviceTypes.selectBillingUnit")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("serviceTypes.allBillingUnits")}</SelectItem>
+                  {billingUnits.map((billingUnit) => (
+                    <SelectItem key={billingUnit} value={billingUnit}>
+                      {t(`serviceTypes.billingUnits.${billingUnit}`)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          <div className="min-w-[180px] space-y-2">
-            <Label htmlFor="client-status-filter" className="text-sm font-medium">
-              {t("clients.status")}
-            </Label>
-            <Select
-              value={statusFilter}
-              onValueChange={(value) =>
-                table.getColumn("status")?.setFilterValue(value === "all" ? undefined : value)
-              }
-            >
-              <SelectTrigger className="h-10 w-full cursor-pointer rounded-lg" id="client-status-filter">
-                <SelectValue placeholder={t("clients.selectStatus")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("clients.allStatuses")}</SelectItem>
-                <SelectItem value="active">{t("clients.active")}</SelectItem>
-                <SelectItem value="inactive">{t("clients.inactive")}</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="w-full min-w-[180px] sm:w-auto">
+            <div className="space-y-2">
+              <Label htmlFor="service-type-status-filter" className="text-sm font-medium">
+                {t("serviceTypes.status")}
+              </Label>
+              <Select
+                value={(table.getColumn("status")?.getFilterValue() as string | undefined) ?? "all"}
+                onValueChange={(value) =>
+                  table.getColumn("status")?.setFilterValue(value === "all" ? undefined : value)
+                }
+              >
+                <SelectTrigger className="h-10 w-full cursor-pointer rounded-lg" id="service-type-status-filter">
+                  <SelectValue placeholder={t("serviceTypes.selectStatus")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("serviceTypes.allStatuses")}</SelectItem>
+                  <SelectItem value="active">{t("serviceTypes.active")}</SelectItem>
+                  <SelectItem value="inactive">{t("serviceTypes.inactive")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="ml-auto">
             <div className="min-w-[180px] space-y-2">
-              <Label htmlFor="clients-column-visibility" className="text-sm font-medium">
+              <Label htmlFor="service-types-column-visibility" className="text-sm font-medium">
                 {t("common.columnVisibility")}
               </Label>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
-                    id="clients-column-visibility"
+                    id="service-types-column-visibility"
                     variant="outline"
                     size="lg"
                     className="h-10 w-full cursor-pointer justify-between rounded-lg px-3"
@@ -408,12 +401,13 @@ export function DataTable({
           </div>
 
           <div>
-            <ClientFormDialog
+            <ServiceTypeFormDialog
               mode="create"
               open={createOpen}
               onOpenChange={setCreateOpen}
-              onSubmit={onCreateClient}
+              onSubmit={onCreateServiceType}
               isSubmitting={isMutating}
+              equipment={equipment}
             />
           </div>
       </AdminListToolbar>
@@ -437,14 +431,7 @@ export function DataTable({
               variant="destructive"
               size="sm"
               className="cursor-pointer"
-              onClick={async () => {
-                const ids = table.getSelectedRowModel().rows.map((row) => row.original.id);
-                if (!ids.length) {
-                  return;
-                }
-                await onDeleteClients(ids);
-                table.resetRowSelection();
-              }}
+              onClick={() => setBulkDeleteOpen(true)}
               disabled={isMutating}
             >
               {t("common.deleteSelected")}
@@ -480,7 +467,7 @@ export function DataTable({
             ) : (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
-                  {t("clients.noClients")}
+                  {t("serviceTypes.noTypes")}
                 </TableCell>
               </TableRow>
             )}
@@ -489,7 +476,7 @@ export function DataTable({
       </AdminListTableCard>
 
       <AdminListPaginationFooter
-        countLabel={t("clients.clientCount", { count: table.getFilteredRowModel().rows.length })}
+        countLabel={t("serviceTypes.typeCount", { count: table.getFilteredRowModel().rows.length })}
         previousLabel={t("common.previous")}
         nextLabel={t("common.next")}
         onPreviousPage={() => table.previousPage()}
@@ -498,40 +485,61 @@ export function DataTable({
         canNextPage={table.getCanNextPage()}
       />
 
-      <ClientFormDialog
+      <ServiceTypeFormDialog
         mode="edit"
-        open={Boolean(editingClient)}
+        open={Boolean(editingServiceType)}
         onOpenChange={(open) => {
           if (!open) {
-            setEditingClient(null);
+            setEditingServiceType(null);
           }
         }}
         onSubmit={async (values) => {
-          if (!editingClient) {
+          if (!editingServiceType) {
             return;
           }
 
-          await onUpdateClient(editingClient.id, values as UpdateClientInput);
+          await onUpdateServiceType(editingServiceType.id, values);
+          setEditingServiceType(null);
         }}
         isSubmitting={isMutating}
-        client={editingClient}
+        serviceType={editingServiceType}
+        equipment={equipment}
       />
 
       <ConfirmDeleteDialog
-        open={Boolean(deletingClient)}
-        onOpenChange={(open) => {
-          if (!open) {
-            setDeletingClient(null);
-          }
-        }}
-        description={deletingClient ? t("clients.confirmDelete", { name: deletingClient.legalName }) : ""}
+        open={bulkDeleteOpen}
+        onOpenChange={setBulkDeleteOpen}
+        description={t("serviceTypes.confirmBulkDelete", { count: selectedCount })}
         onConfirm={async () => {
-          if (!deletingClient) {
+          const ids = table.getSelectedRowModel().rows.map((row) => row.original.id);
+          if (!ids.length) {
             return;
           }
 
-          await onDeleteClient(deletingClient.id);
-          setDeletingClient(null);
+          await onDeleteServiceTypes(ids);
+          table.resetRowSelection();
+          setBulkDeleteOpen(false);
+        }}
+        isLoading={isMutating}
+      />
+
+      <ConfirmDeleteDialog
+        open={Boolean(deletingServiceType)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeletingServiceType(null);
+          }
+        }}
+        description={deletingServiceType
+          ? t("serviceTypes.confirmDelete", { name: deletingServiceType.name })
+          : ""}
+        onConfirm={async () => {
+          if (!deletingServiceType) {
+            return;
+          }
+
+          await onDeleteServiceType(deletingServiceType.id);
+          setDeletingServiceType(null);
         }}
         isLoading={isMutating}
       />

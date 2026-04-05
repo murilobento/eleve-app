@@ -3,11 +3,21 @@ import { NextResponse } from "next/server";
 
 import { auth, pool } from "@/lib/auth";
 import {
+  calculateBudgetSubtotal,
+  calculateBudgetTotal,
+  type BudgetServiceItemInput,
+  type BudgetTransitionStatus,
+  type ManagedBudget,
+  type ManagedBudgetItem,
+} from "@/lib/budgets-admin";
+import {
   PERMISSION_CATALOG,
   type PermissionKey,
   type RoleRecord,
   type UserRoleSummary,
 } from "@/lib/rbac-shared";
+import type { EquipmentOption } from "@/lib/equipment-admin";
+import type { ManagedServiceType } from "@/lib/service-types-admin";
 
 export type RoleWithDetails = RoleRecord & {
   permissions: PermissionKey[];
@@ -58,6 +68,30 @@ type EquipmentRow = {
   updated_at: string;
 };
 
+type ServiceTypeRow = {
+  id: string;
+  name: string;
+  description: string | null;
+  status: "active" | "inactive";
+  billing_unit:
+    | "hour"
+    | "daily"
+    | "monthly"
+    | "annual"
+    | "km"
+    | "freight"
+    | "mobilization_demobilization"
+    | "counterweight_transport";
+  base_value: string | number;
+  minimum_hours: string | number | null;
+  minimum_km: string | number | null;
+  created_at: string;
+  updated_at: string;
+  equipment_ids?: string[] | null;
+  equipment_json?: string | null;
+  equipment_count?: string | number;
+};
+
 type CompanyRow = {
   id: string;
   app_name: string | null;
@@ -101,6 +135,74 @@ type ClientRow = {
   country: string;
   created_at: string;
   updated_at: string;
+};
+
+type OperatorRow = {
+  id: string;
+  name: string;
+  phone: string;
+  license: "A" | "B" | "C" | "D" | "E";
+  status: "active" | "inactive";
+  created_at: string;
+  updated_at: string;
+};
+
+type BudgetRow = {
+  id: string;
+  number: string;
+  status: "pending" | "approved" | "cancelled";
+  client_id: string;
+  client_name: string;
+  service_postal_code: string;
+  service_street: string;
+  service_number: string;
+  service_complement: string | null;
+  service_district: string;
+  service_city: string;
+  service_state: string;
+  service_country: string;
+  subtotal_value: string | number;
+  manual_adjustment: string | number;
+  total_value: string | number;
+  item_count: string | number;
+  items_json: string;
+  notes: string | null;
+  approved_at: string | null;
+  cancelled_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type BudgetItemRow = {
+  id: string;
+  position: number;
+  service_type_id: string;
+  service_type_name: string;
+  service_type_billing_unit: string;
+  equipment_id: string;
+  equipment_name: string;
+  equipment_brand: string;
+  equipment_model: string;
+  operator_id: string;
+  operator_name: string;
+  service_description: string;
+  service_date: string;
+  start_time: string;
+  end_time: string;
+  base_value: string | number;
+  minimum_hours: string | number | null;
+  minimum_km: string | number | null;
+  initial_value: string | number;
+  created_at: string;
+  updated_at: string;
+};
+
+type BudgetServiceTypeSnapshotRow = {
+  id: string;
+  billing_unit: ServiceTypeRow["billing_unit"];
+  base_value: string | number;
+  minimum_hours: string | number | null;
+  minimum_km: string | number | null;
 };
 
 type UserAccessRow = {
@@ -283,6 +385,40 @@ async function ensureSchema() {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS service_types (
+      id text PRIMARY KEY,
+      name text NOT NULL,
+      description text,
+      status text NOT NULL DEFAULT 'active',
+      billing_unit text NOT NULL,
+      base_value numeric(12, 2) NOT NULL,
+      minimum_hours numeric(12, 2),
+      minimum_km numeric(12, 2),
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+  `);
+
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS service_types_name_lower_idx
+    ON service_types ((lower(name)));
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS service_type_equipment (
+      service_type_id text NOT NULL REFERENCES service_types(id) ON DELETE CASCADE,
+      equipment_id text NOT NULL REFERENCES equipment(id) ON DELETE RESTRICT,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (service_type_id, equipment_id)
+    );
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS service_type_equipment_equipment_idx
+    ON service_type_equipment (equipment_id);
+  `);
+
+  await pool.query(`
     ALTER TABLE clients
     ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'active';
   `);
@@ -305,6 +441,289 @@ async function ensureSchema() {
   await pool.query(`
     ALTER TABLE clients
     ADD COLUMN IF NOT EXISTS contact_phone text;
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS operators (
+      id text PRIMARY KEY,
+      name text NOT NULL,
+      phone text NOT NULL,
+      license text NOT NULL,
+      status text NOT NULL DEFAULT 'active',
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+  `);
+
+  await pool.query(`
+    ALTER TABLE operators
+    ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'active';
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS budgets (
+      id text PRIMARY KEY,
+      number text NOT NULL,
+      status text NOT NULL DEFAULT 'pending',
+      client_id text NOT NULL REFERENCES clients(id) ON DELETE RESTRICT,
+      equipment_id text NOT NULL REFERENCES equipment(id) ON DELETE RESTRICT,
+      service_type_id text NOT NULL REFERENCES service_types(id) ON DELETE RESTRICT,
+      operator_id text NOT NULL REFERENCES operators(id) ON DELETE RESTRICT,
+      service_description text NOT NULL,
+      service_date date NOT NULL,
+      start_time time NOT NULL,
+      end_time time NOT NULL,
+      service_postal_code text NOT NULL,
+      service_street text NOT NULL,
+      service_number text NOT NULL,
+      service_complement text,
+      service_district text NOT NULL,
+      service_city text NOT NULL,
+      service_state text NOT NULL,
+      service_country text NOT NULL DEFAULT 'Brasil',
+      initial_value numeric(12, 2) NOT NULL,
+      notes text,
+      approved_at timestamptz,
+      cancelled_at timestamptz,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+  `);
+
+  await pool.query(`
+    ALTER TABLE budgets
+    ADD COLUMN IF NOT EXISTS manual_adjustment numeric(12, 2) NOT NULL DEFAULT 0;
+  `);
+
+  await pool.query(`
+    ALTER TABLE budgets
+    ADD COLUMN IF NOT EXISTS subtotal_value numeric(12, 2);
+  `);
+
+  await pool.query(`
+    ALTER TABLE budgets
+    ADD COLUMN IF NOT EXISTS total_value numeric(12, 2);
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS budget_items (
+      id text PRIMARY KEY,
+      budget_id text NOT NULL REFERENCES budgets(id) ON DELETE CASCADE,
+      position integer NOT NULL DEFAULT 0,
+      service_type_id text NOT NULL REFERENCES service_types(id) ON DELETE RESTRICT,
+      equipment_id text NOT NULL REFERENCES equipment(id) ON DELETE RESTRICT,
+      operator_id text NOT NULL REFERENCES operators(id) ON DELETE RESTRICT,
+      service_description text NOT NULL,
+      service_date date NOT NULL,
+      start_time time NOT NULL,
+      end_time time NOT NULL,
+      billing_unit text NOT NULL,
+      base_value numeric(12, 2) NOT NULL,
+      minimum_hours numeric(12, 2),
+      minimum_km numeric(12, 2),
+      initial_value numeric(12, 2) NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+  `);
+
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS budget_items_budget_position_idx
+    ON budget_items (budget_id, position);
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS budget_items_budget_id_idx
+    ON budget_items (budget_id);
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS budget_items_service_type_id_idx
+    ON budget_items (service_type_id);
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS budget_items_equipment_id_idx
+    ON budget_items (equipment_id);
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS budget_items_operator_id_idx
+    ON budget_items (operator_id);
+  `);
+
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS budgets_number_idx
+    ON budgets (number);
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS budgets_status_idx
+    ON budgets (status);
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS budgets_client_id_idx
+    ON budgets (client_id);
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS budgets_equipment_id_idx
+    ON budgets (equipment_id);
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS budgets_service_type_id_idx
+    ON budgets (service_type_id);
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS budgets_operator_id_idx
+    ON budgets (operator_id);
+  `);
+
+  const legacyBudgetItems = await pool.query<{
+    budget_id: string;
+    service_type_id: string;
+    equipment_id: string;
+    operator_id: string;
+    service_description: string;
+    service_date: string;
+    start_time: string;
+    end_time: string;
+    initial_value: string | number;
+    created_at: string;
+    updated_at: string;
+    billing_unit: ServiceTypeRow["billing_unit"];
+    base_value: string | number;
+    minimum_hours: string | number | null;
+    minimum_km: string | number | null;
+  }>(
+    `
+      SELECT
+        b.id AS budget_id,
+        b.service_type_id,
+        b.equipment_id,
+        b.operator_id,
+        b.service_description,
+        b.service_date::text,
+        b.start_time::text,
+        b.end_time::text,
+        b.initial_value::text,
+        b.created_at,
+        b.updated_at,
+        st.billing_unit,
+        st.base_value::text,
+        st.minimum_hours::text,
+        st.minimum_km::text
+      FROM budgets b
+      INNER JOIN service_types st ON st.id = b.service_type_id
+      LEFT JOIN budget_items bi ON bi.budget_id = b.id
+      WHERE bi.id IS NULL
+    `,
+  );
+
+  if (legacyBudgetItems.rows.length > 0) {
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN");
+
+      for (const row of legacyBudgetItems.rows) {
+        await client.query(
+          `
+            INSERT INTO budget_items (
+              id,
+              budget_id,
+              position,
+              service_type_id,
+              equipment_id,
+              operator_id,
+              service_description,
+              service_date,
+              start_time,
+              end_time,
+              billing_unit,
+              base_value,
+              minimum_hours,
+              minimum_km,
+              initial_value,
+              created_at,
+              updated_at
+            )
+            VALUES ($1, $2, 0, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+          `,
+          [
+            randomUUID(),
+            row.budget_id,
+            row.service_type_id,
+            row.equipment_id,
+            row.operator_id,
+            row.service_description,
+            row.service_date,
+            row.start_time,
+            row.end_time,
+            row.billing_unit,
+            row.base_value,
+            row.minimum_hours,
+            row.minimum_km,
+            row.initial_value,
+            row.created_at,
+            row.updated_at,
+          ],
+        );
+      }
+
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  await pool.query(`
+    UPDATE budget_items
+    SET initial_value = ROUND((base_value * minimum_hours)::numeric, 2),
+        updated_at = now()
+    WHERE billing_unit = 'hour'
+      AND minimum_hours IS NOT NULL
+      AND minimum_hours > 1
+      AND initial_value = base_value;
+  `);
+
+  await pool.query(`
+    UPDATE budgets b
+    SET initial_value = bi.initial_value,
+        updated_at = now()
+    FROM budget_items bi
+    WHERE bi.budget_id = b.id
+      AND bi.position = 0
+      AND b.initial_value IS DISTINCT FROM bi.initial_value;
+  `);
+
+  await pool.query(`
+    UPDATE budgets b
+    SET subtotal_value = COALESCE(items.subtotal_value, b.initial_value),
+        total_value = COALESCE(items.subtotal_value, b.initial_value) + COALESCE(b.manual_adjustment, 0)
+    FROM (
+      SELECT budget_id, SUM(initial_value)::numeric(12, 2) AS subtotal_value
+      FROM budget_items
+      GROUP BY budget_id
+    ) items
+    WHERE b.id = items.budget_id
+      AND (
+        b.subtotal_value IS DISTINCT FROM items.subtotal_value
+        OR b.total_value IS DISTINCT FROM (items.subtotal_value + COALESCE(b.manual_adjustment, 0))
+      );
+  `);
+
+  await pool.query(`
+    UPDATE budgets
+    SET subtotal_value = COALESCE(subtotal_value, initial_value),
+        total_value = COALESCE(total_value, COALESCE(subtotal_value, initial_value) + COALESCE(manual_adjustment, 0))
+    WHERE subtotal_value IS NULL OR total_value IS NULL;
   `);
 }
 
@@ -609,6 +1028,26 @@ function mapEquipmentRow(row: EquipmentRow) {
   };
 }
 
+function mapServiceTypeRow(row: ServiceTypeRow): ManagedServiceType {
+  const equipment = row.equipment_json ? JSON.parse(row.equipment_json) as ManagedServiceType["equipment"] : [];
+
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    status: row.status,
+    billingUnit: row.billing_unit,
+    baseValue: Number(row.base_value),
+    minimumHours: row.minimum_hours == null ? null : Number(row.minimum_hours),
+    minimumKm: row.minimum_km == null ? null : Number(row.minimum_km),
+    equipmentIds: row.equipment_ids ?? equipment.map((item) => item.id),
+    equipment,
+    equipmentCount: Number(row.equipment_count ?? equipment.length),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 function mapCompanyRow(row: CompanyRow) {
   return {
     id: row.id,
@@ -656,6 +1095,194 @@ function mapClientRow(row: ClientRow) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+function mapOperatorRow(row: OperatorRow) {
+  return {
+    id: row.id,
+    name: row.name,
+    phone: row.phone,
+    license: row.license,
+    status: row.status,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapBudgetItemRow(row: BudgetItemRow): ManagedBudgetItem {
+  return {
+    id: row.id,
+    position: Number(row.position),
+    serviceTypeId: row.service_type_id,
+    serviceTypeName: row.service_type_name,
+    serviceTypeBillingUnit: row.service_type_billing_unit,
+    equipmentId: row.equipment_id,
+    equipmentName: row.equipment_name,
+    equipmentBrand: row.equipment_brand,
+    equipmentModel: row.equipment_model,
+    operatorId: row.operator_id,
+    operatorName: row.operator_name,
+    serviceDescription: row.service_description,
+    serviceDate: row.service_date.slice(0, 10),
+    startTime: row.start_time.slice(0, 5),
+    endTime: row.end_time.slice(0, 5),
+    baseValue: Number(row.base_value),
+    minimumHours: row.minimum_hours === null ? null : Number(row.minimum_hours),
+    minimumKm: row.minimum_km === null ? null : Number(row.minimum_km),
+    initialValue: Number(row.initial_value),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapBudgetRow(row: BudgetRow): ManagedBudget {
+  const items = JSON.parse(row.items_json || "[]") as BudgetItemRow[];
+
+  return {
+    id: row.id,
+    number: row.number,
+    status: row.status,
+    clientId: row.client_id,
+    clientName: row.client_name,
+    servicePostalCode: row.service_postal_code,
+    serviceStreet: row.service_street,
+    serviceNumber: row.service_number,
+    serviceComplement: row.service_complement,
+    serviceDistrict: row.service_district,
+    serviceCity: row.service_city,
+    serviceState: row.service_state,
+    serviceCountry: row.service_country,
+    subtotalValue: Number(row.subtotal_value),
+    manualAdjustment: Number(row.manual_adjustment),
+    totalValue: Number(row.total_value),
+    itemCount: Number(row.item_count),
+    items: items.map(mapBudgetItemRow),
+    notes: row.notes,
+    approvedAt: row.approved_at,
+    cancelledAt: row.cancelled_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function formatBudgetNumber(sequence: number) {
+  return `ORC-${sequence.toString().padStart(6, "0")}`;
+}
+
+async function assertBudgetRelationsExist(input: {
+  clientId: string;
+  items: BudgetServiceItemInput[];
+}) {
+  const serviceTypeIds = [...new Set(input.items.map((item) => item.serviceTypeId))];
+  const equipmentIds = [...new Set(input.items.map((item) => item.equipmentId))];
+  const operatorIds = [...new Set(input.items.map((item) => item.operatorId))];
+
+  const [clientResult, equipmentResult, serviceTypeResult, operatorResult] = await Promise.all([
+    pool.query<{ id: string }>(`SELECT id FROM clients WHERE id = $1 LIMIT 1`, [input.clientId]),
+    pool.query<{ id: string }>(`SELECT id FROM equipment WHERE id = ANY($1::text[])`, [equipmentIds]),
+    pool.query<BudgetServiceTypeSnapshotRow>(
+      `
+        SELECT id, billing_unit, base_value::text, minimum_hours::text, minimum_km::text
+        FROM service_types
+        WHERE id = ANY($1::text[])
+      `,
+      [serviceTypeIds],
+    ),
+    pool.query<{ id: string }>(`SELECT id FROM operators WHERE id = ANY($1::text[])`, [operatorIds]),
+  ]);
+
+  if (!clientResult.rows[0]) {
+    throw new Error("Client not found.");
+  }
+
+  if (equipmentResult.rows.length !== equipmentIds.length) {
+    throw new Error("One or more equipment items were not found.");
+  }
+
+  if (serviceTypeResult.rows.length !== serviceTypeIds.length) {
+    throw new Error("One or more service types were not found.");
+  }
+
+  if (operatorResult.rows.length !== operatorIds.length) {
+    throw new Error("One or more operators were not found.");
+  }
+
+  return new Map(serviceTypeResult.rows.map((row) => [row.id, row]));
+}
+
+function getPrimaryBudgetItem(items: BudgetServiceItemInput[]) {
+  const primaryItem = items[0];
+
+  if (!primaryItem) {
+    throw new Error("Add at least one service item.");
+  }
+
+  return primaryItem;
+}
+
+function normalizeBudgetItemValue(value: string | number | null | undefined) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  return Number(value);
+}
+
+async function replaceBudgetItems(
+  client: { query: (queryText: string, values?: unknown[]) => Promise<unknown> },
+  budgetId: string,
+  items: BudgetServiceItemInput[],
+  serviceTypeMap: Map<string, BudgetServiceTypeSnapshotRow>,
+) {
+  await client.query(`DELETE FROM budget_items WHERE budget_id = $1`, [budgetId]);
+
+  for (const [index, item] of items.entries()) {
+    const serviceType = serviceTypeMap.get(item.serviceTypeId);
+
+    if (!serviceType) {
+      throw new Error("Service type not found.");
+    }
+
+    await client.query(
+      `
+        INSERT INTO budget_items (
+          id,
+          budget_id,
+          position,
+          service_type_id,
+          equipment_id,
+          operator_id,
+          service_description,
+          service_date,
+          start_time,
+          end_time,
+          billing_unit,
+          base_value,
+          minimum_hours,
+          minimum_km,
+          initial_value
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+      `,
+      [
+        randomUUID(),
+        budgetId,
+        index,
+        item.serviceTypeId,
+        item.equipmentId,
+        item.operatorId,
+        item.serviceDescription.trim(),
+        item.serviceDate,
+        item.startTime,
+        item.endTime,
+        serviceType.billing_unit,
+        Number(serviceType.base_value),
+        normalizeBudgetItemValue(serviceType.minimum_hours),
+        normalizeBudgetItemValue(serviceType.minimum_km),
+        item.initialValue,
+      ],
+    );
+  }
 }
 
 export async function listAssignableRoles() {
@@ -1064,7 +1691,147 @@ export async function deleteClient(clientId: string) {
     throw new Error("Client not found.");
   }
 
+  const budgetsCount = await pool.query<{ total: string }>(
+    `SELECT COUNT(*)::text AS total FROM budgets WHERE client_id = $1`,
+    [clientId],
+  );
+
+  if (Number(budgetsCount.rows[0]?.total ?? "0") > 0) {
+    throw new Error("Remove budgets linked to this client before deleting it.");
+  }
+
   await pool.query(`DELETE FROM clients WHERE id = $1`, [clientId]);
+}
+
+export async function listOperators() {
+  await bootstrapRbac();
+  const result = await pool.query<OperatorRow>(
+    `
+      SELECT
+        id,
+        name,
+        phone,
+        license,
+        status,
+        created_at,
+        updated_at
+      FROM operators
+      ORDER BY updated_at DESC, name ASC
+    `,
+  );
+
+  return result.rows.map(mapOperatorRow);
+}
+
+export async function getOperatorById(operatorId: string) {
+  await bootstrapRbac();
+  const result = await pool.query<OperatorRow>(
+    `
+      SELECT
+        id,
+        name,
+        phone,
+        license,
+        status,
+        created_at,
+        updated_at
+      FROM operators
+      WHERE id = $1
+      LIMIT 1
+    `,
+    [operatorId],
+  );
+
+  const row = result.rows[0];
+  return row ? mapOperatorRow(row) : null;
+}
+
+export async function createOperator(input: {
+  name: string;
+  phone: string;
+  license: "A" | "B" | "C" | "D" | "E";
+  status: "active" | "inactive";
+}) {
+  await bootstrapRbac();
+  const id = randomUUID();
+
+  await pool.query(
+    `
+      INSERT INTO operators (
+        id,
+        name,
+        phone,
+        license,
+        status
+      )
+      VALUES ($1, $2, $3, $4, $5)
+    `,
+    [
+      id,
+      input.name.trim(),
+      input.phone.trim(),
+      input.license,
+      input.status,
+    ],
+  );
+
+  return id;
+}
+
+export async function updateOperator(
+  operatorId: string,
+  input: {
+    name: string;
+    phone: string;
+    license: "A" | "B" | "C" | "D" | "E";
+    status: "active" | "inactive";
+  },
+) {
+  await bootstrapRbac();
+  const current = await getOperatorById(operatorId);
+
+  if (!current) {
+    throw new Error("Operator not found.");
+  }
+
+  await pool.query(
+    `
+      UPDATE operators
+      SET name = $2,
+          phone = $3,
+          license = $4,
+          status = $5,
+          updated_at = now()
+      WHERE id = $1
+    `,
+    [
+      operatorId,
+      input.name.trim(),
+      input.phone.trim(),
+      input.license,
+      input.status,
+    ],
+  );
+}
+
+export async function deleteOperator(operatorId: string) {
+  await bootstrapRbac();
+  const current = await getOperatorById(operatorId);
+
+  if (!current) {
+    throw new Error("Operator not found.");
+  }
+
+  const budgetsCount = await pool.query<{ total: string }>(
+    `SELECT COUNT(*)::text AS total FROM budget_items WHERE operator_id = $1`,
+    [operatorId],
+  );
+
+  if (Number(budgetsCount.rows[0]?.total ?? "0") > 0) {
+    throw new Error("Remove budgets linked to this operator before deleting it.");
+  }
+
+  await pool.query(`DELETE FROM operators WHERE id = $1`, [operatorId]);
 }
 
 export async function listEquipmentTypes() {
@@ -1342,7 +2109,727 @@ export async function deleteEquipment(equipmentId: string) {
     throw new Error("Equipment not found.");
   }
 
+  const budgetsCount = await pool.query<{ total: string }>(
+    `SELECT COUNT(*)::text AS total FROM budget_items WHERE equipment_id = $1`,
+    [equipmentId],
+  );
+
+  if (Number(budgetsCount.rows[0]?.total ?? "0") > 0) {
+    throw new Error("Remove budgets linked to this equipment before deleting it.");
+  }
+
   await pool.query(`DELETE FROM equipment WHERE id = $1`, [equipmentId]);
+}
+
+export async function listEquipmentOptions(): Promise<EquipmentOption[]> {
+  await bootstrapRbac();
+  const result = await pool.query<Pick<EquipmentRow, "id" | "name" | "brand" | "model">>(
+    `
+      SELECT id, name, brand, model
+      FROM equipment
+      ORDER BY name ASC, brand ASC, model ASC
+    `,
+  );
+
+  return result.rows;
+}
+
+export async function listServiceTypes() {
+  await bootstrapRbac();
+  const result = await pool.query<ServiceTypeRow>(
+    `
+      SELECT
+        st.id,
+        st.name,
+        st.description,
+        st.status,
+        st.billing_unit,
+        st.base_value::text,
+        st.minimum_hours::text,
+        st.minimum_km::text,
+        st.created_at,
+        st.updated_at,
+        COALESCE(array_agg(ste.equipment_id ORDER BY e.name, e.brand, e.model) FILTER (WHERE ste.equipment_id IS NOT NULL), '{}') AS equipment_ids,
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'id', e.id,
+              'name', e.name,
+              'brand', e.brand,
+              'model', e.model
+            )
+            ORDER BY e.name, e.brand, e.model
+          ) FILTER (WHERE e.id IS NOT NULL),
+          '[]'::json
+        )::text AS equipment_json,
+        COUNT(ste.equipment_id)::text AS equipment_count
+      FROM service_types st
+      LEFT JOIN service_type_equipment ste ON ste.service_type_id = st.id
+      LEFT JOIN equipment e ON e.id = ste.equipment_id
+      GROUP BY st.id, st.name, st.description, st.status, st.billing_unit, st.base_value, st.minimum_hours, st.minimum_km, st.created_at, st.updated_at
+      ORDER BY st.updated_at DESC, st.name ASC
+    `,
+  );
+
+  return result.rows.map(mapServiceTypeRow);
+}
+
+export async function getServiceTypeById(serviceTypeId: string) {
+  await bootstrapRbac();
+  const result = await pool.query<ServiceTypeRow>(
+    `
+      SELECT
+        st.id,
+        st.name,
+        st.description,
+        st.status,
+        st.billing_unit,
+        st.base_value::text,
+        st.minimum_hours::text,
+        st.minimum_km::text,
+        st.created_at,
+        st.updated_at,
+        COALESCE(array_agg(ste.equipment_id ORDER BY e.name, e.brand, e.model) FILTER (WHERE ste.equipment_id IS NOT NULL), '{}') AS equipment_ids,
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'id', e.id,
+              'name', e.name,
+              'brand', e.brand,
+              'model', e.model
+            )
+            ORDER BY e.name, e.brand, e.model
+          ) FILTER (WHERE e.id IS NOT NULL),
+          '[]'::json
+        )::text AS equipment_json,
+        COUNT(ste.equipment_id)::text AS equipment_count
+      FROM service_types st
+      LEFT JOIN service_type_equipment ste ON ste.service_type_id = st.id
+      LEFT JOIN equipment e ON e.id = ste.equipment_id
+      WHERE st.id = $1
+      GROUP BY st.id, st.name, st.description, st.status, st.billing_unit, st.base_value, st.minimum_hours, st.minimum_km, st.created_at, st.updated_at
+      LIMIT 1
+    `,
+    [serviceTypeId],
+  );
+
+  const row = result.rows[0];
+  return row ? mapServiceTypeRow(row) : null;
+}
+
+async function assertEquipmentIdsExist(equipmentIds: string[]) {
+  if (equipmentIds.length === 0) {
+    return;
+  }
+
+  const result = await pool.query<{ id: string }>(
+    `SELECT id FROM equipment WHERE id = ANY($1::text[])`,
+    [equipmentIds],
+  );
+
+  if (result.rows.length !== new Set(equipmentIds).size) {
+    throw new Error("One or more linked equipment items were not found.");
+  }
+}
+
+export async function createServiceType(input: {
+  name: string;
+  description?: string;
+  status: "active" | "inactive";
+  billingUnit:
+    | "hour"
+    | "daily"
+    | "monthly"
+    | "annual"
+    | "km"
+    | "freight"
+    | "mobilization_demobilization"
+    | "counterweight_transport";
+  baseValue: number;
+  minimumHours?: number;
+  minimumKm?: number;
+  equipmentIds: string[];
+}) {
+  await bootstrapRbac();
+  const duplicate = await pool.query<{ id: string }>(
+    `SELECT id FROM service_types WHERE lower(name) = lower($1) LIMIT 1`,
+    [input.name],
+  );
+
+  if (duplicate.rows[0]) {
+    throw new Error("A service type with this name already exists.");
+  }
+
+  const equipmentIds = [...new Set(input.equipmentIds)];
+  await assertEquipmentIdsExist(equipmentIds);
+
+  const id = randomUUID();
+  await pool.query(
+    `
+      INSERT INTO service_types (id, name, description, status, billing_unit, base_value, minimum_hours, minimum_km)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `,
+    [
+      id,
+      input.name.trim(),
+      input.description?.trim() || null,
+      input.status,
+      input.billingUnit,
+      input.baseValue,
+      input.minimumHours ?? null,
+      input.minimumKm ?? null,
+    ],
+  );
+
+  for (const equipmentId of equipmentIds) {
+    await pool.query(
+      `
+        INSERT INTO service_type_equipment (service_type_id, equipment_id)
+        VALUES ($1, $2)
+      `,
+      [id, equipmentId],
+    );
+  }
+
+  return id;
+}
+
+export async function updateServiceType(
+  serviceTypeId: string,
+  input: {
+    name: string;
+    description?: string;
+    status: "active" | "inactive";
+    billingUnit:
+      | "hour"
+      | "daily"
+      | "monthly"
+      | "annual"
+      | "km"
+      | "freight"
+      | "mobilization_demobilization"
+      | "counterweight_transport";
+    baseValue: number;
+    minimumHours?: number;
+    minimumKm?: number;
+    equipmentIds: string[];
+  },
+) {
+  await bootstrapRbac();
+  const current = await getServiceTypeById(serviceTypeId);
+
+  if (!current) {
+    throw new Error("Service type not found.");
+  }
+
+  const duplicate = await pool.query<{ id: string }>(
+    `SELECT id FROM service_types WHERE lower(name) = lower($1) AND id <> $2 LIMIT 1`,
+    [input.name, serviceTypeId],
+  );
+
+  if (duplicate.rows[0]) {
+    throw new Error("A service type with this name already exists.");
+  }
+
+  const equipmentIds = [...new Set(input.equipmentIds)];
+  await assertEquipmentIdsExist(equipmentIds);
+
+  await pool.query(
+    `
+      UPDATE service_types
+      SET name = $2,
+          description = $3,
+          status = $4,
+          billing_unit = $5,
+          base_value = $6,
+          minimum_hours = $7,
+          minimum_km = $8,
+          updated_at = now()
+      WHERE id = $1
+    `,
+    [
+      serviceTypeId,
+      input.name.trim(),
+      input.description?.trim() || null,
+      input.status,
+      input.billingUnit,
+      input.baseValue,
+      input.minimumHours ?? null,
+      input.minimumKm ?? null,
+    ],
+  );
+
+  await pool.query(`DELETE FROM service_type_equipment WHERE service_type_id = $1`, [serviceTypeId]);
+
+  for (const equipmentId of equipmentIds) {
+    await pool.query(
+      `
+        INSERT INTO service_type_equipment (service_type_id, equipment_id)
+        VALUES ($1, $2)
+      `,
+      [serviceTypeId, equipmentId],
+    );
+  }
+}
+
+export async function deleteServiceType(serviceTypeId: string) {
+  await bootstrapRbac();
+  const current = await getServiceTypeById(serviceTypeId);
+
+  if (!current) {
+    throw new Error("Service type not found.");
+  }
+
+  const budgetsCount = await pool.query<{ total: string }>(
+    `SELECT COUNT(*)::text AS total FROM budget_items WHERE service_type_id = $1`,
+    [serviceTypeId],
+  );
+
+  if (Number(budgetsCount.rows[0]?.total ?? "0") > 0) {
+    throw new Error("Remove budgets linked to this service type before deleting it.");
+  }
+
+  const linked = await pool.query<{ total: string }>(
+    `SELECT COUNT(*)::text AS total FROM service_type_equipment WHERE service_type_id = $1`,
+    [serviceTypeId],
+  );
+
+  if (Number(linked.rows[0]?.total ?? "0") > 0) {
+    throw new Error("Remove linked equipment before deleting this service type.");
+  }
+
+  await pool.query(`DELETE FROM service_types WHERE id = $1`, [serviceTypeId]);
+}
+
+export async function listBudgets(): Promise<ManagedBudget[]> {
+  await bootstrapRbac();
+  const result = await pool.query<BudgetRow>(
+    `
+      SELECT
+        b.id,
+        b.number,
+        b.status,
+        b.client_id,
+        COALESCE(NULLIF(c.trade_name, ''), c.legal_name) AS client_name,
+        b.service_postal_code,
+        b.service_street,
+        b.service_number,
+        b.service_complement,
+        b.service_district,
+        b.service_city,
+        b.service_state,
+        b.service_country,
+        b.subtotal_value::text,
+        b.manual_adjustment::text,
+        b.total_value::text,
+        COUNT(bi.id)::text AS item_count,
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'id', bi.id,
+              'position', bi.position,
+              'service_type_id', bi.service_type_id,
+              'service_type_name', st.name,
+              'service_type_billing_unit', bi.billing_unit,
+              'equipment_id', bi.equipment_id,
+              'equipment_name', e.name,
+              'equipment_brand', e.brand,
+              'equipment_model', e.model,
+              'operator_id', bi.operator_id,
+              'operator_name', o.name,
+              'service_description', bi.service_description,
+              'service_date', bi.service_date::text,
+              'start_time', bi.start_time::text,
+              'end_time', bi.end_time::text,
+              'base_value', bi.base_value::text,
+              'minimum_hours', bi.minimum_hours::text,
+              'minimum_km', bi.minimum_km::text,
+              'initial_value', bi.initial_value::text,
+              'created_at', bi.created_at,
+              'updated_at', bi.updated_at
+            )
+            ORDER BY bi.position
+          ) FILTER (WHERE bi.id IS NOT NULL),
+          '[]'::json
+        )::text AS items_json,
+        b.notes,
+        b.approved_at,
+        b.cancelled_at,
+        b.created_at,
+        b.updated_at
+      FROM budgets b
+      INNER JOIN clients c ON c.id = b.client_id
+      LEFT JOIN budget_items bi ON bi.budget_id = b.id
+      LEFT JOIN equipment e ON e.id = bi.equipment_id
+      LEFT JOIN service_types st ON st.id = bi.service_type_id
+      LEFT JOIN operators o ON o.id = bi.operator_id
+      GROUP BY
+        b.id,
+        b.number,
+        b.status,
+        b.client_id,
+        c.trade_name,
+        c.legal_name,
+        b.service_postal_code,
+        b.service_street,
+        b.service_number,
+        b.service_complement,
+        b.service_district,
+        b.service_city,
+        b.service_state,
+        b.service_country,
+        b.subtotal_value,
+        b.manual_adjustment,
+        b.total_value,
+        b.notes,
+        b.approved_at,
+        b.cancelled_at,
+        b.created_at,
+        b.updated_at
+      ORDER BY b.updated_at DESC, b.number DESC
+    `,
+  );
+
+  return result.rows.map(mapBudgetRow);
+}
+
+export async function getBudgetById(budgetId: string): Promise<ManagedBudget | null> {
+  await bootstrapRbac();
+  const result = await pool.query<BudgetRow>(
+    `
+      SELECT
+        b.id,
+        b.number,
+        b.status,
+        b.client_id,
+        COALESCE(NULLIF(c.trade_name, ''), c.legal_name) AS client_name,
+        b.service_postal_code,
+        b.service_street,
+        b.service_number,
+        b.service_complement,
+        b.service_district,
+        b.service_city,
+        b.service_state,
+        b.service_country,
+        b.subtotal_value::text,
+        b.manual_adjustment::text,
+        b.total_value::text,
+        COUNT(bi.id)::text AS item_count,
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'id', bi.id,
+              'position', bi.position,
+              'service_type_id', bi.service_type_id,
+              'service_type_name', st.name,
+              'service_type_billing_unit', bi.billing_unit,
+              'equipment_id', bi.equipment_id,
+              'equipment_name', e.name,
+              'equipment_brand', e.brand,
+              'equipment_model', e.model,
+              'operator_id', bi.operator_id,
+              'operator_name', o.name,
+              'service_description', bi.service_description,
+              'service_date', bi.service_date::text,
+              'start_time', bi.start_time::text,
+              'end_time', bi.end_time::text,
+              'base_value', bi.base_value::text,
+              'minimum_hours', bi.minimum_hours::text,
+              'minimum_km', bi.minimum_km::text,
+              'initial_value', bi.initial_value::text,
+              'created_at', bi.created_at,
+              'updated_at', bi.updated_at
+            )
+            ORDER BY bi.position
+          ) FILTER (WHERE bi.id IS NOT NULL),
+          '[]'::json
+        )::text AS items_json,
+        b.notes,
+        b.approved_at,
+        b.cancelled_at,
+        b.created_at,
+        b.updated_at
+      FROM budgets b
+      INNER JOIN clients c ON c.id = b.client_id
+      LEFT JOIN budget_items bi ON bi.budget_id = b.id
+      LEFT JOIN equipment e ON e.id = bi.equipment_id
+      LEFT JOIN service_types st ON st.id = bi.service_type_id
+      LEFT JOIN operators o ON o.id = bi.operator_id
+      WHERE b.id = $1
+      GROUP BY
+        b.id,
+        b.number,
+        b.status,
+        b.client_id,
+        c.trade_name,
+        c.legal_name,
+        b.service_postal_code,
+        b.service_street,
+        b.service_number,
+        b.service_complement,
+        b.service_district,
+        b.service_city,
+        b.service_state,
+        b.service_country,
+        b.subtotal_value,
+        b.manual_adjustment,
+        b.total_value,
+        b.notes,
+        b.approved_at,
+        b.cancelled_at,
+        b.created_at,
+        b.updated_at
+    `,
+    [budgetId],
+  );
+
+  const row = result.rows[0];
+  return row ? mapBudgetRow(row) : null;
+}
+
+export async function createBudget(input: {
+  clientId: string;
+  servicePostalCode: string;
+  serviceStreet: string;
+  serviceNumber: string;
+  serviceComplement?: string;
+  serviceDistrict: string;
+  serviceCity: string;
+  serviceState: string;
+  serviceCountry: string;
+  manualAdjustment: number;
+  notes?: string;
+  items: BudgetServiceItemInput[];
+}) {
+  await bootstrapRbac();
+  const serviceTypeMap = await assertBudgetRelationsExist(input);
+
+  const id = randomUUID();
+  const primaryItem = getPrimaryBudgetItem(input.items);
+  const subtotalValue = calculateBudgetSubtotal(input.items);
+  const totalValue = calculateBudgetTotal(subtotalValue, input.manualAdjustment);
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+    await client.query("LOCK TABLE budgets IN EXCLUSIVE MODE");
+
+    const sequenceResult = await client.query<{ max_sequence: string }>(
+      `
+        SELECT COALESCE(MAX(CAST(SUBSTRING(number FROM 5) AS integer)), 0)::text AS max_sequence
+        FROM budgets
+      `,
+    );
+
+    const nextSequence = Number(sequenceResult.rows[0]?.max_sequence ?? "0") + 1;
+    const number = formatBudgetNumber(nextSequence);
+
+    await client.query(
+      `
+        INSERT INTO budgets (
+          id,
+          number,
+          status,
+          client_id,
+          equipment_id,
+          service_type_id,
+          operator_id,
+          service_description,
+          service_date,
+          start_time,
+          end_time,
+          service_postal_code,
+          service_street,
+          service_number,
+          service_complement,
+          service_district,
+          service_city,
+          service_state,
+          service_country,
+          initial_value,
+          manual_adjustment,
+          subtotal_value,
+          total_value,
+          notes
+        )
+        VALUES (
+          $1, $2, 'pending', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23
+        )
+      `,
+      [
+        id,
+        number,
+        input.clientId,
+        primaryItem.equipmentId,
+        primaryItem.serviceTypeId,
+        primaryItem.operatorId,
+        primaryItem.serviceDescription.trim(),
+        primaryItem.serviceDate,
+        primaryItem.startTime,
+        primaryItem.endTime,
+        input.servicePostalCode,
+        input.serviceStreet.trim(),
+        input.serviceNumber.trim(),
+        input.serviceComplement?.trim() || null,
+        input.serviceDistrict.trim(),
+        input.serviceCity.trim(),
+        input.serviceState.trim(),
+        input.serviceCountry.trim() || "Brasil",
+        primaryItem.initialValue,
+        input.manualAdjustment ?? 0,
+        subtotalValue,
+        totalValue,
+        input.notes?.trim() || null,
+      ],
+    );
+
+    await replaceBudgetItems(client, id, input.items, serviceTypeMap);
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+
+  return id;
+}
+
+export async function updateBudget(
+  budgetId: string,
+  input: {
+    clientId: string;
+    servicePostalCode: string;
+    serviceStreet: string;
+    serviceNumber: string;
+    serviceComplement?: string;
+    serviceDistrict: string;
+    serviceCity: string;
+    serviceState: string;
+    serviceCountry: string;
+    manualAdjustment: number;
+    notes?: string;
+    items: BudgetServiceItemInput[];
+  },
+) {
+  await bootstrapRbac();
+  const current = await getBudgetById(budgetId);
+
+  if (!current) {
+    throw new Error("Budget not found.");
+  }
+
+  if (current.status !== "pending") {
+    throw new Error("Only pending budgets can be edited.");
+  }
+
+  const serviceTypeMap = await assertBudgetRelationsExist(input);
+  const primaryItem = getPrimaryBudgetItem(input.items);
+  const subtotalValue = calculateBudgetSubtotal(input.items);
+  const totalValue = calculateBudgetTotal(subtotalValue, input.manualAdjustment);
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      `
+        UPDATE budgets
+        SET client_id = $2,
+            equipment_id = $3,
+            service_type_id = $4,
+            operator_id = $5,
+            service_description = $6,
+            service_date = $7,
+            start_time = $8,
+            end_time = $9,
+            service_postal_code = $10,
+            service_street = $11,
+            service_number = $12,
+            service_complement = $13,
+            service_district = $14,
+            service_city = $15,
+            service_state = $16,
+            service_country = $17,
+            initial_value = $18,
+            manual_adjustment = $19,
+            subtotal_value = $20,
+            total_value = $21,
+            notes = $22,
+            updated_at = now()
+        WHERE id = $1
+      `,
+      [
+        budgetId,
+        input.clientId,
+        primaryItem.equipmentId,
+        primaryItem.serviceTypeId,
+        primaryItem.operatorId,
+        primaryItem.serviceDescription.trim(),
+        primaryItem.serviceDate,
+        primaryItem.startTime,
+        primaryItem.endTime,
+        input.servicePostalCode,
+        input.serviceStreet.trim(),
+        input.serviceNumber.trim(),
+        input.serviceComplement?.trim() || null,
+        input.serviceDistrict.trim(),
+        input.serviceCity.trim(),
+        input.serviceState.trim(),
+        input.serviceCountry.trim() || "Brasil",
+        primaryItem.initialValue,
+        input.manualAdjustment ?? 0,
+        subtotalValue,
+        totalValue,
+        input.notes?.trim() || null,
+      ],
+    );
+    await replaceBudgetItems(client, budgetId, input.items, serviceTypeMap);
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function updateBudgetStatus(
+  budgetId: string,
+  status: BudgetTransitionStatus,
+) {
+  await bootstrapRbac();
+  const current = await getBudgetById(budgetId);
+
+  if (!current) {
+    throw new Error("Budget not found.");
+  }
+
+  const isPendingTransition = current.status === "pending" && (status === "approved" || status === "cancelled");
+  const isCancelledRevert = current.status === "cancelled" && status === "pending";
+
+  if (!isPendingTransition && !isCancelledRevert) {
+    throw new Error("This budget status transition is not allowed.");
+  }
+
+  await pool.query(
+    `
+      UPDATE budgets
+      SET status = $2,
+          approved_at = CASE
+            WHEN $2 = 'approved' THEN now()
+            WHEN $2 = 'pending' THEN null
+            ELSE approved_at
+          END,
+          cancelled_at = CASE
+            WHEN $2 = 'cancelled' THEN now()
+            WHEN $2 = 'pending' THEN null
+            ELSE cancelled_at
+          END,
+          updated_at = now()
+      WHERE id = $1
+    `,
+    [budgetId, status],
+  );
 }
 
 export async function listRolesWithDetails(): Promise<RoleWithDetails[]> {

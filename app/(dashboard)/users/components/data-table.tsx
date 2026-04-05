@@ -17,6 +17,11 @@ import { ChevronDown, EllipsisVertical, Pencil, Search, Trash2 } from "lucide-re
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  AdminListPaginationFooter,
+  AdminListTableCard,
+  AdminListToolbar,
+} from "@/components/admin-list-layout";
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -176,7 +181,7 @@ export function DataTable({
         cell: ({ row }) => <span className="text-sm">{formatDate(row.original.updatedDate, locale)}</span>,
       },
       {
-        accessorKey: "statusLabel",
+        accessorKey: "status",
         header: ({ column }) => <SortableHeader column={column} title={t("users.status")} className="-ml-3" />,
         cell: ({ row }) => {
           const user = row.original;
@@ -184,10 +189,11 @@ export function DataTable({
             user.status === "active"
               ? "text-primary bg-primary/10"
               : "text-destructive bg-destructive/10";
+          const statusLabel = user.status === "active" ? t("users.active") : t("users.inactive");
 
           return (
             <Badge variant="secondary" className={className}>
-              {user.statusLabel}
+              {statusLabel}
             </Badge>
           );
         },
@@ -233,7 +239,7 @@ export function DataTable({
   const columnVisibilityLabels = useMemo<Record<string, string>>(
     () => ({
       roles: t("users.roles"),
-      statusLabel: t("users.status"),
+      status: t("users.status"),
       joinedDate: t("users.joined"),
       updatedDate: t("users.updated"),
     }),
@@ -271,13 +277,19 @@ export function DataTable({
   });
 
   const roleFilter = (table.getColumn("roles")?.getFilterValue() as string) || "all";
-  const statusFilter = (table.getColumn("statusLabel")?.getFilterValue() as string) || "all";
+  const statusFilter = (table.getColumn("status")?.getFilterValue() as string) || "all";
   const selectedCount = table.getFilteredSelectedRowModel().rows.length;
+  const hasActiveFilters = Boolean(globalFilter.trim()) || columnFilters.length > 0;
+
+  const handleClearFilters = () => {
+    setGlobalFilter("");
+    setColumnFilters([]);
+    table.setPageIndex(0);
+  };
 
   return (
     <div className="w-full space-y-4">
-      <div className="rounded-xl border bg-card/40 p-3">
-        <div className="flex flex-wrap items-end gap-3">
+      <AdminListToolbar>
           <div className="relative min-w-[240px] flex-1">
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -318,7 +330,7 @@ export function DataTable({
             <Select
               value={statusFilter}
               onValueChange={(value) =>
-                table.getColumn("statusLabel")?.setFilterValue(value === "all" ? undefined : value)
+                table.getColumn("status")?.setFilterValue(value === "all" ? undefined : value)
               }
             >
               <SelectTrigger className="h-10 w-full cursor-pointer rounded-lg" id="status-filter">
@@ -326,23 +338,27 @@ export function DataTable({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t("users.allStatuses")}</SelectItem>
-                <SelectItem value="Active">{t("users.active")}</SelectItem>
-                <SelectItem value="Inactive">{t("users.inactive")}</SelectItem>
+                <SelectItem value="active">{t("users.active")}</SelectItem>
+                <SelectItem value="inactive">{t("users.inactive")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="ml-auto">
-            <div className="min-w-[170px] space-y-2">
+            <div className="min-w-[180px] space-y-2">
               <Label htmlFor="users-column-visibility" className="text-sm font-medium">
                 {t("common.columnVisibility")}
               </Label>
               <DropdownMenu>
-                <DropdownMenuTrigger
-                  id="users-column-visibility"
-                  className="inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-lg border bg-background px-3 text-sm font-medium shadow-xs hover:bg-accent hover:text-accent-foreground"
-                >
-                  {t("common.columns")} <ChevronDown className="ml-2 size-4" />
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    id="users-column-visibility"
+                    variant="outline"
+                    size="lg"
+                    className="h-10 w-full cursor-pointer justify-between rounded-lg px-3"
+                  >
+                    {t("common.columns")} <ChevronDown className="size-4" />
+                  </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   {table
@@ -362,6 +378,21 @@ export function DataTable({
             </div>
           </div>
 
+          <div className="w-full min-w-[160px] space-y-2 sm:w-auto">
+            <Label className="text-sm font-medium text-transparent">
+              {t("common.clearFilters")}
+            </Label>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 w-full cursor-pointer rounded-lg sm:w-auto"
+              onClick={handleClearFilters}
+              disabled={!hasActiveFilters}
+            >
+              {t("common.clearFilters")}
+            </Button>
+          </div>
+
           <div>
             <UserFormDialog
               mode="create"
@@ -372,8 +403,7 @@ export function DataTable({
               availableRoles={roles}
             />
           </div>
-        </div>
-      </div>
+      </AdminListToolbar>
 
       {selectedCount > 0 ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/30 px-3 py-2">
@@ -410,7 +440,7 @@ export function DataTable({
         </div>
       ) : null}
 
-      <div className="rounded-md border">
+      <AdminListTableCard>
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -438,75 +468,27 @@ export function DataTable({
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
+                <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
                   {t("users.noUsers")}
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
-      </div>
+      </AdminListTableCard>
 
-      <div className="flex items-center justify-between space-x-2 py-4">
-        <div className="flex items-center space-x-2">
-          <Label htmlFor="page-size" className="text-sm font-medium">
-            {t("users.show")}
-          </Label>
-          <Select
-            value={`${table.getState().pagination.pageSize}`}
-            onValueChange={(value) => {
-              table.setPageSize(Number(value));
-            }}
-          >
-            <SelectTrigger className="w-20 cursor-pointer" id="page-size">
-              <SelectValue placeholder={table.getState().pagination.pageSize} />
-            </SelectTrigger>
-            <SelectContent side="top">
-              {[10, 20, 30, 40, 50].map((pageSize) => (
-                <SelectItem key={pageSize} value={`${pageSize}`}>
-                  {pageSize}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="flex-1 text-sm text-muted-foreground hidden sm:block">
-          {t("users.selectedRows", {
-            selected: table.getFilteredSelectedRowModel().rows.length,
-            total: table.getFilteredRowModel().rows.length,
-          })}
-        </div>
-
-        <div className="flex items-center space-x-6 lg:space-x-8">
-          <div className="flex items-center space-x-2 hidden sm:flex">
-            <p className="text-sm font-medium">{t("users.page")}</p>
-            <strong className="text-sm">
-              {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
-            </strong>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => table.previousPage()}
-              disabled={!table.getCanPreviousPage()}
-              className="cursor-pointer"
-            >
-              {t("common.previous")}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => table.nextPage()}
-              disabled={!table.getCanNextPage()}
-              className="cursor-pointer"
-            >
-              {t("common.next")}
-            </Button>
-          </div>
-        </div>
-      </div>
+      <AdminListPaginationFooter
+        countLabel={t("users.selectedRows", {
+          selected: table.getFilteredSelectedRowModel().rows.length,
+          total: table.getFilteredRowModel().rows.length,
+        })}
+        previousLabel={t("common.previous")}
+        nextLabel={t("common.next")}
+        onPreviousPage={() => table.previousPage()}
+        onNextPage={() => table.nextPage()}
+        canPreviousPage={table.getCanPreviousPage()}
+        canNextPage={table.getCanNextPage()}
+      />
 
       <UserFormDialog
         mode="edit"

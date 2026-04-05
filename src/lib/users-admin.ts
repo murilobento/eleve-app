@@ -80,7 +80,6 @@ export type ManagedUser = {
   image: string | null;
   roles: ManagedRoleAssignment[];
   status: ManagedUserStatus;
-  statusLabel: string;
   emailVerified: boolean;
   banned: boolean;
   banReason: string | null;
@@ -118,15 +117,6 @@ export function getStatusFromUser(
   return accessState?.isActive === false ? "inactive" : "active";
 }
 
-export function getStatusLabel(status: ManagedUserStatus) {
-  switch (status) {
-    case "active":
-      return "Active";
-    case "inactive":
-      return "Inactive";
-  }
-}
-
 export function mapAuthUserToManagedUser(
   user: AuthAdminUser,
   roles: ManagedRoleAssignment[],
@@ -142,7 +132,6 @@ export function mapAuthUserToManagedUser(
     image: user.image ?? null,
     roles,
     status,
-    statusLabel: getStatusLabel(status),
     emailVerified: user.emailVerified,
     banned: Boolean(user.banned),
     banReason: user.banReason ?? null,
