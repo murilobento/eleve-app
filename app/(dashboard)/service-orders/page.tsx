@@ -4,31 +4,41 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { DataTable } from "./components/data-table";
-import type { CreateBudgetInput, ManagedBudget, UpdateBudgetInput } from "@/lib/budgets-admin";
+import type { ManagedBudget } from "@/lib/budgets-admin";
 import type { ManagedClient } from "@/lib/clients-admin";
 import type { EquipmentOption } from "@/lib/equipment-admin";
 import type { ManagedOperator } from "@/lib/operators-admin";
+import type {
+  CreateServiceOrderInput,
+  ManagedServiceOrder,
+  UpdateServiceOrderInput,
+} from "@/lib/service-orders-admin";
 import type { ManagedServiceType } from "@/lib/service-types-admin";
 import { useI18n } from "@/i18n/provider";
 
-type BudgetsResponse = {
-  budgets: ManagedBudget[];
+type ServiceOrdersResponse = {
+  serviceOrders: ManagedServiceOrder[];
   clients: ManagedClient[];
   equipment: EquipmentOption[];
   serviceTypes: ManagedServiceType[];
   operators: ManagedOperator[];
+  approvedBudgets: ManagedBudget[];
 };
 
-function getLocalizedBudgetError(message: string, t: ReturnType<typeof useI18n>["t"]) {
+function getLocalizedServiceOrderError(message: string, t: ReturnType<typeof useI18n>["t"]) {
   switch (message) {
+    case "Service order not found.":
+      return t("serviceOrders.errors.notFound");
+    case "This service order status transition is not allowed.":
+      return t("serviceOrders.errors.invalidStatusTransition");
+    case "Completed or cancelled service orders cannot be edited.":
+      return t("serviceOrders.errors.editLocked");
+    case "Only approved budgets can originate service orders.":
+      return t("serviceOrders.errors.originBudgetRequiredApproved");
+    case "Only approved budgets can generate service orders.":
+      return t("serviceOrders.errors.generateFromApprovedBudgetOnly");
     case "Budget not found.":
       return t("budgets.errors.notFound");
-    case "This budget status transition is not allowed.":
-      return t("budgets.errors.invalidStatusTransition");
-    case "Approved budget cannot be reverted because no linked service order was found.":
-      return t("budgets.errors.approvedRevertMissingServiceOrder");
-    case "Approved budget can only be reverted when the linked service order is pending.":
-      return t("budgets.errors.approvedRevertRequiresPendingServiceOrder");
     default:
       return message;
   }
@@ -38,44 +48,46 @@ async function parseResponse(response: Response, t: ReturnType<typeof useI18n>["
   const payload = await response.json().catch(() => null);
 
   if (!response.ok) {
-    throw new Error(getLocalizedBudgetError(payload?.error || "Request failed.", t));
+    throw new Error(getLocalizedServiceOrderError(payload?.error || "Request failed.", t));
   }
 
   return payload;
 }
 
-export default function BudgetsPage() {
+export default function ServiceOrdersPage() {
   const { t } = useI18n();
-  const [budgets, setBudgets] = useState<ManagedBudget[]>([]);
+  const [serviceOrders, setServiceOrders] = useState<ManagedServiceOrder[]>([]);
   const [clients, setClients] = useState<ManagedClient[]>([]);
   const [equipment, setEquipment] = useState<EquipmentOption[]>([]);
   const [serviceTypes, setServiceTypes] = useState<ManagedServiceType[]>([]);
   const [operators, setOperators] = useState<ManagedOperator[]>([]);
+  const [approvedBudgets, setApprovedBudgets] = useState<ManagedBudget[]>([]);
   const [loading, setLoading] = useState(true);
   const [isMutating, setIsMutating] = useState(false);
 
-  const loadBudgets = async () => {
+  const loadServiceOrders = async () => {
     setLoading(true);
 
     try {
-      const payload = (await parseResponse(await fetch("/api/budgets", {
+      const payload = (await parseResponse(await fetch("/api/service-orders", {
         cache: "no-store",
-      }), t)) as BudgetsResponse;
+      }), t)) as ServiceOrdersResponse;
 
-      setBudgets(payload.budgets);
+      setServiceOrders(payload.serviceOrders);
       setClients(payload.clients);
       setEquipment(payload.equipment);
       setServiceTypes(payload.serviceTypes);
       setOperators(payload.operators);
+      setApprovedBudgets(payload.approvedBudgets);
     } catch (loadError) {
-      toast.error(loadError instanceof Error ? loadError.message : t("budgets.loadError"));
+      toast.error(loadError instanceof Error ? loadError.message : t("serviceOrders.loadError"));
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    void loadBudgets();
+    void loadServiceOrders();
   }, []);
 
   const runMutation = async (
@@ -87,7 +99,7 @@ export default function BudgetsPage() {
 
     try {
       await operation();
-      await loadBudgets();
+      await loadServiceOrders();
       toast.success(successMessage);
     } catch (mutationError) {
       const message =
@@ -99,10 +111,10 @@ export default function BudgetsPage() {
     }
   };
 
-  const handleCreateBudget = async (values: CreateBudgetInput) => {
+  const handleCreateServiceOrder = async (values: CreateServiceOrderInput) => {
     await runMutation(async () => {
       await parseResponse(
-        await fetch("/api/budgets", {
+        await fetch("/api/service-orders", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -111,13 +123,13 @@ export default function BudgetsPage() {
         }),
         t,
       );
-    }, t("common.budgetCreateSuccess"), t("budgets.updateError"));
+    }, t("common.serviceOrderCreateSuccess"), t("serviceOrders.updateError"));
   };
 
-  const handleUpdateBudget = async (id: string, values: UpdateBudgetInput) => {
+  const handleUpdateServiceOrder = async (id: string, values: UpdateServiceOrderInput) => {
     await runMutation(async () => {
       await parseResponse(
-        await fetch(`/api/budgets/${id}`, {
+        await fetch(`/api/service-orders/${id}`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
@@ -126,80 +138,61 @@ export default function BudgetsPage() {
         }),
         t,
       );
-    }, t("common.budgetUpdateSuccess"), t("budgets.updateError"));
+    }, t("common.serviceOrderUpdateSuccess"), t("serviceOrders.updateError"));
   };
 
-  const handleApproveBudget = async (id: string, reason?: string) => {
+  const handleStatusChange = async (
+    id: string,
+    status: "pending" | "scheduled" | "in_progress" | "completed" | "cancelled",
+    reason?: string,
+  ) => {
+    const successKeyByStatus = {
+      pending: "common.serviceOrderRevertSuccess",
+      scheduled: "common.serviceOrderScheduleSuccess",
+      in_progress: "common.serviceOrderStartSuccess",
+      completed: "common.serviceOrderCompleteSuccess",
+      cancelled: "common.serviceOrderCancelSuccess",
+    } as const;
+
     await runMutation(async () => {
       await parseResponse(
-        await fetch(`/api/budgets/${id}/status`, {
+        await fetch(`/api/service-orders/${id}/status`, {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ status: "approved", reason }),
+          body: JSON.stringify({ status, reason }),
         }),
         t,
       );
-    }, t("common.budgetApproveSuccess"), t("budgets.updateError"));
-  };
-
-  const handleCancelBudget = async (id: string, reason?: string) => {
-    await runMutation(async () => {
-      await parseResponse(
-        await fetch(`/api/budgets/${id}/status`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ status: "cancelled", reason }),
-        }),
-        t,
-      );
-    }, t("common.budgetCancelSuccess"), t("budgets.updateError"));
-  };
-
-  const handleRevertBudget = async (id: string, reason?: string) => {
-    await runMutation(async () => {
-      await parseResponse(
-        await fetch(`/api/budgets/${id}/status`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ status: "pending", reason }),
-        }),
-        t,
-      );
-    }, t("common.budgetRevertSuccess"), t("budgets.updateError"));
+    }, t(successKeyByStatus[status]), t("serviceOrders.updateError"));
   };
 
   return (
     <>
       <div className="px-4 lg:px-6">
         <div className="flex flex-col gap-2">
-          <h1 className="text-2xl font-bold tracking-tight">{t("budgets.title")}</h1>
-          <p className="text-muted-foreground">{t("budgets.description")}</p>
+          <h1 className="text-2xl font-bold tracking-tight">{t("serviceOrders.title")}</h1>
+          <p className="text-muted-foreground">{t("serviceOrders.description")}</p>
         </div>
       </div>
 
       <div className="@container/main mt-2 px-4 lg:mt-4 lg:px-6">
         {loading ? (
           <div className="rounded-md border px-6 py-10 text-sm text-muted-foreground">
-            {t("common.loadingBudgets")}
+            {t("common.loadingServiceOrders")}
           </div>
         ) : (
           <DataTable
-            budgets={budgets}
+            serviceOrders={serviceOrders}
             clients={clients}
             equipment={equipment}
             serviceTypes={serviceTypes}
             operators={operators}
-            onCreateBudget={handleCreateBudget}
-            onUpdateBudget={handleUpdateBudget}
-            onApproveBudget={handleApproveBudget}
-            onCancelBudget={handleCancelBudget}
-            onRevertBudget={handleRevertBudget}
+            approvedBudgets={approvedBudgets}
+            onCreateServiceOrder={handleCreateServiceOrder}
+            onUpdateServiceOrder={handleUpdateServiceOrder}
+            onChangeStatus={handleStatusChange}
             isMutating={isMutating}
           />
         )}

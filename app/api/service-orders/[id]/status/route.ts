@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { getBudgetById, requirePermission, updateBudgetStatus } from "@/lib/rbac";
-import { updateBudgetStatusSchema } from "@/lib/budgets-admin";
+import { getServiceOrderById, requirePermission, updateServiceOrderStatus } from "@/lib/rbac";
+import { updateServiceOrderStatusSchema } from "@/lib/service-orders-admin";
 
 function getErrorResponse(error: unknown) {
   const message = error instanceof Error ? error.message : "Unexpected error while processing the request.";
@@ -13,22 +13,22 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const permission = await requirePermission(request, "budgets.update");
+    const permission = await requirePermission(request, "service-orders.update");
 
     if (permission instanceof NextResponse) {
       return permission;
     }
 
     const { id } = await params;
-    const payload = updateBudgetStatusSchema.parse(await request.json());
-    await updateBudgetStatus(id, payload.status, payload.reason, {
+    const payload = updateServiceOrderStatusSchema.parse(await request.json());
+    await updateServiceOrderStatus(id, payload.status, payload.reason, {
       userId: permission.session.user.id,
       name: permission.session.user.name,
       email: permission.session.user.email,
     });
-    const budget = await getBudgetById(id);
+    const serviceOrder = await getServiceOrderById(id);
 
-    return NextResponse.json({ budget });
+    return NextResponse.json({ serviceOrder });
   } catch (error) {
     return getErrorResponse(error);
   }

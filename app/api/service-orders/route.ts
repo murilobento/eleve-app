@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 
-import { createBudgetSchema } from "@/lib/budgets-admin";
+import { createServiceOrderSchema } from "@/lib/service-orders-admin";
 import {
-  createBudget,
-  getBudgetById,
+  createServiceOrder,
+  getServiceOrderById,
   listBudgets,
   listClients,
   listEquipmentOptions,
   listOperators,
+  listServiceOrders,
   listServiceTypes,
   requirePermission,
 } from "@/lib/rbac";
@@ -19,21 +20,24 @@ function getErrorResponse(error: unknown) {
 
 export async function GET(request: Request) {
   try {
-    const permission = await requirePermission(request, "budgets.read");
+    const permission = await requirePermission(request, "service-orders.read");
 
     if (permission instanceof NextResponse) {
       return permission;
     }
 
-    const [budgets, clients, equipment, serviceTypes, operators] = await Promise.all([
-      listBudgets(),
+    const [serviceOrders, clients, equipment, serviceTypes, operators, budgets] = await Promise.all([
+      listServiceOrders(),
       listClients(),
       listEquipmentOptions(),
       listServiceTypes(),
       listOperators(),
+      listBudgets(),
     ]);
 
-    return NextResponse.json({ budgets, clients, equipment, serviceTypes, operators });
+    const approvedBudgets = budgets.filter((budget) => budget.status === "approved");
+
+    return NextResponse.json({ serviceOrders, clients, equipment, serviceTypes, operators, approvedBudgets });
   } catch (error) {
     return getErrorResponse(error);
   }
@@ -41,21 +45,21 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const permission = await requirePermission(request, "budgets.create");
+    const permission = await requirePermission(request, "service-orders.create");
 
     if (permission instanceof NextResponse) {
       return permission;
     }
 
-    const payload = createBudgetSchema.parse(await request.json());
-    const budgetId = await createBudget(payload, {
+    const payload = createServiceOrderSchema.parse(await request.json());
+    const serviceOrderId = await createServiceOrder(payload, {
       userId: permission.session.user.id,
       name: permission.session.user.name,
       email: permission.session.user.email,
     });
-    const budget = await getBudgetById(budgetId);
+    const serviceOrder = await getServiceOrderById(serviceOrderId);
 
-    return NextResponse.json({ budget });
+    return NextResponse.json({ serviceOrder });
   } catch (error) {
     return getErrorResponse(error);
   }

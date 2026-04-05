@@ -105,6 +105,12 @@ export function useAppNavigation() {
           icon: FileText,
           visible: hasPermission("budgets.read"),
         },
+        {
+          title: t("navigation.serviceOrders"),
+          url: getAppUrl("/service-orders", locale),
+          icon: Wrench,
+          visible: hasPermission("service-orders.read"),
+        },
       ],
     },
     {

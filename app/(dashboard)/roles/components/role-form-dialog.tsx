@@ -67,6 +67,8 @@ export function RoleFormDialog({
         return t("roles.resourceCalendar");
       case "budgets":
         return t("roles.resourceBudgets");
+      case "service-orders":
+        return t("roles.resourceServiceOrders");
       case "company":
         return t("roles.resourceCompany");
       case "clients":

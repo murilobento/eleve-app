@@ -23,6 +23,7 @@ const routePermissions = [
   { path: "/dashboard", permission: "dashboard.read" },
   { path: "/calendar", permission: "calendar.read" },
   { path: "/budgets", permission: "budgets.read" },
+  { path: "/service-orders", permission: "service-orders.read" },
   { path: "/company", permission: "company.read" },
   { path: "/clients", permission: "clients.read" },
   { path: "/operators", permission: "operators.read" },

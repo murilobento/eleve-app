@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   ChevronLeft,
   ChevronRight,
@@ -10,12 +10,11 @@ import {
   Users,
   MoreHorizontal,
   Search,
-  Grid3X3,
   List,
   ChevronDown,
   Menu
 } from "lucide-react"
-import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, isSameDay } from "date-fns"
+import { format, addDays, subDays, isToday, isSameDay } from "date-fns"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -40,9 +39,6 @@ import { useI18n, useLocale } from "@/i18n/provider"
 import { getDateFnsLocale } from "@/lib/date-locale"
 import { type CalendarEvent } from "../types"
 
-// Import data
-import eventsData from "../data/events.json"
-
 interface CalendarMainProps {
   selectedDate?: Date
   onDateSelect?: (date: Date) => void
@@ -52,43 +48,39 @@ interface CalendarMainProps {
 }
 
 export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, onEventClick }: CalendarMainProps) {
-  const { messages, t } = useI18n()
+  const { t } = useI18n()
   const locale = useLocale()
   const dateLocale = getDateFnsLocale(locale)
-  // Convert JSON events to CalendarEvent objects with proper Date objects, fallback to imported data
-  const sampleEvents: CalendarEvent[] = events || eventsData.map(event => ({
-    ...event,
-    date: new Date(event.date),
-    type: event.type as "meeting" | "event" | "personal" | "task" | "reminder"
-  }))
+  const calendarEvents = events ?? []
 
   const [currentDate, setCurrentDate] = useState(selectedDate || new Date())
-  const [viewMode, setViewMode] = useState<"month" | "week" | "day" | "list">("month")
+  const [viewMode, setViewMode] = useState<"day" | "list">("day")
   const [showEventDialog, setShowEventDialog] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
 
-  const monthStart = startOfMonth(currentDate)
-  const monthEnd = endOfMonth(currentDate)
+  useEffect(() => {
+    if (selectedDate) {
+      setCurrentDate(selectedDate)
+    }
+  }, [selectedDate])
 
-  // Extend to show full weeks (including previous/next month days)
-  const calendarStart = new Date(monthStart)
-  calendarStart.setDate(calendarStart.getDate() - monthStart.getDay())
+  const dayEvents = useMemo(
+    () => calendarEvents
+      .filter(event => isSameDay(event.date, currentDate))
+      .sort((a, b) => a.date.getTime() - b.date.getTime()),
+    [calendarEvents, currentDate]
+  )
 
-  const calendarEnd = new Date(monthEnd)
-  calendarEnd.setDate(calendarEnd.getDate() + (6 - monthEnd.getDay()))
-
-  const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd })
-
-  const getEventsForDay = (date: Date) => {
-    return sampleEvents.filter(event => isSameDay(event.date, date))
-  }
-
-  const navigateMonth = (direction: "prev" | "next") => {
-    setCurrentDate(direction === "prev" ? subMonths(currentDate, 1) : addMonths(currentDate, 1))
+  const navigateDay = (direction: "prev" | "next") => {
+    const nextDate = direction === "prev" ? subDays(currentDate, 1) : addDays(currentDate, 1)
+    setCurrentDate(nextDate)
+    onDateSelect?.(nextDate)
   }
 
   const goToToday = () => {
-    setCurrentDate(new Date())
+    const today = new Date()
+    setCurrentDate(today)
+    onDateSelect?.(today)
   }
 
   const handleEventClick = (event: CalendarEvent) => {
@@ -117,83 +109,67 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
     }
   }
 
-  const renderCalendarGrid = () => {
-    const weekDays = messages.calendar.weekdays
+  const renderDayView = () => {
+    const isCurrentDayToday = isToday(currentDate)
 
     return (
-      <div className="flex-1 bg-background">
-        {/* Calendar Header */}
-        <div className="grid grid-cols-7 border-b">
-          {weekDays.map(day => (
-            <div key={day} className="p-4 text-center font-medium text-sm text-muted-foreground border-r last:border-r-0">
-              {day}
+      <div className="flex-1 p-6">
+        <div className="mb-6 flex items-center justify-between rounded-xl border bg-muted/20 p-4">
+          <div>
+            <div className="text-sm text-muted-foreground">
+              {format(currentDate, "EEEE", { locale: dateLocale })}
             </div>
-          ))}
+            <div className="text-xl font-semibold">
+              {format(currentDate, "PPP", { locale: dateLocale })}
+            </div>
+          </div>
+          {isCurrentDayToday ? (
+            <Badge variant="secondary">{t("calendar.today")}</Badge>
+          ) : null}
         </div>
 
-        {/* Calendar Body */}
-        <div className="grid grid-cols-7 flex-1">
-          {calendarDays.map(day => {
-            const dayEvents = getEventsForDay(day)
-            const isCurrentMonth = isSameMonth(day, currentDate)
-            const isDayToday = isToday(day)
-            const isSelected = selectedDate && isSameDay(day, selectedDate)
-
-            return (
-              <div
-                key={day.toISOString()}
-                className={cn(
-                  "min-h-[120px] border-r border-b last:border-r-0 p-2 cursor-pointer transition-colors",
-                  isCurrentMonth ? "bg-background hover:bg-accent/50" : "bg-muted/30 text-muted-foreground",
-                  isSelected && "ring-2 ring-primary ring-inset",
-                  isDayToday && "bg-accent/20"
-                )}
-                onClick={() => onDateSelect?.(day)}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className={cn(
-                    "text-sm font-medium",
-                    isDayToday && "bg-primary text-primary-foreground rounded-md w-6 h-6 flex items-center justify-center text-xs"
-                  )}>
-                    {format(day, 'd', { locale: dateLocale })}
-                  </span>
-                  {dayEvents.length > 2 && (
-                    <span className="text-xs text-muted-foreground">
-                      +{dayEvents.length - 2}
-                    </span>
-                  )}
-                </div>
-
-                <div className="space-y-1">
-                  {dayEvents.slice(0, 2).map(event => (
-                    <div
-                      key={event.id}
-                      className={cn(
-                        "text-xs p-1 rounded-sm text-white cursor-pointer truncate",
-                        event.color
-                      )}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleEventClick(event)
-                      }}
-                    >
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        <span className="truncate">{event.title}</span>
+        {dayEvents.length === 0 ? (
+          <div className="rounded-xl border border-dashed px-6 py-12 text-center text-sm text-muted-foreground">
+            {t("calendar.noEventsForDay")}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {dayEvents.map(event => (
+              <Card key={event.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => handleEventClick(event)}>
+                <CardContent className="px-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <div className={cn("mt-1.5 h-3 w-3 rounded-full", event.color)} />
+                      <div className="space-y-2">
+                        <h3 className="font-medium">{event.title}</h3>
+                        <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <Clock className="w-4 h-4" />
+                            {event.time}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <MapPin className="w-4 h-4" />
+                            {event.location}
+                          </div>
+                        </div>
+                        {event.description ? (
+                          <p className="text-sm text-muted-foreground">{event.description}</p>
+                        ) : null}
                       </div>
                     </div>
-                  ))}
-                </div>
-              </div>
-            )
-          })}
-        </div>
+                    <Badge variant="secondary">{getEventTypeLabel(event.type)}</Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     )
   }
 
   const renderListView = () => {
-    const upcomingEvents = sampleEvents
+    const upcomingEvents = calendarEvents
       .filter(event => event.date >= new Date())
       .sort((a, b) => a.date.getTime() - b.date.getTime())
 
@@ -245,6 +221,10 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
     )
   }
 
+  const currentPeriodLabel = viewMode === "day"
+    ? format(currentDate, "PPP", { locale: dateLocale })
+    : format(currentDate, "MMMM yyyy", { locale: dateLocale })
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -261,10 +241,10 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
           </Button>
 
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => navigateMonth("prev")} className="cursor-pointer">
+            <Button variant="outline" size="sm" onClick={() => navigateDay("prev")} className="cursor-pointer">
               <ChevronLeft className="w-4 h-4" />
             </Button>
-            <Button variant="outline" size="sm" onClick={() => navigateMonth("next")} className="cursor-pointer">
+            <Button variant="outline" size="sm" onClick={() => navigateDay("next")} className="cursor-pointer">
               <ChevronRight className="w-4 h-4" />
             </Button>
             <Button variant="outline" size="sm" onClick={goToToday} className="cursor-pointer">
@@ -273,7 +253,7 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
           </div>
 
           <h1 className="text-2xl font-semibold">
-            {format(currentDate, 'MMMM yyyy', { locale: dateLocale })}
+            {currentPeriodLabel}
           </h1>
         </div>
 
@@ -288,16 +268,16 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="cursor-pointer">
-                {viewMode === "month" && <Grid3X3 className="w-4 h-4 mr-2" />}
+                {viewMode === "day" && <CalendarIcon className="w-4 h-4 mr-2" />}
                 {viewMode === "list" && <List className="w-4 h-4 mr-2" />}
-                {viewMode === "month" ? t("calendar.month") : t("calendar.list")}
+                {viewMode === "day" ? t("calendar.day") : t("calendar.list")}
                 <ChevronDown className="w-4 h-4 ml-2" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => setViewMode("month")} className="cursor-pointer">
-                <Grid3X3 className="w-4 h-4 mr-2" />
-                {t("calendar.month")}
+              <DropdownMenuItem onClick={() => setViewMode("day")} className="cursor-pointer">
+                <CalendarIcon className="w-4 h-4 mr-2" />
+                {t("calendar.day")}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setViewMode("list")} className="cursor-pointer">
                 <List className="w-4 h-4 mr-2" />
@@ -309,7 +289,7 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
       </div>
 
       {/* Calendar Content */}
-      {viewMode === "month" ? renderCalendarGrid() : renderListView()}
+      {viewMode === "day" ? renderDayView() : renderListView()}
 
       {/* Event Detail Dialog */}
       <Dialog open={showEventDialog} onOpenChange={setShowEventDialog}>

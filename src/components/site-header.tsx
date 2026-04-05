@@ -46,6 +46,7 @@ export function SiteHeader() {
       "/dashboard": t("navigation.dashboard"),
       "/calendar": t("navigation.calendar"),
       "/budgets": t("navigation.budgets"),
+      "/service-orders": t("navigation.serviceOrders"),
       "/company": t("navigation.company"),
       "/clients": t("navigation.clients"),
       "/operators": t("navigation.operators"),

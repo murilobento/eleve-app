@@ -5,6 +5,14 @@ import type { ManagedServiceType } from "@/lib/service-types-admin";
 export const budgetStatusSchema = z.enum(["pending", "approved", "cancelled"]);
 export const budgetTransitionStatusSchema = z.enum(["approved", "cancelled", "pending"]);
 
+const statusReasonSchema = z
+  .string()
+  .trim()
+  .min(3, "Reason must be at least 3 characters.")
+  .max(1000, "Reason must be at most 1000 characters.")
+  .optional()
+  .transform((value) => (value && value.length > 0 ? value : undefined));
+
 const MAX_BUDGET_ITEMS = 50;
 
 const relationIdSchema = (label: string) => z.string().uuid(`Select a valid ${label}.`);
@@ -213,6 +221,15 @@ export const createBudgetSchema = baseBudgetSchema;
 export const updateBudgetSchema = baseBudgetSchema;
 export const updateBudgetStatusSchema = z.object({
   status: budgetTransitionStatusSchema,
+  reason: statusReasonSchema,
+}).superRefine((value, ctx) => {
+  if (value.status === "pending" && !value.reason) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["reason"],
+      message: "Reason is required when reverting to pending.",
+    });
+  }
 });
 
 export type BudgetStatus = z.infer<typeof budgetStatusSchema>;
@@ -221,6 +238,19 @@ export type BudgetServiceItemInput = z.infer<typeof budgetServiceItemSchema>;
 export type CreateBudgetInput = z.infer<typeof createBudgetSchema>;
 export type UpdateBudgetInput = z.infer<typeof updateBudgetSchema>;
 export type UpdateBudgetStatusInput = z.infer<typeof updateBudgetStatusSchema>;
+
+export type ManagedBudgetStatusHistory = {
+  id: string;
+  budgetId: string | null;
+  budgetNumber: string;
+  previousStatus: BudgetStatus | null;
+  nextStatus: BudgetStatus;
+  reason: string | null;
+  actorUserId: string | null;
+  actorNameSnapshot: string | null;
+  actorEmailSnapshot: string | null;
+  createdAt: string;
+};
 
 export type ManagedBudgetItem = {
   id: string;

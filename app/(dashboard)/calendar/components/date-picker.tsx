@@ -1,7 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Calendar } from "@/components/ui/calendar"
+import { useLocale } from "@/i18n/provider"
+import { getDateFnsLocale } from "@/lib/date-locale"
 
 interface DatePickerProps {
   selectedDate?: Date
@@ -10,7 +12,13 @@ interface DatePickerProps {
 }
 
 export function DatePicker({ selectedDate, onDateSelect, events = [] }: DatePickerProps) {
+  const locale = useLocale()
+  const dateLocale = getDateFnsLocale(locale)
   const [date, setDate] = useState<Date | undefined>(selectedDate || new Date())
+
+  useEffect(() => {
+    setDate(selectedDate || new Date())
+  }, [selectedDate])
 
   const handleDateSelect = (selectedDate: Date | undefined) => {
     if (selectedDate) {
@@ -30,6 +38,7 @@ export function DatePicker({ selectedDate, onDateSelect, events = [] }: DatePick
     <div className="flex justify-center">
       <Calendar 
         mode="single"
+        locale={dateLocale}
         selected={date}
         onSelect={handleDateSelect}
         className="w-full [&_[role=gridcell]_button]:cursor-pointer [&_button]:cursor-pointer"

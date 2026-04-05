@@ -6,9 +6,11 @@ import {
   calculateBudgetSubtotal,
   calculateBudgetTotal,
   type BudgetServiceItemInput,
+  type BudgetStatus,
   type BudgetTransitionStatus,
   type ManagedBudget,
   type ManagedBudgetItem,
+  type ManagedBudgetStatusHistory,
 } from "@/lib/budgets-admin";
 import {
   PERMISSION_CATALOG,
@@ -17,6 +19,14 @@ import {
   type UserRoleSummary,
 } from "@/lib/rbac-shared";
 import type { EquipmentOption } from "@/lib/equipment-admin";
+import type {
+  ManagedServiceOrder,
+  ManagedServiceOrderItem,
+  ManagedServiceOrderStatusHistory,
+  ServiceOrderStatus,
+  ServiceOrderItemInput,
+  ServiceOrderTransitionStatus,
+} from "@/lib/service-orders-admin";
 import type { ManagedServiceType } from "@/lib/service-types-admin";
 
 export type RoleWithDetails = RoleRecord & {
@@ -31,6 +41,12 @@ type SessionUser = {
 };
 
 type SessionResult = Awaited<ReturnType<typeof auth.api.getSession>>;
+
+type StatusActorInput = {
+  userId?: string | null;
+  name?: string | null;
+  email?: string | null;
+};
 
 type RoleRow = {
   id: string;
@@ -195,6 +211,83 @@ type BudgetItemRow = {
   initial_value: string | number;
   created_at: string;
   updated_at: string;
+};
+
+type ServiceOrderRow = {
+  id: string;
+  number: string;
+  origin_type: "manual" | "budget";
+  source_budget_id: string | null;
+  source_budget_number: string | null;
+  status: "pending" | "scheduled" | "in_progress" | "completed" | "cancelled";
+  client_id: string;
+  client_name: string;
+  service_postal_code: string;
+  service_street: string;
+  service_number: string;
+  service_complement: string | null;
+  service_district: string;
+  service_city: string;
+  service_state: string;
+  service_country: string;
+  item_count: string | number;
+  items_json: string;
+  notes: string | null;
+  completed_at: string | null;
+  cancelled_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type ServiceOrderItemRow = {
+  id: string;
+  position: number;
+  source_budget_item_id: string | null;
+  service_type_id: string;
+  service_type_name: string;
+  service_type_billing_unit: string;
+  equipment_id: string;
+  equipment_name: string;
+  equipment_brand: string;
+  equipment_model: string;
+  operator_id: string;
+  operator_name: string;
+  service_description: string;
+  service_date: string;
+  planned_start_time: string;
+  planned_end_time: string;
+  actual_start_time: string | null;
+  actual_end_time: string | null;
+  quoted_value: string | number | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type BudgetStatusHistoryRow = {
+  id: string;
+  budget_id: string | null;
+  budget_number: string;
+  previous_status: BudgetStatus | null;
+  next_status: BudgetStatus;
+  reason: string | null;
+  actor_user_id: string | null;
+  actor_name_snapshot: string | null;
+  actor_email_snapshot: string | null;
+  created_at: string;
+};
+
+type ServiceOrderStatusHistoryRow = {
+  id: string;
+  service_order_id: string | null;
+  service_order_number: string;
+  previous_status: ServiceOrderStatus | null;
+  next_status: ServiceOrderStatus;
+  reason: string | null;
+  actor_user_id: string | null;
+  actor_name_snapshot: string | null;
+  actor_email_snapshot: string | null;
+  created_at: string;
 };
 
 type BudgetServiceTypeSnapshotRow = {
@@ -580,6 +673,141 @@ async function ensureSchema() {
   await pool.query(`
     CREATE INDEX IF NOT EXISTS budgets_operator_id_idx
     ON budgets (operator_id);
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS budget_status_history (
+      id text PRIMARY KEY,
+      budget_id text REFERENCES budgets(id) ON DELETE SET NULL,
+      budget_number text NOT NULL,
+      previous_status text,
+      next_status text NOT NULL,
+      reason text,
+      actor_user_id text REFERENCES "user"(id) ON DELETE SET NULL,
+      actor_name_snapshot text,
+      actor_email_snapshot text,
+      created_at timestamptz NOT NULL DEFAULT now()
+    );
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS budget_status_history_budget_id_idx
+    ON budget_status_history (budget_id, created_at DESC);
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS service_orders (
+      id text PRIMARY KEY,
+      number text NOT NULL,
+      origin_type text NOT NULL DEFAULT 'manual',
+      source_budget_id text REFERENCES budgets(id) ON DELETE SET NULL,
+      source_budget_number text,
+      status text NOT NULL DEFAULT 'pending',
+      client_id text NOT NULL REFERENCES clients(id) ON DELETE RESTRICT,
+      client_name text NOT NULL,
+      service_postal_code text NOT NULL,
+      service_street text NOT NULL,
+      service_number text NOT NULL,
+      service_complement text,
+      service_district text NOT NULL,
+      service_city text NOT NULL,
+      service_state text NOT NULL,
+      service_country text NOT NULL DEFAULT 'Brasil',
+      notes text,
+      completed_at timestamptz,
+      cancelled_at timestamptz,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+  `);
+
+  await pool.query(`
+    UPDATE service_orders
+    SET status = 'pending'
+    WHERE status = 'draft';
+  `);
+
+  await pool.query(`
+    ALTER TABLE service_orders
+    ALTER COLUMN status SET DEFAULT 'pending';
+  `);
+
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS service_orders_number_idx
+    ON service_orders (number);
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS service_orders_status_idx
+    ON service_orders (status);
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS service_orders_client_id_idx
+    ON service_orders (client_id);
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS service_orders_source_budget_id_idx
+    ON service_orders (source_budget_id);
+  `);
+
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS service_orders_source_budget_unique_idx
+    ON service_orders (source_budget_id)
+    WHERE source_budget_id IS NOT NULL;
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS service_order_items (
+      id text PRIMARY KEY,
+      service_order_id text NOT NULL REFERENCES service_orders(id) ON DELETE CASCADE,
+      position integer NOT NULL DEFAULT 0,
+      source_budget_item_id text REFERENCES budget_items(id) ON DELETE SET NULL,
+      service_type_id text NOT NULL REFERENCES service_types(id) ON DELETE RESTRICT,
+      equipment_id text NOT NULL REFERENCES equipment(id) ON DELETE RESTRICT,
+      operator_id text NOT NULL REFERENCES operators(id) ON DELETE RESTRICT,
+      service_description text NOT NULL,
+      service_date date NOT NULL,
+      planned_start_time time NOT NULL,
+      planned_end_time time NOT NULL,
+      actual_start_time time,
+      actual_end_time time,
+      quoted_value numeric(12, 2),
+      notes text,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+  `);
+
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS service_order_items_order_position_idx
+    ON service_order_items (service_order_id, position);
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS service_order_items_order_id_idx
+    ON service_order_items (service_order_id);
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS service_order_status_history (
+      id text PRIMARY KEY,
+      service_order_id text REFERENCES service_orders(id) ON DELETE SET NULL,
+      service_order_number text NOT NULL,
+      previous_status text,
+      next_status text NOT NULL,
+      reason text,
+      actor_user_id text REFERENCES "user"(id) ON DELETE SET NULL,
+      actor_name_snapshot text,
+      actor_email_snapshot text,
+      created_at timestamptz NOT NULL DEFAULT now()
+    );
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS service_order_status_history_order_id_idx
+    ON service_order_status_history (service_order_id, created_at DESC);
   `);
 
   const legacyBudgetItems = await pool.query<{
@@ -1165,8 +1393,107 @@ function mapBudgetRow(row: BudgetRow): ManagedBudget {
   };
 }
 
+function mapServiceOrderItemRow(row: ServiceOrderItemRow): ManagedServiceOrderItem {
+  return {
+    id: row.id,
+    position: Number(row.position),
+    sourceBudgetItemId: row.source_budget_item_id,
+    serviceTypeId: row.service_type_id,
+    serviceTypeName: row.service_type_name,
+    serviceTypeBillingUnit: row.service_type_billing_unit,
+    equipmentId: row.equipment_id,
+    equipmentName: row.equipment_name,
+    equipmentBrand: row.equipment_brand,
+    equipmentModel: row.equipment_model,
+    operatorId: row.operator_id,
+    operatorName: row.operator_name,
+    serviceDescription: row.service_description,
+    serviceDate: row.service_date.slice(0, 10),
+    plannedStartTime: row.planned_start_time.slice(0, 5),
+    plannedEndTime: row.planned_end_time.slice(0, 5),
+    actualStartTime: row.actual_start_time ? row.actual_start_time.slice(0, 5) : null,
+    actualEndTime: row.actual_end_time ? row.actual_end_time.slice(0, 5) : null,
+    quotedValue: row.quoted_value === null ? null : Number(row.quoted_value),
+    notes: row.notes,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapServiceOrderRow(row: ServiceOrderRow): ManagedServiceOrder {
+  const items = JSON.parse(row.items_json || "[]") as ServiceOrderItemRow[];
+
+  return {
+    id: row.id,
+    number: row.number,
+    originType: row.origin_type,
+    sourceBudgetId: row.source_budget_id,
+    sourceBudgetNumber: row.source_budget_number,
+    status: row.status,
+    clientId: row.client_id,
+    clientName: row.client_name,
+    servicePostalCode: row.service_postal_code,
+    serviceStreet: row.service_street,
+    serviceNumber: row.service_number,
+    serviceComplement: row.service_complement,
+    serviceDistrict: row.service_district,
+    serviceCity: row.service_city,
+    serviceState: row.service_state,
+    serviceCountry: row.service_country,
+    notes: row.notes,
+    itemCount: Number(row.item_count),
+    items: items.map(mapServiceOrderItemRow),
+    completedAt: row.completed_at,
+    cancelledAt: row.cancelled_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapBudgetStatusHistoryRow(row: BudgetStatusHistoryRow): ManagedBudgetStatusHistory {
+  return {
+    id: row.id,
+    budgetId: row.budget_id,
+    budgetNumber: row.budget_number,
+    previousStatus: row.previous_status,
+    nextStatus: row.next_status,
+    reason: row.reason,
+    actorUserId: row.actor_user_id,
+    actorNameSnapshot: row.actor_name_snapshot,
+    actorEmailSnapshot: row.actor_email_snapshot,
+    createdAt: row.created_at,
+  };
+}
+
+function mapServiceOrderStatusHistoryRow(row: ServiceOrderStatusHistoryRow): ManagedServiceOrderStatusHistory {
+  return {
+    id: row.id,
+    serviceOrderId: row.service_order_id,
+    serviceOrderNumber: row.service_order_number,
+    previousStatus: row.previous_status,
+    nextStatus: row.next_status,
+    reason: row.reason,
+    actorUserId: row.actor_user_id,
+    actorNameSnapshot: row.actor_name_snapshot,
+    actorEmailSnapshot: row.actor_email_snapshot,
+    createdAt: row.created_at,
+  };
+}
+
+function normalizeStatusActor(actor?: StatusActorInput | null) {
+  return {
+    userId: actor?.userId ?? null,
+    name: actor?.name?.trim() || null,
+    email: actor?.email?.trim().toLowerCase() || null,
+  };
+}
+
 function formatBudgetNumber(sequence: number) {
   return `ORC-${sequence.toString().padStart(6, "0")}`;
+}
+
+function formatServiceOrderNumber(sequence: number) {
+  return `OS-${sequence.toString().padStart(6, "0")}`;
 }
 
 async function assertBudgetRelationsExist(input: {
@@ -1228,6 +1555,90 @@ function normalizeBudgetItemValue(value: string | number | null | undefined) {
   return Number(value);
 }
 
+async function insertBudgetStatusHistory(
+  client: { query: (queryText: string, values?: unknown[]) => Promise<unknown> },
+  input: {
+    budgetId: string | null;
+    budgetNumber: string;
+    previousStatus: BudgetStatus | null;
+    nextStatus: BudgetStatus;
+    reason?: string | null;
+    actor?: StatusActorInput | null;
+  },
+) {
+  const actor = normalizeStatusActor(input.actor);
+
+  await client.query(
+    `
+      INSERT INTO budget_status_history (
+        id,
+        budget_id,
+        budget_number,
+        previous_status,
+        next_status,
+        reason,
+        actor_user_id,
+        actor_name_snapshot,
+        actor_email_snapshot
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    `,
+    [
+      randomUUID(),
+      input.budgetId,
+      input.budgetNumber,
+      input.previousStatus,
+      input.nextStatus,
+      input.reason?.trim() || null,
+      actor.userId,
+      actor.name,
+      actor.email,
+    ],
+  );
+}
+
+async function insertServiceOrderStatusHistory(
+  client: { query: (queryText: string, values?: unknown[]) => Promise<unknown> },
+  input: {
+    serviceOrderId: string | null;
+    serviceOrderNumber: string;
+    previousStatus: ServiceOrderStatus | null;
+    nextStatus: ServiceOrderStatus;
+    reason?: string | null;
+    actor?: StatusActorInput | null;
+  },
+) {
+  const actor = normalizeStatusActor(input.actor);
+
+  await client.query(
+    `
+      INSERT INTO service_order_status_history (
+        id,
+        service_order_id,
+        service_order_number,
+        previous_status,
+        next_status,
+        reason,
+        actor_user_id,
+        actor_name_snapshot,
+        actor_email_snapshot
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    `,
+    [
+      randomUUID(),
+      input.serviceOrderId,
+      input.serviceOrderNumber,
+      input.previousStatus,
+      input.nextStatus,
+      input.reason?.trim() || null,
+      actor.userId,
+      actor.name,
+      actor.email,
+    ],
+  );
+}
+
 async function replaceBudgetItems(
   client: { query: (queryText: string, values?: unknown[]) => Promise<unknown> },
   budgetId: string,
@@ -1283,6 +1694,263 @@ async function replaceBudgetItems(
       ],
     );
   }
+}
+
+async function assertServiceOrderRelationsExist(input: {
+  clientId: string;
+  sourceBudgetId?: string;
+  items: ServiceOrderItemInput[];
+}) {
+  const serviceTypeIds = [...new Set(input.items.map((item) => item.serviceTypeId))];
+  const equipmentIds = [...new Set(input.items.map((item) => item.equipmentId))];
+  const operatorIds = [...new Set(input.items.map((item) => item.operatorId))];
+  const sourceBudgetItemIds = [...new Set(input.items.map((item) => item.sourceBudgetItemId).filter(Boolean))];
+
+  const [clientResult, equipmentResult, serviceTypeResult, operatorResult, sourceBudgetResult, sourceBudgetItemsResult] = await Promise.all([
+    pool.query<{ id: string; display_name: string }>(
+      `
+        SELECT id, COALESCE(NULLIF(trade_name, ''), legal_name) AS display_name
+        FROM clients
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [input.clientId],
+    ),
+    pool.query<{ id: string }>(`SELECT id FROM equipment WHERE id = ANY($1::text[])`, [equipmentIds]),
+    pool.query<BudgetServiceTypeSnapshotRow>(
+      `
+        SELECT id, billing_unit, base_value::text, minimum_hours::text, minimum_km::text
+        FROM service_types
+        WHERE id = ANY($1::text[])
+      `,
+      [serviceTypeIds],
+    ),
+    pool.query<{ id: string }>(`SELECT id FROM operators WHERE id = ANY($1::text[])`, [operatorIds]),
+    input.sourceBudgetId
+      ? pool.query<{ id: string; number: string; status: string }>(
+        `SELECT id, number, status FROM budgets WHERE id = $1 LIMIT 1`,
+        [input.sourceBudgetId],
+      )
+      : Promise.resolve({ rows: [] }),
+    sourceBudgetItemIds.length > 0
+      ? pool.query<{ id: string }>(`SELECT id FROM budget_items WHERE id = ANY($1::text[])`, [sourceBudgetItemIds])
+      : Promise.resolve({ rows: [] }),
+  ]);
+
+  const clientRow = clientResult.rows[0];
+
+  if (!clientRow) {
+    throw new Error("Client not found.");
+  }
+
+  if (equipmentResult.rows.length !== equipmentIds.length) {
+    throw new Error("One or more equipment items were not found.");
+  }
+
+  if (serviceTypeResult.rows.length !== serviceTypeIds.length) {
+    throw new Error("One or more service types were not found.");
+  }
+
+  if (operatorResult.rows.length !== operatorIds.length) {
+    throw new Error("One or more operators were not found.");
+  }
+
+  if (sourceBudgetItemIds.length > 0 && sourceBudgetItemsResult.rows.length !== sourceBudgetItemIds.length) {
+    throw new Error("One or more linked budget items were not found.");
+  }
+
+  const sourceBudget = input.sourceBudgetId ? sourceBudgetResult.rows[0] : null;
+
+  if (input.sourceBudgetId && !sourceBudget) {
+    throw new Error("Budget not found.");
+  }
+
+  if (sourceBudget && sourceBudget.status !== "approved") {
+    throw new Error("Only approved budgets can originate service orders.");
+  }
+
+  return {
+    clientName: clientRow.display_name,
+    sourceBudgetNumber: sourceBudget?.number ?? null,
+    serviceTypeMap: new Map(serviceTypeResult.rows.map((row) => [row.id, row])),
+  };
+}
+
+async function replaceServiceOrderItems(
+  client: { query: (queryText: string, values?: unknown[]) => Promise<unknown> },
+  serviceOrderId: string,
+  items: ServiceOrderItemInput[],
+  serviceTypeMap: Map<string, BudgetServiceTypeSnapshotRow>,
+) {
+  await client.query(`DELETE FROM service_order_items WHERE service_order_id = $1`, [serviceOrderId]);
+
+  for (const [index, item] of items.entries()) {
+    const serviceType = serviceTypeMap.get(item.serviceTypeId);
+
+    if (!serviceType) {
+      throw new Error("Service type not found.");
+    }
+
+    await client.query(
+      `
+        INSERT INTO service_order_items (
+          id,
+          service_order_id,
+          position,
+          source_budget_item_id,
+          service_type_id,
+          equipment_id,
+          operator_id,
+          service_description,
+          service_date,
+          planned_start_time,
+          planned_end_time,
+          actual_start_time,
+          actual_end_time,
+          quoted_value,
+          notes
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+      `,
+      [
+        randomUUID(),
+        serviceOrderId,
+        index,
+        item.sourceBudgetItemId ?? null,
+        item.serviceTypeId,
+        item.equipmentId,
+        item.operatorId,
+        item.serviceDescription.trim(),
+        item.serviceDate,
+        item.plannedStartTime,
+        item.plannedEndTime,
+        item.actualStartTime ?? null,
+        item.actualEndTime ?? null,
+        item.quotedValue ?? null,
+        item.notes?.trim() || null,
+      ],
+    );
+  }
+}
+
+async function createServiceOrderFromApprovedBudget(
+  client: { query: <T = unknown>(queryText: string, values?: unknown[]) => Promise<{ rows: T[] }> },
+  budget: ManagedBudget,
+  actor?: StatusActorInput | null,
+) {
+  if (budget.status !== "approved") {
+    throw new Error("Only approved budgets can generate service orders.");
+  }
+
+  const existingResult = await client.query<{ id: string }>(
+    `
+      SELECT id
+      FROM service_orders
+      WHERE source_budget_id = $1
+      LIMIT 1
+    `,
+    [budget.id],
+  );
+
+  if (existingResult.rows[0]) {
+    return existingResult.rows[0].id;
+  }
+
+  const serviceTypeIds = [...new Set(budget.items.map((item) => item.serviceTypeId))];
+  const serviceTypeResult = await client.query<BudgetServiceTypeSnapshotRow>(
+    `
+      SELECT id, billing_unit, base_value::text, minimum_hours::text, minimum_km::text
+      FROM service_types
+      WHERE id = ANY($1::text[])
+    `,
+    [serviceTypeIds],
+  );
+
+  const serviceTypeMap = new Map(serviceTypeResult.rows.map((row) => [row.id, row]));
+  const sequenceResult = await client.query<{ max_sequence: string }>(
+    `
+      SELECT COALESCE(MAX(CAST(SUBSTRING(number FROM 4) AS integer)), 0)::text AS max_sequence
+      FROM service_orders
+    `,
+  );
+
+  const nextSequence = Number(sequenceResult.rows[0]?.max_sequence ?? "0") + 1;
+  const serviceOrderId = randomUUID();
+  const serviceOrderNumber = formatServiceOrderNumber(nextSequence);
+
+  await client.query(
+    `
+      INSERT INTO service_orders (
+        id,
+        number,
+        origin_type,
+        source_budget_id,
+        source_budget_number,
+        status,
+        client_id,
+        client_name,
+        service_postal_code,
+        service_street,
+        service_number,
+        service_complement,
+        service_district,
+        service_city,
+        service_state,
+        service_country,
+        notes
+      )
+      VALUES (
+        $1, $2, 'budget', $3, $4, 'pending', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
+      )
+    `,
+    [
+      serviceOrderId,
+      serviceOrderNumber,
+      budget.id,
+      budget.number,
+      budget.clientId,
+      budget.clientName,
+      budget.servicePostalCode,
+      budget.serviceStreet,
+      budget.serviceNumber,
+      budget.serviceComplement,
+      budget.serviceDistrict,
+      budget.serviceCity,
+      budget.serviceState,
+      budget.serviceCountry,
+      budget.notes,
+    ],
+  );
+
+  await replaceServiceOrderItems(
+    client,
+    serviceOrderId,
+    budget.items.map((item) => ({
+      sourceBudgetItemId: item.id,
+      serviceTypeId: item.serviceTypeId,
+      equipmentId: item.equipmentId,
+      operatorId: item.operatorId,
+      serviceDescription: item.serviceDescription,
+      serviceDate: item.serviceDate,
+      plannedStartTime: item.startTime,
+      plannedEndTime: item.endTime,
+      actualStartTime: undefined,
+      actualEndTime: undefined,
+      quotedValue: item.initialValue,
+      notes: undefined,
+    })),
+    serviceTypeMap,
+  );
+
+  await insertServiceOrderStatusHistory(client, {
+    serviceOrderId,
+    serviceOrderNumber,
+    previousStatus: null,
+    nextStatus: "pending",
+    actor,
+  });
+
+  return serviceOrderId;
 }
 
 export async function listAssignableRoles() {
@@ -2587,6 +3255,31 @@ export async function getBudgetById(budgetId: string): Promise<ManagedBudget | n
   return row ? mapBudgetRow(row) : null;
 }
 
+export async function listBudgetStatusHistory(budgetId: string): Promise<ManagedBudgetStatusHistory[]> {
+  await bootstrapRbac();
+  const result = await pool.query<BudgetStatusHistoryRow>(
+    `
+      SELECT
+        id,
+        budget_id,
+        budget_number,
+        previous_status,
+        next_status,
+        reason,
+        actor_user_id,
+        actor_name_snapshot,
+        actor_email_snapshot,
+        created_at
+      FROM budget_status_history
+      WHERE budget_id = $1
+      ORDER BY created_at DESC
+    `,
+    [budgetId],
+  );
+
+  return result.rows.map(mapBudgetStatusHistoryRow);
+}
+
 export async function createBudget(input: {
   clientId: string;
   servicePostalCode: string;
@@ -2600,7 +3293,7 @@ export async function createBudget(input: {
   manualAdjustment: number;
   notes?: string;
   items: BudgetServiceItemInput[];
-}) {
+}, actor?: StatusActorInput | null) {
   await bootstrapRbac();
   const serviceTypeMap = await assertBudgetRelationsExist(input);
 
@@ -2684,6 +3377,13 @@ export async function createBudget(input: {
     );
 
     await replaceBudgetItems(client, id, input.items, serviceTypeMap);
+    await insertBudgetStatusHistory(client, {
+      budgetId: id,
+      budgetNumber: number,
+      previousStatus: null,
+      nextStatus: "pending",
+      actor,
+    });
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK");
@@ -2796,6 +3496,8 @@ export async function updateBudget(
 export async function updateBudgetStatus(
   budgetId: string,
   status: BudgetTransitionStatus,
+  reason?: string,
+  actor?: StatusActorInput | null,
 ) {
   await bootstrapRbac();
   const current = await getBudgetById(budgetId);
@@ -2806,30 +3508,548 @@ export async function updateBudgetStatus(
 
   const isPendingTransition = current.status === "pending" && (status === "approved" || status === "cancelled");
   const isCancelledRevert = current.status === "cancelled" && status === "pending";
+  const isApprovedRevert = current.status === "approved" && status === "pending";
 
-  if (!isPendingTransition && !isCancelledRevert) {
+  if (!isPendingTransition && !isCancelledRevert && !isApprovedRevert) {
     throw new Error("This budget status transition is not allowed.");
   }
 
-  await pool.query(
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    if (isApprovedRevert) {
+      const linkedServiceOrderResult = await client.query<{ id: string; status: string }>(
+        `
+          SELECT id, status
+          FROM service_orders
+          WHERE source_budget_id = $1
+          LIMIT 1
+        `,
+        [budgetId],
+      );
+
+      const linkedServiceOrder = linkedServiceOrderResult.rows[0];
+
+      if (!linkedServiceOrder) {
+        throw new Error("Approved budget cannot be reverted because no linked service order was found.");
+      }
+
+      if (linkedServiceOrder.status !== "pending") {
+        throw new Error("Approved budget can only be reverted when the linked service order is pending.");
+      }
+
+      await client.query(
+        `
+          DELETE FROM service_orders
+          WHERE id = $1
+        `,
+        [linkedServiceOrder.id],
+      );
+    }
+
+    await client.query(
+      `
+        UPDATE budgets
+        SET status = $2,
+            approved_at = CASE
+              WHEN $2 = 'approved' THEN now()
+              WHEN $2 = 'pending' THEN null
+              ELSE approved_at
+            END,
+            cancelled_at = CASE
+              WHEN $2 = 'cancelled' THEN now()
+              WHEN $2 = 'pending' THEN null
+              ELSE cancelled_at
+            END,
+            updated_at = now()
+        WHERE id = $1
+      `,
+      [budgetId, status],
+    );
+
+    await insertBudgetStatusHistory(client, {
+      budgetId,
+      budgetNumber: current.number,
+      previousStatus: current.status,
+      nextStatus: status,
+      reason,
+      actor,
+    });
+
+    if (status === "approved") {
+      await createServiceOrderFromApprovedBudget(client, {
+        ...current,
+        status: "approved",
+      }, actor);
+    }
+
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function listServiceOrders(): Promise<ManagedServiceOrder[]> {
+  await bootstrapRbac();
+  const result = await pool.query<ServiceOrderRow>(
     `
-      UPDATE budgets
-      SET status = $2,
-          approved_at = CASE
-            WHEN $2 = 'approved' THEN now()
-            WHEN $2 = 'pending' THEN null
-            ELSE approved_at
-          END,
-          cancelled_at = CASE
-            WHEN $2 = 'cancelled' THEN now()
-            WHEN $2 = 'pending' THEN null
-            ELSE cancelled_at
-          END,
-          updated_at = now()
-      WHERE id = $1
+      SELECT
+        so.id,
+        so.number,
+        so.origin_type,
+        so.source_budget_id,
+        so.source_budget_number,
+        so.status,
+        so.client_id,
+        so.client_name,
+        so.service_postal_code,
+        so.service_street,
+        so.service_number,
+        so.service_complement,
+        so.service_district,
+        so.service_city,
+        so.service_state,
+        so.service_country,
+        COUNT(soi.id)::text AS item_count,
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'id', soi.id,
+              'position', soi.position,
+              'source_budget_item_id', soi.source_budget_item_id,
+              'service_type_id', soi.service_type_id,
+              'service_type_name', st.name,
+              'service_type_billing_unit', st.billing_unit,
+              'equipment_id', soi.equipment_id,
+              'equipment_name', e.name,
+              'equipment_brand', e.brand,
+              'equipment_model', e.model,
+              'operator_id', soi.operator_id,
+              'operator_name', o.name,
+              'service_description', soi.service_description,
+              'service_date', soi.service_date::text,
+              'planned_start_time', soi.planned_start_time::text,
+              'planned_end_time', soi.planned_end_time::text,
+              'actual_start_time', soi.actual_start_time::text,
+              'actual_end_time', soi.actual_end_time::text,
+              'quoted_value', soi.quoted_value::text,
+              'notes', soi.notes,
+              'created_at', soi.created_at,
+              'updated_at', soi.updated_at
+            )
+            ORDER BY soi.position
+          ) FILTER (WHERE soi.id IS NOT NULL),
+          '[]'::json
+        )::text AS items_json,
+        so.notes,
+        so.completed_at,
+        so.cancelled_at,
+        so.created_at,
+        so.updated_at
+      FROM service_orders so
+      LEFT JOIN service_order_items soi ON soi.service_order_id = so.id
+      LEFT JOIN service_types st ON st.id = soi.service_type_id
+      LEFT JOIN equipment e ON e.id = soi.equipment_id
+      LEFT JOIN operators o ON o.id = soi.operator_id
+      GROUP BY
+        so.id,
+        so.number,
+        so.origin_type,
+        so.source_budget_id,
+        so.source_budget_number,
+        so.status,
+        so.client_id,
+        so.client_name,
+        so.service_postal_code,
+        so.service_street,
+        so.service_number,
+        so.service_complement,
+        so.service_district,
+        so.service_city,
+        so.service_state,
+        so.service_country,
+        so.notes,
+        so.completed_at,
+        so.cancelled_at,
+        so.created_at,
+        so.updated_at
+      ORDER BY so.updated_at DESC, so.number DESC
     `,
-    [budgetId, status],
   );
+
+  return result.rows.map(mapServiceOrderRow);
+}
+
+export async function getServiceOrderById(serviceOrderId: string): Promise<ManagedServiceOrder | null> {
+  await bootstrapRbac();
+  const result = await pool.query<ServiceOrderRow>(
+    `
+      SELECT
+        so.id,
+        so.number,
+        so.origin_type,
+        so.source_budget_id,
+        so.source_budget_number,
+        so.status,
+        so.client_id,
+        so.client_name,
+        so.service_postal_code,
+        so.service_street,
+        so.service_number,
+        so.service_complement,
+        so.service_district,
+        so.service_city,
+        so.service_state,
+        so.service_country,
+        COUNT(soi.id)::text AS item_count,
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'id', soi.id,
+              'position', soi.position,
+              'source_budget_item_id', soi.source_budget_item_id,
+              'service_type_id', soi.service_type_id,
+              'service_type_name', st.name,
+              'service_type_billing_unit', st.billing_unit,
+              'equipment_id', soi.equipment_id,
+              'equipment_name', e.name,
+              'equipment_brand', e.brand,
+              'equipment_model', e.model,
+              'operator_id', soi.operator_id,
+              'operator_name', o.name,
+              'service_description', soi.service_description,
+              'service_date', soi.service_date::text,
+              'planned_start_time', soi.planned_start_time::text,
+              'planned_end_time', soi.planned_end_time::text,
+              'actual_start_time', soi.actual_start_time::text,
+              'actual_end_time', soi.actual_end_time::text,
+              'quoted_value', soi.quoted_value::text,
+              'notes', soi.notes,
+              'created_at', soi.created_at,
+              'updated_at', soi.updated_at
+            )
+            ORDER BY soi.position
+          ) FILTER (WHERE soi.id IS NOT NULL),
+          '[]'::json
+        )::text AS items_json,
+        so.notes,
+        so.completed_at,
+        so.cancelled_at,
+        so.created_at,
+        so.updated_at
+      FROM service_orders so
+      LEFT JOIN service_order_items soi ON soi.service_order_id = so.id
+      LEFT JOIN service_types st ON st.id = soi.service_type_id
+      LEFT JOIN equipment e ON e.id = soi.equipment_id
+      LEFT JOIN operators o ON o.id = soi.operator_id
+      WHERE so.id = $1
+      GROUP BY
+        so.id,
+        so.number,
+        so.origin_type,
+        so.source_budget_id,
+        so.source_budget_number,
+        so.status,
+        so.client_id,
+        so.client_name,
+        so.service_postal_code,
+        so.service_street,
+        so.service_number,
+        so.service_complement,
+        so.service_district,
+        so.service_city,
+        so.service_state,
+        so.service_country,
+        so.notes,
+        so.completed_at,
+        so.cancelled_at,
+        so.created_at,
+        so.updated_at
+    `,
+    [serviceOrderId],
+  );
+
+  const row = result.rows[0];
+  return row ? mapServiceOrderRow(row) : null;
+}
+
+export async function listServiceOrderStatusHistory(serviceOrderId: string): Promise<ManagedServiceOrderStatusHistory[]> {
+  await bootstrapRbac();
+  const result = await pool.query<ServiceOrderStatusHistoryRow>(
+    `
+      SELECT
+        id,
+        service_order_id,
+        service_order_number,
+        previous_status,
+        next_status,
+        reason,
+        actor_user_id,
+        actor_name_snapshot,
+        actor_email_snapshot,
+        created_at
+      FROM service_order_status_history
+      WHERE service_order_id = $1
+      ORDER BY created_at DESC
+    `,
+    [serviceOrderId],
+  );
+
+  return result.rows.map(mapServiceOrderStatusHistoryRow);
+}
+
+export async function createServiceOrder(input: {
+  originType: "manual" | "budget";
+  sourceBudgetId?: string;
+  clientId: string;
+  servicePostalCode: string;
+  serviceStreet: string;
+  serviceNumber: string;
+  serviceComplement?: string;
+  serviceDistrict: string;
+  serviceCity: string;
+  serviceState: string;
+  serviceCountry: string;
+  notes?: string;
+  items: ServiceOrderItemInput[];
+}, actor?: StatusActorInput | null) {
+  await bootstrapRbac();
+  const relationData = await assertServiceOrderRelationsExist(input);
+  const id = randomUUID();
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+    await client.query("LOCK TABLE service_orders IN EXCLUSIVE MODE");
+
+    const sequenceResult = await client.query<{ max_sequence: string }>(
+      `
+        SELECT COALESCE(MAX(CAST(SUBSTRING(number FROM 4) AS integer)), 0)::text AS max_sequence
+        FROM service_orders
+      `,
+    );
+
+    const nextSequence = Number(sequenceResult.rows[0]?.max_sequence ?? "0") + 1;
+    const number = formatServiceOrderNumber(nextSequence);
+
+    await client.query(
+      `
+        INSERT INTO service_orders (
+          id,
+          number,
+          origin_type,
+          source_budget_id,
+          source_budget_number,
+          status,
+          client_id,
+          client_name,
+          service_postal_code,
+          service_street,
+          service_number,
+          service_complement,
+          service_district,
+          service_city,
+          service_state,
+          service_country,
+          notes
+        )
+        VALUES (
+          $1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
+        )
+      `,
+      [
+        id,
+        number,
+        input.originType,
+        input.sourceBudgetId ?? null,
+        relationData.sourceBudgetNumber,
+        input.clientId,
+        relationData.clientName,
+        input.servicePostalCode,
+        input.serviceStreet.trim(),
+        input.serviceNumber.trim(),
+        input.serviceComplement?.trim() || null,
+        input.serviceDistrict.trim(),
+        input.serviceCity.trim(),
+        input.serviceState.trim(),
+        input.serviceCountry.trim() || "Brasil",
+        input.notes?.trim() || null,
+      ],
+    );
+
+    await replaceServiceOrderItems(client, id, input.items, relationData.serviceTypeMap);
+    await insertServiceOrderStatusHistory(client, {
+      serviceOrderId: id,
+      serviceOrderNumber: number,
+      previousStatus: null,
+      nextStatus: "pending",
+      actor,
+    });
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+
+  return id;
+}
+
+export async function updateServiceOrder(
+  serviceOrderId: string,
+  input: {
+    originType: "manual" | "budget";
+    sourceBudgetId?: string;
+    clientId: string;
+    servicePostalCode: string;
+    serviceStreet: string;
+    serviceNumber: string;
+    serviceComplement?: string;
+    serviceDistrict: string;
+    serviceCity: string;
+    serviceState: string;
+    serviceCountry: string;
+    notes?: string;
+    items: ServiceOrderItemInput[];
+  },
+) {
+  await bootstrapRbac();
+  const current = await getServiceOrderById(serviceOrderId);
+
+  if (!current) {
+    throw new Error("Service order not found.");
+  }
+
+  if (current.status === "completed" || current.status === "cancelled") {
+    throw new Error("Completed or cancelled service orders cannot be edited.");
+  }
+
+  const relationData = await assertServiceOrderRelationsExist(input);
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      `
+        UPDATE service_orders
+        SET origin_type = $2,
+            source_budget_id = $3,
+            source_budget_number = $4,
+            client_id = $5,
+            client_name = $6,
+            service_postal_code = $7,
+            service_street = $8,
+            service_number = $9,
+            service_complement = $10,
+            service_district = $11,
+            service_city = $12,
+            service_state = $13,
+            service_country = $14,
+            notes = $15,
+            updated_at = now()
+        WHERE id = $1
+      `,
+      [
+        serviceOrderId,
+        input.originType,
+        input.sourceBudgetId ?? null,
+        relationData.sourceBudgetNumber,
+        input.clientId,
+        relationData.clientName,
+        input.servicePostalCode,
+        input.serviceStreet.trim(),
+        input.serviceNumber.trim(),
+        input.serviceComplement?.trim() || null,
+        input.serviceDistrict.trim(),
+        input.serviceCity.trim(),
+        input.serviceState.trim(),
+        input.serviceCountry.trim() || "Brasil",
+        input.notes?.trim() || null,
+      ],
+    );
+
+    await replaceServiceOrderItems(client, serviceOrderId, input.items, relationData.serviceTypeMap);
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function updateServiceOrderStatus(
+  serviceOrderId: string,
+  status: ServiceOrderTransitionStatus,
+  reason?: string,
+  actor?: StatusActorInput | null,
+) {
+  await bootstrapRbac();
+  const current = await getServiceOrderById(serviceOrderId);
+
+  if (!current) {
+    throw new Error("Service order not found.");
+  }
+
+  const validTransitions = new Set([
+    "pending:scheduled",
+    "pending:cancelled",
+    "scheduled:in_progress",
+    "scheduled:cancelled",
+    "in_progress:completed",
+    "completed:pending",
+    "cancelled:pending",
+  ]);
+
+  if (!validTransitions.has(`${current.status}:${status}`)) {
+    throw new Error("This service order status transition is not allowed.");
+  }
+
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      `
+        UPDATE service_orders
+        SET status = $2,
+            completed_at = CASE
+              WHEN $2 = 'completed' THEN now()
+              WHEN $2 = 'pending' THEN null
+              ELSE completed_at
+            END,
+            cancelled_at = CASE
+              WHEN $2 = 'cancelled' THEN now()
+              WHEN $2 = 'pending' THEN null
+              ELSE cancelled_at
+            END,
+            updated_at = now()
+        WHERE id = $1
+      `,
+      [serviceOrderId, status],
+    );
+
+    await insertServiceOrderStatusHistory(client, {
+      serviceOrderId,
+      serviceOrderNumber: current.number,
+      previousStatus: current.status,
+      nextStatus: status,
+      reason,
+      actor,
+    });
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function listRolesWithDetails(): Promise<RoleWithDetails[]> {

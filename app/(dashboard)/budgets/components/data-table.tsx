@@ -13,7 +13,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { CalendarDays, Check, ChevronDown, EllipsisVertical, FileDown, Pencil, RotateCcw, Search, X } from "lucide-react";
+import { CalendarDays, Check, ChevronDown, Clock3, EllipsisVertical, FileDown, Pencil, RotateCcw, Search, X } from "lucide-react";
 
 import { BudgetFormDialog } from "./budget-form-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +23,6 @@ import {
   AdminListTableCard,
   AdminListToolbar,
 } from "@/components/admin-list-layout";
-import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
 import {
   Dialog,
   DialogContent,
@@ -50,9 +49,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SortableHeader } from "@/components/sortable-header";
+import { StatusHistoryDialog } from "@/components/status-history-dialog";
+import { StatusTransitionDialog } from "@/components/status-transition-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Calendar } from "@/components/ui/calendar";
-import type { CreateBudgetInput, ManagedBudget, UpdateBudgetInput } from "@/lib/budgets-admin";
+import type {
+  CreateBudgetInput,
+  ManagedBudget,
+  ManagedBudgetStatusHistory,
+  UpdateBudgetInput,
+} from "@/lib/budgets-admin";
 import type { ManagedClient } from "@/lib/clients-admin";
 import type { EquipmentOption } from "@/lib/equipment-admin";
 import { usePersistentColumnVisibility } from "@/hooks/use-persistent-column-visibility";
@@ -60,6 +66,7 @@ import { useI18n, useLocale } from "@/i18n/provider";
 import type { ManagedOperator } from "@/lib/operators-admin";
 import type { ManagedServiceType } from "@/lib/service-types-admin";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 type DataTableProps = {
   budgets: ManagedBudget[];
@@ -69,9 +76,9 @@ type DataTableProps = {
   operators: ManagedOperator[];
   onCreateBudget: (values: CreateBudgetInput) => Promise<void>;
   onUpdateBudget: (id: string, values: UpdateBudgetInput) => Promise<void>;
-  onApproveBudget: (id: string) => Promise<void>;
-  onCancelBudget: (id: string) => Promise<void>;
-  onRevertBudget: (id: string) => Promise<void>;
+  onApproveBudget: (id: string, reason?: string) => Promise<void>;
+  onCancelBudget: (id: string, reason?: string) => Promise<void>;
+  onRevertBudget: (id: string, reason?: string) => Promise<void>;
   isMutating: boolean;
 };
 
@@ -442,6 +449,10 @@ function getStatusBadgeClass(status: ManagedBudget["status"]) {
   }
 }
 
+function getBudgetStatusLabel(status: ManagedBudget["status"], t: ReturnType<typeof useI18n>["t"]) {
+  return t(`budgets.statusOptions.${status}`);
+}
+
 function buildServicesSummary(budget: ManagedBudget, t: ReturnType<typeof useI18n>["t"]) {
   const serviceNames = [...new Set(budget.items.map((item) => item.serviceTypeName).filter(Boolean))];
 
@@ -501,6 +512,9 @@ export function DataTable({
   const [createOpen, setCreateOpen] = useState(false);
   const [editingBudget, setEditingBudget] = useState<ManagedBudget | null>(null);
   const [pendingStatusAction, setPendingStatusAction] = useState<PendingStatusAction>(null);
+  const [historyBudget, setHistoryBudget] = useState<ManagedBudget | null>(null);
+  const [budgetHistory, setBudgetHistory] = useState<ManagedBudgetStatusHistory[]>([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [createdDateFilter, setCreatedDateFilter] = useState<DateFilterValue>({ preset: "all" });
   const [serviceDateFilter, setServiceDateFilter] = useState<DateFilterValue>({ preset: "all" });
   const createdDateRange = useMemo(() => resolveDateFilterRange(createdDateFilter), [createdDateFilter]);
@@ -573,7 +587,7 @@ export function DataTable({
       header: ({ column }) => <SortableHeader column={column} title={t("budgets.status")} className="-ml-3" />,
       cell: ({ row }) => (
         <Badge variant="secondary" className={getStatusBadgeClass(row.original.status)}>
-          {t(`budgets.statusOptions.${row.original.status}`)}
+          {getBudgetStatusLabel(row.original.status, t)}
         </Badge>
       ),
       filterFn: "equals",
@@ -591,6 +605,7 @@ export function DataTable({
       cell: ({ row }) => {
         const budget = row.original;
         const isPending = budget.status === "pending";
+        const isApproved = budget.status === "approved";
         const isCancelled = budget.status === "cancelled";
 
         return (
@@ -615,6 +630,32 @@ export function DataTable({
                 <FileDown className="mr-2 size-4" />
                 {t("budgets.downloadPdf")}
               </DropdownMenuItem>
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={async () => {
+                  setHistoryBudget(budget);
+                  setIsHistoryLoading(true);
+
+                  try {
+                    const response = await fetch(`/api/budgets/${budget.id}/history`, { cache: "no-store" });
+                    const payload = await response.json().catch(() => null);
+
+                    if (!response.ok) {
+                      throw new Error(payload?.error || t("budgets.updateError"));
+                    }
+
+                    setBudgetHistory(payload.history ?? []);
+                  } catch (error) {
+                    toast.error(error instanceof Error ? error.message : t("budgets.updateError"));
+                    setHistoryBudget(null);
+                  } finally {
+                    setIsHistoryLoading(false);
+                  }
+                }}
+              >
+                <Clock3 className="mr-2 size-4" />
+                {t("budgets.viewHistory")}
+              </DropdownMenuItem>
               {isPending ? (
                 <DropdownMenuItem
                   className="cursor-pointer"
@@ -633,7 +674,7 @@ export function DataTable({
                   {t("budgets.cancelBudget")}
                 </DropdownMenuItem>
               ) : null}
-              {isCancelled ? (
+              {isApproved || isCancelled ? (
                 <DropdownMenuItem
                   className="cursor-pointer"
                   onClick={() => setPendingStatusAction({ budget, status: "pending" })}
@@ -920,7 +961,7 @@ export function DataTable({
         operators={operators}
       />
 
-      <ConfirmDeleteDialog
+      <StatusTransitionDialog
         open={Boolean(pendingStatusAction)}
         onOpenChange={(nextOpen) => {
           if (!nextOpen) {
@@ -949,22 +990,39 @@ export function DataTable({
               : t("budgets.revertBudget")
         }
         confirmVariant={pendingStatusAction?.status === "cancelled" ? "destructive" : "default"}
-        onConfirm={async () => {
+        requireReason={pendingStatusAction?.status === "pending"}
+        onConfirm={async (reason) => {
           if (!pendingStatusAction) {
             return;
           }
 
           if (pendingStatusAction.status === "approved") {
-            await onApproveBudget(pendingStatusAction.budget.id);
+            await onApproveBudget(pendingStatusAction.budget.id, reason);
           } else if (pendingStatusAction.status === "cancelled") {
-            await onCancelBudget(pendingStatusAction.budget.id);
+            await onCancelBudget(pendingStatusAction.budget.id, reason);
           } else {
-            await onRevertBudget(pendingStatusAction.budget.id);
+            await onRevertBudget(pendingStatusAction.budget.id, reason);
           }
 
           setPendingStatusAction(null);
         }}
         isLoading={isMutating}
+      />
+
+      <StatusHistoryDialog
+        open={Boolean(historyBudget)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setHistoryBudget(null);
+            setBudgetHistory([]);
+          }
+        }}
+        title={historyBudget ? `${t("budgets.historyTitle")} • ${historyBudget.number}` : t("budgets.historyTitle")}
+        description={t("budgets.historyDescription")}
+        entries={budgetHistory}
+        isLoading={isHistoryLoading}
+        emptyMessage={t("budgets.noHistory")}
+        getStatusLabel={(status) => getBudgetStatusLabel(status as ManagedBudget["status"], t)}
       />
     </div>
   );
