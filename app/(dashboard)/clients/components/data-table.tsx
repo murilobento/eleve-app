@@ -142,7 +142,7 @@ export function DataTable({
       accessorKey: "personType",
       header: ({ column }) => <SortableHeader column={column} title={t("clients.personType")} className="-ml-3" />,
       cell: ({ row }) => (
-        <Badge variant={row.original.personType === "PJ" ? "default" : "secondary"}>
+        <Badge variant="outline">
           {row.original.personType}
         </Badge>
       ),

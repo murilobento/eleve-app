@@ -179,7 +179,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
     accessorKey: "status",
     header: "Status",
     cell: ({ row }) => (
-      <Badge variant="outline" className="text-muted-foreground px-1.5">
+      <Badge variant="secondary" className="px-1.5">
         {row.original.status === "Done" ? (
           <CircleCheckBig className="text-primary" />
         ) : (

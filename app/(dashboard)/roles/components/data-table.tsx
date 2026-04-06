@@ -119,7 +119,7 @@ export function DataTable({
       header: ({ column }) => <SortableHeader column={column} title={t("roles.type")} className="-ml-3" />,
       cell: ({ row }) => (
         row.original.isSystem ? (
-          <Badge variant="secondary" className="gap-1">
+          <Badge variant="outline" className="gap-1">
             <ShieldCheck className="size-3" />
             {t("roles.system")}
           </Badge>

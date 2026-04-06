@@ -148,7 +148,7 @@ export function DataTable({
       header: ({ column }) => (
         <SortableHeader column={column} title={t("equipment.licenseRequired")} className="-ml-3" />
       ),
-      cell: ({ row }) => <Badge variant="secondary">{row.original.licenseRequired}</Badge>,
+      cell: ({ row }) => <Badge variant="outline">{row.original.licenseRequired}</Badge>,
       filterFn: "equals",
     },
     {
