@@ -3,12 +3,14 @@
 import { LoginForm2 } from "./components/login-form-2"
 import { Logo } from "@/components/logo"
 import { LanguageSwitcher } from "@/components/language-switcher"
+import { ModeToggle } from "@/components/mode-toggle"
 import { useLocale, useI18n } from "@/i18n/provider"
 import { getAppUrl } from "@/lib/utils"
 
 export default function LoginPage() {
   const locale = useLocale()
   const { t } = useI18n()
+  const appName = process.env.NEXT_PUBLIC_APP_NAME || "ELEVE"
 
   return (
     <div className="grid min-h-svh lg:grid-cols-2">
@@ -18,9 +20,12 @@ export default function LoginPage() {
             <div className="bg-primary text-primary-foreground flex size-8 items-center justify-center rounded-md">
               <Logo size={24} />
             </div>
-            ShadcnStore
+            {appName}
           </a>
-          <LanguageSwitcher />
+          <div className="flex items-center gap-2">
+            <ModeToggle variant="ghost" />
+            <LanguageSwitcher />
+          </div>
         </div>
         <div className="flex flex-1 items-center justify-center">
           <div className="w-full max-w-md">

@@ -3,16 +3,29 @@
 import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, type FieldErrors } from "react-hook-form";
-import { EllipsisVertical, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import {
+  type ColumnDef,
+  type ColumnFiltersState,
+  type SortingState,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+import { ChevronDown, EllipsisVertical, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import {
+  AdminListPaginationFooter,
   AdminListTableCard,
   AdminListToolbar,
 } from "@/components/admin-list-layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +36,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
@@ -36,6 +50,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SortableHeader } from "@/components/sortable-header";
 import {
   Select,
   SelectContent,
@@ -45,7 +60,8 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useI18n } from "@/i18n/provider";
+import { usePersistentColumnVisibility } from "@/hooks/use-persistent-column-visibility";
+import { useI18n, useLocale } from "@/i18n/provider";
 import type {
   CnpjLookupResult,
   CreateSupplierInput,
@@ -105,12 +121,26 @@ function findFirstErrorMessage(value: unknown): string | null {
   return null;
 }
 
+function formatDate(value: string, locale: string) {
+  return new Intl.DateTimeFormat(locale, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
 export default function SuppliersPage() {
   const { t } = useI18n();
+  const locale = useLocale();
   const [suppliers, setSuppliers] = useState<ManagedSupplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [isMutating, setIsMutating] = useState(false);
-  const [search, setSearch] = useState("");
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const { columnVisibility, setColumnVisibility } = usePersistentColumnVisibility("table:suppliers:columns:v1", {
+    updatedAt: false,
+  });
+  const [rowSelection, setRowSelection] = useState({});
+  const [globalFilter, setGlobalFilter] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<ManagedSupplier | null>(null);
   const [deleting, setDeleting] = useState<ManagedSupplier | null>(null);
@@ -188,25 +218,6 @@ export default function SuppliersPage() {
     });
   }, [editing, form, open]);
 
-  const visibleSuppliers = useMemo(() => {
-    const term = search.trim().toLowerCase();
-
-    if (!term) {
-      return suppliers;
-    }
-
-    return suppliers.filter((supplier) =>
-      [
-        supplier.legalName,
-        supplier.tradeName ?? "",
-        supplier.document,
-        supplier.city,
-        supplier.state,
-        supplier.phone,
-      ].some((value) => value.toLowerCase().includes(term)),
-    );
-  }, [search, suppliers]);
-
   async function runMutation(operation: () => Promise<void>, successMessage: string) {
     setIsMutating(true);
 
@@ -217,6 +228,41 @@ export default function SuppliersPage() {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t("suppliers.updateError"));
       throw error;
+    } finally {
+      setIsMutating(false);
+    }
+  }
+
+  async function handleDeleteSuppliers(ids: string[]) {
+    if (!ids.length) {
+      return;
+    }
+
+    setIsMutating(true);
+
+    try {
+      const results = await Promise.allSettled(
+        ids.map(async (id) => {
+          await parseResponse(
+            await fetch(`/api/suppliers/${id}`, {
+              method: "DELETE",
+            }),
+          );
+        }),
+      );
+
+      const successCount = results.filter((result) => result.status === "fulfilled").length;
+      const failedCount = ids.length - successCount;
+
+      await loadSuppliers();
+
+      if (successCount > 0) {
+        toast.success(t("common.bulkDeleteSuccess", { count: successCount }));
+      }
+
+      if (failedCount > 0) {
+        toast.error(t("common.bulkDeletePartialError", { failed: failedCount, total: ids.length }));
+      }
     } finally {
       setIsMutating(false);
     }
@@ -318,6 +364,199 @@ export default function SuppliersPage() {
     toast.error(message);
   }
 
+  const columns = useMemo<ColumnDef<ManagedSupplier>[]>(() => [
+    {
+      id: "select",
+      header: ({ table }) => (
+        <div className="flex items-center justify-center px-2">
+          <Checkbox
+            checked={table.getIsAllPageRowsSelected() || (table.getIsSomePageRowsSelected() && "indeterminate")}
+            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+            aria-label={t("common.selectAll")}
+          />
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="flex items-center justify-center px-2">
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            aria-label={t("common.selectRow")}
+          />
+        </div>
+      ),
+      enableSorting: false,
+      enableHiding: false,
+      size: 50,
+    },
+    {
+      accessorKey: "legalName",
+      header: ({ column }) => <SortableHeader column={column} title={t("suppliers.name")} className="-ml-3" />,
+      enableHiding: false,
+      cell: ({ row }) => (
+        <div className="space-y-1">
+          <div className="font-medium">{row.original.legalName}</div>
+          <div className="text-sm text-muted-foreground">
+            {row.original.tradeName || row.original.contactName || row.original.email || "-"}
+          </div>
+        </div>
+      ),
+    },
+    {
+      accessorKey: "supplierType",
+      header: ({ column }) => <SortableHeader column={column} title={t("suppliers.type")} className="-ml-3" />,
+      cell: ({ row }) => <Badge variant="outline">{t(`suppliers.types.${row.original.supplierType}`)}</Badge>,
+      filterFn: "equals",
+    },
+    {
+      accessorKey: "document",
+      header: ({ column }) => <SortableHeader column={column} title={t("suppliers.document")} className="-ml-3" />,
+      cell: ({ row }) => <span className="text-sm">{formatSupplierDocument(row.original.document)}</span>,
+    },
+    {
+      accessorKey: "contactName",
+      header: ({ column }) => <SortableHeader column={column} title={t("suppliers.contactName")} className="-ml-3" />,
+      cell: ({ row }) => (
+        <div className="text-sm">
+          <div>{row.original.contactName || "-"}</div>
+          <div className="text-muted-foreground">{row.original.contactPhone || "-"}</div>
+        </div>
+      ),
+    },
+    {
+      accessorKey: "email",
+      header: ({ column }) => <SortableHeader column={column} title={t("suppliers.email")} className="-ml-3" />,
+      cell: ({ row }) => <span className="text-sm">{row.original.email || "-"}</span>,
+    },
+    {
+      accessorKey: "location",
+      header: ({ column }) => <SortableHeader column={column} title={t("suppliers.location")} className="-ml-3" />,
+      cell: ({ row }) => (
+        <span className="text-sm">
+          {row.original.city} / {row.original.state}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "updatedAt",
+      header: ({ column }) => <SortableHeader column={column} title={t("suppliers.updated")} className="-ml-3" />,
+      cell: ({ row }) => <span className="text-sm">{formatDate(row.original.updatedAt, locale)}</span>,
+    },
+    {
+      accessorKey: "status",
+      header: ({ column }) => <SortableHeader column={column} title={t("suppliers.status")} className="-ml-3" />,
+      cell: ({ row }) => {
+        const isActive = row.original.status === "active";
+        const className = isActive ? "text-primary bg-primary/10" : "text-destructive bg-destructive/10";
+
+        return (
+          <Badge variant="secondary" className={className}>
+            {isActive ? t("suppliers.active") : t("suppliers.inactive")}
+          </Badge>
+        );
+      },
+      filterFn: "equals",
+    },
+    {
+      id: "actions",
+      header: t("suppliers.actions"),
+      enableSorting: false,
+      enableHiding: false,
+      cell: ({ row }) => {
+        const supplier = row.original;
+
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer" disabled={isMutating}>
+                <EllipsisVertical className="size-4" />
+                <span className="sr-only">{t("suppliers.actions")}</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem className="cursor-pointer" onClick={() => setEditing(supplier)}>
+                <Pencil className="mr-2 size-4" />
+                {t("suppliers.edit")}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                variant="destructive"
+                className="cursor-pointer"
+                onClick={() => setDeleting(supplier)}
+              >
+                <Trash2 className="mr-2 size-4" />
+                {t("common.delete")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
+  ], [isMutating, locale, t]);
+
+  const columnVisibilityLabels = useMemo<Record<string, string>>(
+    () => ({
+      supplierType: t("suppliers.type"),
+      status: t("suppliers.status"),
+      document: t("suppliers.document"),
+      contactName: t("suppliers.contactName"),
+      email: t("suppliers.email"),
+      location: t("suppliers.location"),
+      updatedAt: t("suppliers.updated"),
+    }),
+    [t],
+  );
+
+  const table = useReactTable({
+    data: suppliers,
+    columns,
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange: setRowSelection,
+    onGlobalFilterChange: setGlobalFilter,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    globalFilterFn: (row, _columnId, filterValue) => {
+      const value = String(filterValue).toLowerCase();
+
+      return [
+        row.original.legalName,
+        row.original.tradeName ?? "",
+        row.original.contactName ?? "",
+        row.original.contactPhone ?? "",
+        row.original.document,
+        row.original.email ?? "",
+        row.original.city,
+        row.original.state,
+      ].some((item) => item.toLowerCase().includes(value));
+    },
+    state: {
+      sorting,
+      columnFilters,
+      columnVisibility,
+      rowSelection,
+      globalFilter,
+    },
+    initialState: {
+      pagination: {
+        pageSize: 10,
+      },
+    },
+  });
+
+  const typeFilter = (table.getColumn("supplierType")?.getFilterValue() as string) || "all";
+  const statusFilter = (table.getColumn("status")?.getFilterValue() as string) || "all";
+  const selectedCount = table.getFilteredSelectedRowModel().rows.length;
+  const hasActiveFilters = Boolean(globalFilter.trim()) || columnFilters.length > 0;
+
+  const handleClearFilters = () => {
+    setGlobalFilter("");
+    setColumnFilters([]);
+    table.setPageIndex(0);
+  };
+
   return (
     <>
       <div className="px-4 lg:px-6">
@@ -329,19 +568,108 @@ export default function SuppliersPage() {
 
       <div className="@container/main mt-2 space-y-4 px-4 lg:mt-4 lg:px-6">
         <AdminListToolbar>
-          <div className="grid min-w-[220px] flex-1 gap-2">
-            <Label htmlFor="suppliers-search">{t("suppliers.search")}</Label>
-            <div className="relative">
-              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                id="suppliers-search"
-                className="pl-9"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder={t("suppliers.searchPlaceholder")}
-              />
+          <div className="relative min-w-[240px] flex-1">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder={t("suppliers.searchPlaceholder")}
+              value={globalFilter}
+              onChange={(event) => setGlobalFilter(event.target.value)}
+              className="h-10 rounded-lg border-muted-foreground/20 bg-background pl-9"
+            />
+          </div>
+
+          <div className="min-w-[180px] space-y-2">
+            <Label htmlFor="supplier-type-filter" className="text-sm font-medium">
+              {t("suppliers.type")}
+            </Label>
+            <Select
+              value={typeFilter}
+              onValueChange={(value) =>
+                table.getColumn("supplierType")?.setFilterValue(value === "all" ? undefined : value)
+              }
+            >
+              <SelectTrigger className="h-10 w-full cursor-pointer rounded-lg" id="supplier-type-filter">
+                <SelectValue placeholder={t("suppliers.selectType")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("suppliers.allTypes")}</SelectItem>
+                <SelectItem value="fuel_station">{t("suppliers.types.fuel_station")}</SelectItem>
+                <SelectItem value="workshop">{t("suppliers.types.workshop")}</SelectItem>
+                <SelectItem value="other">{t("suppliers.types.other")}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="min-w-[180px] space-y-2">
+            <Label htmlFor="supplier-status-filter" className="text-sm font-medium">
+              {t("suppliers.status")}
+            </Label>
+            <Select
+              value={statusFilter}
+              onValueChange={(value) =>
+                table.getColumn("status")?.setFilterValue(value === "all" ? undefined : value)
+              }
+            >
+              <SelectTrigger className="h-10 w-full cursor-pointer rounded-lg" id="supplier-status-filter">
+                <SelectValue placeholder={t("suppliers.selectStatus")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("suppliers.allStatuses")}</SelectItem>
+                <SelectItem value="active">{t("suppliers.active")}</SelectItem>
+                <SelectItem value="inactive">{t("suppliers.inactive")}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="ml-auto">
+            <div className="min-w-[180px] space-y-2">
+              <Label htmlFor="suppliers-column-visibility" className="text-sm font-medium">
+                {t("common.columnVisibility")}
+              </Label>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    id="suppliers-column-visibility"
+                    variant="outline"
+                    size="lg"
+                    className="h-10 w-full cursor-pointer justify-between rounded-lg px-3"
+                  >
+                    {t("common.columns")} <ChevronDown className="size-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {table
+                    .getAllColumns()
+                    .filter((column) => column.getCanHide())
+                    .map((column) => (
+                      <DropdownMenuCheckboxItem
+                        key={column.id}
+                        checked={column.getIsVisible()}
+                        onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                      >
+                        {columnVisibilityLabels[column.id] ?? column.id}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
+
+          <div className="w-full min-w-[160px] space-y-2 sm:w-auto">
+            <Label className="text-sm font-medium text-transparent">
+              {t("common.clearFilters")}
+            </Label>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 w-full cursor-pointer rounded-lg sm:w-auto"
+              onClick={handleClearFilters}
+              disabled={!hasActiveFilters}
+            >
+              {t("common.clearFilters")}
+            </Button>
+          </div>
+
           <Button
             className="cursor-pointer"
             onClick={() => {
@@ -357,63 +685,87 @@ export default function SuppliersPage() {
         {loading ? (
           <div className="rounded-md border px-6 py-10 text-sm text-muted-foreground">{t("suppliers.loading")}</div>
         ) : (
-          <AdminListTableCard>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("suppliers.name")}</TableHead>
-                  <TableHead>{t("suppliers.type")}</TableHead>
-                  <TableHead>{t("suppliers.status")}</TableHead>
-                  <TableHead>{t("suppliers.location")}</TableHead>
-                  <TableHead>{t("suppliers.actions")}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {visibleSuppliers.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
-                      {t("suppliers.noSuppliers")}
-                    </TableCell>
-                  </TableRow>
-                ) : visibleSuppliers.map((supplier) => (
-                  <TableRow key={supplier.id}>
-                    <TableCell>
-                      <div className="font-medium">{supplier.tradeName || supplier.legalName}</div>
-                      <div className="text-xs text-muted-foreground">{supplier.legalName}</div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{t(`suppliers.types.${supplier.supplierType}`)}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={supplier.status === "active" ? "default" : "secondary"}>
-                        {supplier.status === "active" ? t("suppliers.active") : t("suppliers.inactive")}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{supplier.city} - {supplier.state}</TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer">
-                            <EllipsisVertical className="size-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem className="cursor-pointer" onClick={() => setEditing(supplier)}>
-                            <Pencil className="mr-2 size-4" />
-                            {t("common.saveChanges")}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="cursor-pointer text-destructive" onClick={() => setDeleting(supplier)}>
-                            <Trash2 className="mr-2 size-4" />
-                            {t("common.delete")}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </AdminListTableCard>
+          <>
+            {selectedCount > 0 ? (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/30 px-3 py-2">
+                <span className="text-sm text-muted-foreground">
+                  {t("common.selectedCount", { count: selectedCount })}
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="cursor-pointer"
+                    onClick={() => table.resetRowSelection()}
+                    disabled={isMutating}
+                  >
+                    {t("common.clearSelection")}
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="cursor-pointer"
+                    onClick={async () => {
+                      const ids = table.getSelectedRowModel().rows.map((row) => row.original.id);
+                      if (!ids.length) {
+                        return;
+                      }
+                      await handleDeleteSuppliers(ids);
+                      table.resetRowSelection();
+                    }}
+                    disabled={isMutating}
+                  >
+                    {t("common.deleteSelected")}
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+
+            <AdminListTableCard>
+              <Table>
+                <TableHeader>
+                  {table.getHeaderGroups().map((headerGroup) => (
+                    <TableRow key={headerGroup.id}>
+                      {headerGroup.headers.map((header) => (
+                        <TableHead key={header.id}>
+                          {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                        </TableHead>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableHeader>
+                <TableBody>
+                  {table.getRowModel().rows.length ? (
+                    table.getRowModel().rows.map((row) => (
+                      <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
+                        {row.getVisibleCells().map((cell) => (
+                          <TableCell key={cell.id}>
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
+                        {t("suppliers.noSuppliers")}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </AdminListTableCard>
+
+            <AdminListPaginationFooter
+              countLabel={t("suppliers.supplierCount", { count: table.getFilteredRowModel().rows.length })}
+              previousLabel={t("common.previous")}
+              nextLabel={t("common.next")}
+              onPreviousPage={() => table.previousPage()}
+              onNextPage={() => table.nextPage()}
+              canPreviousPage={table.getCanPreviousPage()}
+              canNextPage={table.getCanNextPage()}
+            />
+          </>
         )}
       </div>
 
