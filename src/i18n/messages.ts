@@ -103,6 +103,9 @@ const messages: Record<AppLocale, any> = {
       bulkDeletePartialError: "{failed} de {total} exclusão(ões) falharam.",
       created: "Criado",
       system: "Sistema",
+      lockScreen: "Bloquear tela",
+      fullscreen: "Tela cheia",
+      exitFullscreen: "Sair da tela cheia",
     },
     navigation: {
       home: "Início",
@@ -166,6 +169,15 @@ const messages: Record<AppLocale, any> = {
       terms: "Termos de Uso",
       and: "e",
       privacy: "Política de Privacidade",
+      lockScreen: {
+        title: "Sessão bloqueada por inatividade",
+        description: "Digite sua senha para continuar.",
+        unlock: "Desbloquear",
+        signOut: "Sair",
+        invalidPassword: "Senha inválida.",
+        attemptsRemaining: "Tentativas restantes: {count}",
+        sessionExpired: "Sessão encerrada por segurança.",
+      },
     },
     landing: {
       trustedBy: "Confiado por empresas líderes no mundo todo",
@@ -1293,6 +1305,9 @@ const messages: Record<AppLocale, any> = {
       bulkDeletePartialError: "{failed} of {total} delete(s) failed.",
       created: "Created",
       system: "System",
+      lockScreen: "Lock screen",
+      fullscreen: "Fullscreen",
+      exitFullscreen: "Exit fullscreen",
     },
     navigation: {
       home: "Home",
@@ -1356,6 +1371,15 @@ const messages: Record<AppLocale, any> = {
       terms: "Terms of Service",
       and: "and",
       privacy: "Privacy Policy",
+      lockScreen: {
+        title: "Session locked due to inactivity",
+        description: "Enter your password to continue.",
+        unlock: "Unlock",
+        signOut: "Sign out",
+        invalidPassword: "Invalid password.",
+        attemptsRemaining: "Attempts remaining: {count}",
+        sessionExpired: "Session ended for security reasons.",
+      },
     },
     landing: {
       trustedBy: "Trusted by leading companies worldwide",

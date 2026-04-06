@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { PanelLeft, PanelTop } from "lucide-react"
+import { Expand, Lock, Minimize, PanelLeft, PanelTop } from "lucide-react"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Logo } from "@/components/logo"
@@ -15,6 +15,7 @@ import { useSidebarConfig } from "@/hooks/use-sidebar-config"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { stripLocaleFromPath } from "@/i18n/config"
 import { useI18n } from "@/i18n/provider"
+import { triggerManualLock } from "@/lib/lockscreen"
 
 export function SiteHeader() {
   const [searchOpen, setSearchOpen] = React.useState(false)
@@ -28,6 +29,7 @@ export function SiteHeader() {
   const showTopbarCompanyName = config.navigationMode === "topbar" && !isMobile
   const normalizedPathname = stripLocaleFromPath(pathname)
   const nextNavigationMode = config.navigationMode === "sidebar" ? "topbar" : "sidebar"
+  const [isFullscreen, setIsFullscreen] = React.useState(false)
 
   React.useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -67,6 +69,31 @@ export function SiteHeader() {
 
     document.title = `${companyName} | ${pageTitle}`
   }, [companyName, normalizedPathname, t])
+
+  React.useEffect(() => {
+    const updateFullscreen = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement))
+    }
+
+    document.addEventListener("fullscreenchange", updateFullscreen)
+    updateFullscreen()
+
+    return () => {
+      document.removeEventListener("fullscreenchange", updateFullscreen)
+    }
+  }, [])
+
+  const handleToggleFullscreen = async () => {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen()
+      } else {
+        await document.documentElement.requestFullscreen()
+      }
+    } catch {
+      // Ignore browser/permission errors.
+    }
+  }
 
   return (
     <>
@@ -118,6 +145,30 @@ export function SiteHeader() {
               </Button>
             </div>
             <LanguageSwitcher />
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="cursor-pointer"
+              onClick={triggerManualLock}
+              aria-label={t("common.lockScreen")}
+              title={t("common.lockScreen")}
+            >
+              <Lock className="size-4" />
+              <span className="sr-only">{t("common.lockScreen")}</span>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="cursor-pointer"
+              onClick={handleToggleFullscreen}
+              aria-label={isFullscreen ? t("common.exitFullscreen") : t("common.fullscreen")}
+              title={isFullscreen ? t("common.exitFullscreen") : t("common.fullscreen")}
+            >
+              {isFullscreen ? <Minimize className="size-4" /> : <Expand className="size-4" />}
+              <span className="sr-only">{isFullscreen ? t("common.exitFullscreen") : t("common.fullscreen")}</span>
+            </Button>
             <ModeToggle />
           </div>
         </div>
