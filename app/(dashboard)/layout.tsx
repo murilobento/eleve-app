@@ -24,7 +24,9 @@ import {
   IDLE_TIMEOUT_MS,
   LAST_ACTIVITY_STORAGE_KEY,
   LOCK_STORAGE_KEY,
+  LOCK_USER_STORAGE_KEY,
   MANUAL_LOCK_EVENT,
+  resetLockscreenStorage,
 } from "@/lib/lockscreen"
 
 const routePermissions = [
@@ -74,7 +76,10 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     setIsLocked(true)
     updateBodyScrollLock(true)
     window.localStorage.setItem(LOCK_STORAGE_KEY, String(Date.now()))
-  }, [updateBodyScrollLock])
+    if (session?.user?.email) {
+      window.localStorage.setItem(LOCK_USER_STORAGE_KEY, session.user.email)
+    }
+  }, [session?.user?.email, updateBodyScrollLock])
 
   const scheduleLockFromActivity = React.useCallback((lastActivityAt: number) => {
     clearLockTimer()
@@ -109,8 +114,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     setIsLocked(false)
     setFailedAttempts(0)
     updateBodyScrollLock(false)
-    window.localStorage.removeItem(LOCK_STORAGE_KEY)
-    window.localStorage.setItem(FAILED_ATTEMPTS_STORAGE_KEY, "0")
+    resetLockscreenStorage()
     persistActivity(true)
   }, [persistActivity, updateBodyScrollLock])
 
@@ -119,8 +123,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     setFailedAttempts(0)
     clearLockTimer()
     updateBodyScrollLock(false)
-    window.localStorage.removeItem(LOCK_STORAGE_KEY)
-    window.localStorage.setItem(FAILED_ATTEMPTS_STORAGE_KEY, "0")
+    resetLockscreenStorage()
 
     void signOut().finally(() => {
       router.replace(getAppUrl("/auth/sign-in", locale))
@@ -161,13 +164,23 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     }
 
     const storedLockAt = window.localStorage.getItem(LOCK_STORAGE_KEY)
+    const storedLockUser = window.localStorage.getItem(LOCK_USER_STORAGE_KEY)
     const storedFailedAttempts = Number(window.localStorage.getItem(FAILED_ATTEMPTS_STORAGE_KEY) ?? "0")
     const storedLastActivity = Number(window.localStorage.getItem(LAST_ACTIVITY_STORAGE_KEY) ?? "0")
+    const parsedFailedAttempts = Number.isNaN(storedFailedAttempts) ? 0 : storedFailedAttempts
+    const lockBelongsToCurrentUser = !storedLockUser || storedLockUser === session.user.email
+    const shouldClearStaleLock = Boolean(storedLockAt) && (!lockBelongsToCurrentUser || parsedFailedAttempts >= 3)
+    const effectiveLocked = Boolean(storedLockAt) && !shouldClearStaleLock
 
-    setIsLocked(Boolean(storedLockAt))
-    setFailedAttempts(Number.isNaN(storedFailedAttempts) ? 0 : storedFailedAttempts)
+    if (shouldClearStaleLock) {
+      resetLockscreenStorage()
+    }
 
-    if (!storedLockAt) {
+    setIsLocked(effectiveLocked)
+    setFailedAttempts(effectiveLocked ? parsedFailedAttempts : 0)
+
+    if (!effectiveLocked) {
+      resetLockscreenStorage()
       const lastActivityAt = Number.isNaN(storedLastActivity) || storedLastActivity <= 0 ? Date.now() : storedLastActivity
       window.localStorage.setItem(LAST_ACTIVITY_STORAGE_KEY, String(lastActivityAt))
       scheduleLockFromActivity(lastActivityAt)
@@ -208,6 +221,15 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         setFailedAttempts(Number.isNaN(parsed) ? 0 : parsed)
       }
 
+      if (event.key === LOCK_USER_STORAGE_KEY && window.localStorage.getItem(LOCK_STORAGE_KEY)) {
+        const lockUser = event.newValue
+        if (lockUser && lockUser !== session.user.email) {
+          setIsLocked(false)
+          updateBodyScrollLock(false)
+          clearLockTimer()
+        }
+      }
+
       if (event.key === LAST_ACTIVITY_STORAGE_KEY && !window.localStorage.getItem(LOCK_STORAGE_KEY)) {
         const parsed = Number(event.newValue ?? "0")
         if (!Number.isNaN(parsed) && parsed > 0) {
@@ -243,31 +265,45 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       throw new Error(t("auth.failedSignIn"))
     }
 
+    const registerFailedAttempt = () => {
+      const currentFailed = Number(window.localStorage.getItem(FAILED_ATTEMPTS_STORAGE_KEY) ?? "0")
+      const normalizedCurrent = Number.isNaN(currentFailed) ? 0 : currentFailed
+      const nextFailedAttempts = normalizedCurrent + 1
+      setFailedAttempts(nextFailedAttempts)
+      window.localStorage.setItem(FAILED_ATTEMPTS_STORAGE_KEY, String(nextFailedAttempts))
+      return nextFailedAttempts
+    }
+
     setIsUnlocking(true)
     try {
-      const result = await signIn.email({
+      let unlockError: string | null = null
+
+      const { error } = await signIn.email({
         email: session.user.email,
         password,
+      }, {
+        onSuccess: () => {
+          clearLockState()
+        },
+        onError: () => {
+          unlockError = t("auth.lockScreen.invalidPassword")
+        },
       })
 
-      if (result.error) {
-        const nextFailedAttempts = failedAttempts + 1
-        setFailedAttempts(nextFailedAttempts)
-        window.localStorage.setItem(FAILED_ATTEMPTS_STORAGE_KEY, String(nextFailedAttempts))
+      if (unlockError || error) {
+        const nextFailedAttempts = registerFailedAttempt()
 
         if (nextFailedAttempts >= 3) {
           forceSignOutToLogin()
           throw new Error(t("auth.lockScreen.sessionExpired"))
         }
 
-        throw new Error(t("auth.lockScreen.invalidPassword"))
+        throw new Error(unlockError ?? t("auth.lockScreen.invalidPassword"))
       }
-
-      clearLockState()
     } finally {
       setIsUnlocking(false)
     }
-  }, [clearLockState, failedAttempts, forceSignOutToLogin, session?.user?.email, t])
+  }, [clearLockState, forceSignOutToLogin, session?.user?.email, t])
 
   if (isPending || (session && (!hasResolved || isLoadingRbac) && normalizedPathname !== "/unauthorized")) {
     return <div className="min-h-screen flex items-center justify-center">{t("common.loading")}</div>

@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { signIn } from "@/lib/auth-client"
 import { useI18n, useLocale } from "@/i18n/provider"
 import { getAppUrl } from "@/lib/utils"
+import { resetLockscreenStorage } from "@/lib/lockscreen"
 
 export function LoginForm2({
   className,
@@ -58,6 +59,7 @@ export function LoginForm2({
       callbackURL: getAppUrl("/dashboard", locale)
     }, {
       onSuccess: () => {
+        resetLockscreenStorage()
         router.push(getAppUrl("/dashboard", locale))
       },
       onError: (ctx) => {
