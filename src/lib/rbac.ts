@@ -222,7 +222,7 @@ type FuelRequisitionRow = {
   requester_email_snapshot: string | null;
   status: RequisitionStatus;
   scheduled_date: string;
-  notes: string;
+  notes: string | null;
   completion_notes: string | null;
   issued_at: string | null;
   last_issued_at: string | null;
@@ -396,6 +396,7 @@ type ServiceOrderItemRow = {
   service_type_billing_unit: string;
   equipment_id: string;
   equipment_name: string;
+  equipment_type_name: string;
   equipment_brand: string;
   equipment_model: string;
   operator_id: string;
@@ -715,7 +716,7 @@ async function ensureSchema() {
       requester_email_snapshot text,
       status text NOT NULL DEFAULT 'draft',
       scheduled_date date NOT NULL,
-      notes text NOT NULL,
+      notes text,
       completion_notes text,
       issued_at timestamptz,
       last_issued_at timestamptz,
@@ -729,6 +730,11 @@ async function ensureSchema() {
   await pool.query(`
     CREATE INDEX IF NOT EXISTS fuel_requisitions_status_idx
     ON fuel_requisitions (status, scheduled_date DESC);
+  `);
+
+  await pool.query(`
+    ALTER TABLE fuel_requisitions
+    ALTER COLUMN notes DROP NOT NULL;
   `);
 
   await pool.query(`
@@ -1905,6 +1911,7 @@ function mapServiceOrderItemRow(row: ServiceOrderItemRow): ManagedServiceOrderIt
     serviceTypeBillingUnit: row.service_type_billing_unit,
     equipmentId: row.equipment_id,
     equipmentName: row.equipment_name,
+    equipmentTypeName: row.equipment_type_name,
     equipmentBrand: row.equipment_brand,
     equipmentModel: row.equipment_model,
     operatorId: row.operator_id,
@@ -4573,7 +4580,7 @@ export async function createFuelRequisition(input: {
   equipmentId: string;
   supplierId: string;
   scheduledDate: string;
-  notes: string;
+  notes?: string;
   requester?: RequisitionRequester;
 }) {
   await bootstrapRbac();
@@ -4610,7 +4617,7 @@ export async function createFuelRequisition(input: {
       normalizedRequester.name,
       normalizedRequester.email,
       input.scheduledDate,
-      input.notes.trim(),
+      input.notes?.trim() || null,
     ],
   );
 
@@ -4623,7 +4630,7 @@ export async function updateFuelRequisition(
     equipmentId: string;
     supplierId: string;
     scheduledDate: string;
-    notes: string;
+    notes?: string;
   },
 ) {
   await bootstrapRbac();
@@ -4658,7 +4665,7 @@ export async function updateFuelRequisition(
       input.equipmentId,
       input.supplierId,
       input.scheduledDate,
-      input.notes.trim(),
+      input.notes?.trim() || null,
       revisionIncrement,
     ],
   );
@@ -5542,6 +5549,7 @@ export async function listServiceOrders(): Promise<ManagedServiceOrder[]> {
               'service_type_billing_unit', st.billing_unit,
               'equipment_id', soi.equipment_id,
               'equipment_name', e.name,
+              'equipment_type_name', et.name,
               'equipment_brand', e.brand,
               'equipment_model', e.model,
               'operator_id', soi.operator_id,
@@ -5570,6 +5578,7 @@ export async function listServiceOrders(): Promise<ManagedServiceOrder[]> {
       LEFT JOIN service_order_items soi ON soi.service_order_id = so.id
       LEFT JOIN service_types st ON st.id = soi.service_type_id
       LEFT JOIN equipment e ON e.id = soi.equipment_id
+      LEFT JOIN equipment_types et ON et.id = e.type_id
       LEFT JOIN operators o ON o.id = soi.operator_id
       GROUP BY
         so.id,
@@ -5633,6 +5642,7 @@ export async function getServiceOrderById(serviceOrderId: string): Promise<Manag
               'service_type_billing_unit', st.billing_unit,
               'equipment_id', soi.equipment_id,
               'equipment_name', e.name,
+              'equipment_type_name', et.name,
               'equipment_brand', e.brand,
               'equipment_model', e.model,
               'operator_id', soi.operator_id,
@@ -5661,6 +5671,7 @@ export async function getServiceOrderById(serviceOrderId: string): Promise<Manag
       LEFT JOIN service_order_items soi ON soi.service_order_id = so.id
       LEFT JOIN service_types st ON st.id = soi.service_type_id
       LEFT JOIN equipment e ON e.id = soi.equipment_id
+      LEFT JOIN equipment_types et ON et.id = e.type_id
       LEFT JOIN operators o ON o.id = soi.operator_id
       WHERE so.id = $1
       GROUP BY

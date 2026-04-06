@@ -55,13 +55,31 @@ export default function CalendarPage() {
   }, [t])
 
   const events = useMemo(() => (
-    serviceOrders.flatMap((serviceOrder, serviceOrderIndex) =>
+    serviceOrders
+      .filter((serviceOrder) => serviceOrder.status !== "pending")
+      .flatMap((serviceOrder, serviceOrderIndex) =>
       serviceOrder.items.map((item, itemIndex) => ({
         id: serviceOrderIndex * 1000 + itemIndex + 1,
         title: item.serviceDescription || item.serviceTypeName,
         date: new Date(`${item.serviceDate}T${item.plannedStartTime || "00:00"}:00`),
         time: `${item.plannedStartTime} - ${item.plannedEndTime}`,
         duration: `${item.plannedStartTime} - ${item.plannedEndTime}`,
+        startTime: item.plannedStartTime,
+        endTime: item.plannedEndTime,
+        serviceOrderId: serviceOrder.id,
+        serviceOrderNumber: serviceOrder.number,
+        clientName: serviceOrder.clientName,
+        equipmentName: item.equipmentName,
+        equipmentTypeName: item.equipmentTypeName,
+        operatorName: item.operatorName,
+        status: serviceOrder.status,
+        address: [
+          serviceOrder.serviceStreet,
+          serviceOrder.serviceNumber,
+          serviceOrder.serviceComplement,
+          serviceOrder.serviceDistrict,
+          `${serviceOrder.serviceCity} - ${serviceOrder.serviceState}`,
+        ].filter(Boolean).join(", "),
         type: "event" as const,
         attendees: item.operatorName ? [item.operatorName] : [],
         location: `${serviceOrder.serviceCity} - ${serviceOrder.serviceState}`,
@@ -75,6 +93,10 @@ export default function CalendarPage() {
     const countByDate = new Map<string, number>()
 
     for (const serviceOrder of serviceOrders) {
+      if (serviceOrder.status === "pending") {
+        continue
+      }
+
       for (const item of serviceOrder.items) {
         countByDate.set(item.serviceDate, (countByDate.get(item.serviceDate) ?? 0) + 1)
       }

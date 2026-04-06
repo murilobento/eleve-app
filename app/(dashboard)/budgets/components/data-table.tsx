@@ -13,11 +13,13 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { CalendarDays, Check, ChevronDown, Clock3, EllipsisVertical, FileDown, Pencil, RotateCcw, Search, X } from "lucide-react";
+import { CalendarDays, Check, ChevronDown, Clock3, EllipsisVertical, FileDown, Pencil, RotateCcw, Search, X, Trash2 } from "lucide-react";
 
 import { BudgetFormDialog } from "./budget-form-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
 import {
   AdminListPaginationFooter,
   AdminListTableCard,
@@ -79,6 +81,7 @@ type DataTableProps = {
   onApproveBudget: (id: string, reason?: string) => Promise<void>;
   onCancelBudget: (id: string, reason?: string) => Promise<void>;
   onRevertBudget: (id: string, reason?: string) => Promise<void>;
+  onCancelBudgets: (ids: string[]) => Promise<void>;
   isMutating: boolean;
 };
 
@@ -499,6 +502,7 @@ export function DataTable({
   onApproveBudget,
   onCancelBudget,
   onRevertBudget,
+  onCancelBudgets,
   isMutating,
 }: DataTableProps) {
   const { t } = useI18n();
@@ -508,6 +512,7 @@ export function DataTable({
   const { columnVisibility, setColumnVisibility } = usePersistentColumnVisibility("table:budgets:columns:v2", {
     updatedAt: false,
   });
+  const [rowSelection, setRowSelection] = useState({});
   const [globalFilter, setGlobalFilter] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [editingBudget, setEditingBudget] = useState<ManagedBudget | null>(null);
@@ -530,6 +535,30 @@ export function DataTable({
   );
 
   const columns = useMemo<ColumnDef<ManagedBudget>[]>(() => [
+    {
+      id: "select",
+      header: ({ table }) => (
+        <div className="flex items-center justify-center px-2">
+          <Checkbox
+            checked={table.getIsAllPageRowsSelected() || (table.getIsSomePageRowsSelected() && "indeterminate")}
+            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+            aria-label={t("common.selectAll")}
+          />
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="flex items-center justify-center px-2">
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            aria-label={t("common.selectRow")}
+          />
+        </div>
+      ),
+      enableSorting: false,
+      enableHiding: false,
+      size: 50,
+    },
     {
       accessorKey: "number",
       header: ({ column }) => <SortableHeader column={column} title={t("budgets.number")} className="-ml-3" />,
@@ -708,6 +737,7 @@ export function DataTable({
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange: setRowSelection,
     onGlobalFilterChange: setGlobalFilter,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
@@ -736,6 +766,7 @@ export function DataTable({
       sorting,
       columnFilters,
       columnVisibility,
+      rowSelection,
       globalFilter,
     },
     initialState: {
@@ -746,6 +777,7 @@ export function DataTable({
   });
 
   const statusFilter = (table.getColumn("status")?.getFilterValue() as string | undefined) ?? "all";
+  const selectedCount = table.getFilteredSelectedRowModel().rows.length;
   const hasActiveFilters = Boolean(globalFilter.trim())
     || columnFilters.length > 0
     || createdDateFilter.preset !== "all"
@@ -758,6 +790,8 @@ export function DataTable({
     setServiceDateFilter({ preset: "all" });
     table.setPageIndex(0);
   };
+
+  const [bulkCancelDialog, setBulkCancelDialog] = useState(false);
 
   return (
     <div className="w-full space-y-4">
@@ -892,6 +926,35 @@ export function DataTable({
           </div>
       </AdminListToolbar>
 
+      {selectedCount > 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/30 px-3 py-2">
+          <span className="text-sm text-muted-foreground">
+            {t("common.selectedCount", { count: selectedCount })}
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="cursor-pointer"
+              onClick={() => table.resetRowSelection()}
+              disabled={isMutating}
+            >
+              {t("common.clearSelection")}
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              className="cursor-pointer"
+              onClick={() => setBulkCancelDialog(true)}
+              disabled={isMutating}
+            >
+              <Trash2 className="mr-2 size-4" />
+              {t("budgets.cancelSelected")}
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
       <AdminListTableCard>
         <Table>
           <TableHeader>
@@ -1023,6 +1086,30 @@ export function DataTable({
         isLoading={isHistoryLoading}
         emptyMessage={t("budgets.noHistory")}
         getStatusLabel={(status) => getBudgetStatusLabel(status as ManagedBudget["status"], t)}
+      />
+
+      <ConfirmDeleteDialog
+        open={bulkCancelDialog}
+        onOpenChange={setBulkCancelDialog}
+        title={t("budgets.bulkCancelTitle")}
+        description={t("budgets.bulkCancelDescription", { count: selectedCount })}
+        onConfirm={async () => {
+          const selectedRows = table.getSelectedRowModel().rows;
+          const pendingBudgets = selectedRows.filter((row) => row.original.status === "pending");
+          
+          if (pendingBudgets.length === 0) {
+            toast.error(t("budgets.noPendingBudgetsSelected"));
+            setBulkCancelDialog(false);
+            return;
+          }
+
+          const ids = pendingBudgets.map((row) => row.original.id);
+          await onCancelBudgets(ids);
+          table.resetRowSelection();
+          setBulkCancelDialog(false);
+        }}
+        isLoading={isMutating}
+        confirmLabel={t("budgets.cancelSelected")}
       />
     </div>
   );

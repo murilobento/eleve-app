@@ -37,7 +37,7 @@ export const createFuelRequisitionSchema = z.object({
   equipmentId: relationIdSchema("equipment"),
   supplierId: relationIdSchema("supplier"),
   scheduledDate: dateSchema("Scheduled date"),
-  notes: textFieldSchema("Notes"),
+  notes: optionalTextFieldSchema("Notes"),
 });
 
 export const updateFuelRequisitionSchema = createFuelRequisitionSchema;
@@ -84,7 +84,7 @@ export type ManagedFuelRequisition = {
   requesterEmailSnapshot: string | null;
   status: "draft" | "issued" | "completed" | "cancelled";
   scheduledDate: string;
-  notes: string;
+  notes: string | null;
   completionNotes: string | null;
   issuedAt: string | null;
   lastIssuedAt: string | null;

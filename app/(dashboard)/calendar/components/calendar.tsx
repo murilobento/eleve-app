@@ -40,7 +40,6 @@ export function Calendar({ events, eventDates }: CalendarProps) {
               onDateSelect={calendar.handleDateSelect}
               onMenuClick={() => calendar.setShowCalendarSheet(true)}
               events={calendar.events}
-              onEventClick={calendar.handleEditEvent}
             />
           </div>
         </div>

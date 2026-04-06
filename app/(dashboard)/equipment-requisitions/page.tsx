@@ -1,15 +1,28 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, EllipsisVertical, FileDown, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import {
+  type ColumnDef,
+  type ColumnFiltersState,
+  type SortingState,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+import { Check, ChevronDown, EllipsisVertical, FileDown, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import {
+  AdminListPaginationFooter,
   AdminListTableCard,
   AdminListToolbar,
 } from "@/components/admin-list-layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
 import {
   Dialog,
@@ -21,12 +34,14 @@ import {
 } from "@/components/ui/dialog";
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { usePersistentColumnVisibility } from "@/hooks/use-persistent-column-visibility";
 import {
   Select,
   SelectContent,
@@ -34,6 +49,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SortableHeader } from "@/components/sortable-header";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -132,6 +148,14 @@ export default function EquipmentRequisitionsPage() {
 
   const [maintenanceSearch, setMaintenanceSearch] = useState("");
   const [fuelSearch, setFuelSearch] = useState("");
+  const [maintenanceSorting, setMaintenanceSorting] = useState<SortingState>([]);
+  const [maintenanceColumnFilters, setMaintenanceColumnFilters] = useState<ColumnFiltersState>([]);
+  const [maintenanceRowSelection, setMaintenanceRowSelection] = useState({});
+  const [fuelSorting, setFuelSorting] = useState<SortingState>([]);
+  const [fuelColumnFilters, setFuelColumnFilters] = useState<ColumnFiltersState>([]);
+  const [fuelRowSelection, setFuelRowSelection] = useState({});
+  const [maintenanceBulkDeleteOpen, setMaintenanceBulkDeleteOpen] = useState(false);
+  const [fuelBulkDeleteOpen, setFuelBulkDeleteOpen] = useState(false);
 
   const [createMaintenanceOpen, setCreateMaintenanceOpen] = useState(false);
   const [editMaintenance, setEditMaintenance] = useState<ManagedMaintenanceRequisition | null>(null);
@@ -196,7 +220,7 @@ export default function EquipmentRequisitionsPage() {
         item.number,
         item.equipmentName,
         item.supplierName,
-        item.notes,
+        item.notes ?? "",
       ].some((value) => value.toLowerCase().includes(term)),
     );
   }, [fuelRequisitions, fuelSearch]);
@@ -250,7 +274,7 @@ export default function EquipmentRequisitionsPage() {
       equipmentId: editFuel.equipmentId,
       supplierId: editFuel.supplierId,
       scheduledDate: editFuel.scheduledDate,
-      notes: editFuel.notes,
+      notes: editFuel.notes ?? "",
     });
   }, [editFuel]);
 
@@ -327,6 +351,337 @@ export default function EquipmentRequisitionsPage() {
     setStatusDialog(null);
   }
 
+  async function handleDeleteMaintenanceItems(ids: string[]) {
+    if (!ids.length) return;
+
+    setIsMutating(true);
+    try {
+      const results = await Promise.allSettled(
+        ids.map(async (id) => {
+          await parseResponse(
+            await fetch(`/api/maintenance-requisitions/${id}`, { method: "DELETE" }),
+          );
+        }),
+      );
+
+      const successCount = results.filter((r) => r.status === "fulfilled").length;
+      const failedCount = ids.length - successCount;
+
+      await loadData();
+
+      if (successCount > 0) {
+        toast.success(t("common.bulkDeleteSuccess", { count: successCount }));
+      }
+      if (failedCount > 0) {
+        toast.error(t("common.bulkDeletePartialError", { failed: failedCount, total: ids.length }));
+      }
+    } finally {
+      setIsMutating(false);
+    }
+  }
+
+  async function handleDeleteFuelItems(ids: string[]) {
+    if (!ids.length) return;
+
+    setIsMutating(true);
+    try {
+      const results = await Promise.allSettled(
+        ids.map(async (id) => {
+          await parseResponse(
+            await fetch(`/api/fuel-requisitions/${id}`, { method: "DELETE" }),
+          );
+        }),
+      );
+
+      const successCount = results.filter((r) => r.status === "fulfilled").length;
+      const failedCount = ids.length - successCount;
+
+      await loadData();
+
+      if (successCount > 0) {
+        toast.success(t("common.bulkDeleteSuccess", { count: successCount }));
+      }
+      if (failedCount > 0) {
+        toast.error(t("common.bulkDeletePartialError", { failed: failedCount, total: ids.length }));
+      }
+    } finally {
+      setIsMutating(false);
+    }
+  }
+
+  const maintenanceColumns = useMemo<ColumnDef<ManagedMaintenanceRequisition>[]>(() => [
+    {
+      id: "select",
+      header: ({ table }) => (
+        <div className="flex items-center justify-center px-2">
+          <Checkbox
+            checked={table.getIsAllPageRowsSelected() || (table.getIsSomePageRowsSelected() && "indeterminate")}
+            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+            aria-label={t("common.selectAll")}
+          />
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="flex items-center justify-center px-2">
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            aria-label={t("common.selectRow")}
+          />
+        </div>
+      ),
+      enableSorting: false,
+      enableHiding: false,
+      size: 50,
+    },
+    {
+      accessorKey: "number",
+      header: ({ column }) => <SortableHeader column={column} title={t("equipmentRequisitions.number")} className="-ml-3" />,
+      enableHiding: false,
+      cell: ({ row }) => (
+        <div className="font-medium">{row.original.number}</div>
+      ),
+    },
+    {
+      accessorKey: "scheduledDate",
+      header: ({ column }) => <SortableHeader column={column} title={t("equipmentRequisitions.scheduledDate")} className="-ml-3" />,
+      cell: ({ row }) => <span className="text-sm">{formatDate(row.original.scheduledDate, locale)}</span>,
+    },
+    {
+      accessorKey: "equipmentName",
+      header: ({ column }) => <SortableHeader column={column} title={t("equipmentRequisitions.equipment")} className="-ml-3" />,
+      cell: ({ row }) => <span className="text-sm">{row.original.equipmentName}</span>,
+    },
+    {
+      accessorKey: "supplierName",
+      header: ({ column }) => <SortableHeader column={column} title={t("equipmentRequisitions.supplier")} className="-ml-3" />,
+      cell: ({ row }) => <span className="text-sm">{row.original.supplierName}</span>,
+    },
+    {
+      accessorKey: "status",
+      header: ({ column }) => <SortableHeader column={column} title={t("equipmentRequisitions.status")} className="-ml-3" />,
+      cell: ({ row }) => (
+        <Badge variant={statusBadgeVariant(row.original.status)}>
+          {t(`equipmentRequisitions.statuses.${row.original.status}`)}
+        </Badge>
+      ),
+      filterFn: "equals",
+    },
+    {
+      id: "actions",
+      header: t("equipmentRequisitions.actions"),
+      enableSorting: false,
+      enableHiding: false,
+      cell: ({ row }) => {
+        const item = row.original;
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer">
+                <EllipsisVertical className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {canUpdate ? (
+                <DropdownMenuItem className="cursor-pointer" onClick={() => setEditMaintenance(item)} disabled={item.status === "completed" || item.status === "cancelled"}>
+                  <Pencil className="mr-2 size-4" />
+                  {t("common.saveChanges")}
+                </DropdownMenuItem>
+              ) : null}
+              {canUpdate && item.status === "draft" ? (
+                <DropdownMenuItem className="cursor-pointer" onClick={() => void handleIssue("maintenance", item.id)}>
+                  <Check className="mr-2 size-4" />
+                  {t("equipmentRequisitions.issue")}
+                </DropdownMenuItem>
+              ) : null}
+              {item.status !== "draft" ? (
+                <DropdownMenuItem className="cursor-pointer" onClick={() => void handleOpenPdf("maintenance", item.id)}>
+                  <FileDown className="mr-2 size-4" />
+                  {t("equipmentRequisitions.viewPdf")}
+                </DropdownMenuItem>
+              ) : null}
+              {canUpdate && item.status === "issued" ? (
+                <DropdownMenuItem className="cursor-pointer" onClick={() => setStatusDialog({ kind: "maintenance", id: item.id, status: "completed" })}>
+                  <Check className="mr-2 size-4" />
+                  {t("equipmentRequisitions.complete")}
+                </DropdownMenuItem>
+              ) : null}
+              {canUpdate && item.status === "issued" ? (
+                <DropdownMenuItem className="cursor-pointer" onClick={() => setStatusDialog({ kind: "maintenance", id: item.id, status: "cancelled" })}>
+                  <X className="mr-2 size-4" />
+                  {t("equipmentRequisitions.cancel")}
+                </DropdownMenuItem>
+              ) : null}
+              {canDelete ? (
+                <DropdownMenuItem className="cursor-pointer text-destructive" onClick={() => setDeleteMaintenance(item)} disabled={item.status !== "draft"}>
+                  <Trash2 className="mr-2 size-4" />
+                  {t("common.delete")}
+                </DropdownMenuItem>
+              ) : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
+  ], [canUpdate, canDelete, locale, t]);
+
+  const fuelColumns = useMemo<ColumnDef<ManagedFuelRequisition>[]>(() => [
+    {
+      id: "select",
+      header: ({ table }) => (
+        <div className="flex items-center justify-center px-2">
+          <Checkbox
+            checked={table.getIsAllPageRowsSelected() || (table.getIsSomePageRowsSelected() && "indeterminate")}
+            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+            aria-label={t("common.selectAll")}
+          />
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="flex items-center justify-center px-2">
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            aria-label={t("common.selectRow")}
+          />
+        </div>
+      ),
+      enableSorting: false,
+      enableHiding: false,
+      size: 50,
+    },
+    {
+      accessorKey: "number",
+      header: ({ column }) => <SortableHeader column={column} title={t("equipmentRequisitions.number")} className="-ml-3" />,
+      enableHiding: false,
+      cell: ({ row }) => <div className="font-medium">{row.original.number}</div>,
+    },
+    {
+      accessorKey: "scheduledDate",
+      header: ({ column }) => <SortableHeader column={column} title={t("equipmentRequisitions.scheduledDate")} className="-ml-3" />,
+      cell: ({ row }) => <span className="text-sm">{formatDate(row.original.scheduledDate, locale)}</span>,
+    },
+    {
+      accessorKey: "equipmentName",
+      header: ({ column }) => <SortableHeader column={column} title={t("equipmentRequisitions.equipment")} className="-ml-3" />,
+      cell: ({ row }) => <span className="text-sm">{row.original.equipmentName}</span>,
+    },
+    {
+      accessorKey: "supplierName",
+      header: ({ column }) => <SortableHeader column={column} title={t("equipmentRequisitions.supplier")} className="-ml-3" />,
+      cell: ({ row }) => <span className="text-sm">{row.original.supplierName}</span>,
+    },
+    {
+      accessorKey: "status",
+      header: ({ column }) => <SortableHeader column={column} title={t("equipmentRequisitions.status")} className="-ml-3" />,
+      cell: ({ row }) => (
+        <Badge variant={statusBadgeVariant(row.original.status)}>
+          {t(`equipmentRequisitions.statuses.${row.original.status}`)}
+        </Badge>
+      ),
+      filterFn: "equals",
+    },
+    {
+      id: "actions",
+      header: t("equipmentRequisitions.actions"),
+      enableSorting: false,
+      enableHiding: false,
+      cell: ({ row }) => {
+        const item = row.original;
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer">
+                <EllipsisVertical className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {canUpdate ? (
+                <DropdownMenuItem className="cursor-pointer" onClick={() => setEditFuel(item)} disabled={item.status === "completed" || item.status === "cancelled"}>
+                  <Pencil className="mr-2 size-4" />
+                  {t("common.saveChanges")}
+                </DropdownMenuItem>
+              ) : null}
+              {canUpdate && item.status === "draft" ? (
+                <DropdownMenuItem className="cursor-pointer" onClick={() => void handleIssue("fuel", item.id)}>
+                  <Check className="mr-2 size-4" />
+                  {t("equipmentRequisitions.issue")}
+                </DropdownMenuItem>
+              ) : null}
+              {item.status !== "draft" ? (
+                <DropdownMenuItem className="cursor-pointer" onClick={() => void handleOpenPdf("fuel", item.id)}>
+                  <FileDown className="mr-2 size-4" />
+                  {t("equipmentRequisitions.viewPdf")}
+                </DropdownMenuItem>
+              ) : null}
+              {canUpdate && item.status === "issued" ? (
+                <DropdownMenuItem className="cursor-pointer" onClick={() => setStatusDialog({ kind: "fuel", id: item.id, status: "completed" })}>
+                  <Check className="mr-2 size-4" />
+                  {t("equipmentRequisitions.complete")}
+                </DropdownMenuItem>
+              ) : null}
+              {canUpdate && item.status === "issued" ? (
+                <DropdownMenuItem className="cursor-pointer" onClick={() => setStatusDialog({ kind: "fuel", id: item.id, status: "cancelled" })}>
+                  <X className="mr-2 size-4" />
+                  {t("equipmentRequisitions.cancel")}
+                </DropdownMenuItem>
+              ) : null}
+              {canDelete ? (
+                <DropdownMenuItem className="cursor-pointer text-destructive" onClick={() => setDeleteFuel(item)} disabled={item.status !== "draft"}>
+                  <Trash2 className="mr-2 size-4" />
+                  {t("common.delete")}
+                </DropdownMenuItem>
+              ) : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
+  ], [canUpdate, canDelete, locale, t]);
+
+  const maintenanceTable = useReactTable({
+    data: maintenanceVisible,
+    columns: maintenanceColumns,
+    getRowId: (row) => row.id,
+    onSortingChange: setMaintenanceSorting,
+    onColumnFiltersChange: setMaintenanceColumnFilters,
+    onRowSelectionChange: setMaintenanceRowSelection,
+    onGlobalFilterChange: setMaintenanceSearch,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    globalFilterFn: (row, _columnId, filterValue) => {
+      const value = String(filterValue).toLowerCase();
+      return [row.original.number, row.original.equipmentName, row.original.supplierName, row.original.description ?? "", row.original.notes ?? ""].some((item) => item.toLowerCase().includes(value));
+    },
+    state: { sorting: maintenanceSorting, columnFilters: maintenanceColumnFilters, rowSelection: maintenanceRowSelection, globalFilter: maintenanceSearch },
+    initialState: { pagination: { pageSize: 10 } },
+  });
+
+  const fuelTable = useReactTable({
+    data: fuelVisible,
+    columns: fuelColumns,
+    getRowId: (row) => row.id,
+    onSortingChange: setFuelSorting,
+    onColumnFiltersChange: setFuelColumnFilters,
+    onRowSelectionChange: setFuelRowSelection,
+    onGlobalFilterChange: setFuelSearch,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    globalFilterFn: (row, _columnId, filterValue) => {
+      const value = String(filterValue).toLowerCase();
+      return [row.original.number, row.original.equipmentName, row.original.supplierName, row.original.notes ?? ""].some((item) => item.toLowerCase().includes(value));
+    },
+    state: { sorting: fuelSorting, columnFilters: fuelColumnFilters, rowSelection: fuelRowSelection, globalFilter: fuelSearch },
+    initialState: { pagination: { pageSize: 10 } },
+  });
+
+  const maintenanceSelectedCount = maintenanceTable.getFilteredSelectedRowModel().rows.length;
+  const fuelSelectedCount = fuelTable.getFilteredSelectedRowModel().rows.length;
+
   return (
     <>
       <div className="px-4 lg:px-6">
@@ -350,18 +705,14 @@ export default function EquipmentRequisitionsPage() {
 
             <TabsContent value="maintenance" className="space-y-4">
               <AdminListToolbar>
-                <div className="grid min-w-[220px] flex-1 gap-2">
-                  <Label htmlFor="maintenance-search">{t("equipmentRequisitions.search")}</Label>
-                  <div className="relative">
-                    <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      id="maintenance-search"
-                      className="pl-9"
-                      value={maintenanceSearch}
-                      onChange={(event) => setMaintenanceSearch(event.target.value)}
-                      placeholder={t("equipmentRequisitions.searchPlaceholder")}
-                    />
-                  </div>
+                <div className="relative min-w-[240px] flex-1">
+                  <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder={t("equipmentRequisitions.searchPlaceholder")}
+                    value={maintenanceSearch}
+                    onChange={(event) => setMaintenanceSearch(event.target.value)}
+                    className="h-10 rounded-lg border-muted-foreground/20 bg-background pl-9"
+                  />
                 </div>
                 {canCreate ? (
                   <Button className="cursor-pointer" onClick={() => setCreateMaintenanceOpen(true)}>
@@ -371,111 +722,79 @@ export default function EquipmentRequisitionsPage() {
                 ) : null}
               </AdminListToolbar>
 
+              {maintenanceSelectedCount > 0 ? (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/30 px-3 py-2">
+                  <span className="text-sm text-muted-foreground">
+                    {t("common.selectedCount", { count: maintenanceSelectedCount })}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="sm" className="cursor-pointer" onClick={() => maintenanceTable.resetRowSelection()} disabled={isMutating}>
+                      {t("common.clearSelection")}
+                    </Button>
+                    <Button variant="destructive" size="sm" className="cursor-pointer" onClick={() => setMaintenanceBulkDeleteOpen(true)} disabled={isMutating}>
+                      <Trash2 className="mr-2 size-4" />
+                      {t("common.deleteSelected")}
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+
               <AdminListTableCard>
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>{t("equipmentRequisitions.number")}</TableHead>
-                      <TableHead>{t("equipmentRequisitions.scheduledDate")}</TableHead>
-                      <TableHead>{t("equipmentRequisitions.equipment")}</TableHead>
-                      <TableHead>{t("equipmentRequisitions.supplier")}</TableHead>
-                      <TableHead>{t("equipmentRequisitions.status")}</TableHead>
-                      <TableHead>{t("equipmentRequisitions.actions")}</TableHead>
-                    </TableRow>
+                    {maintenanceTable.getHeaderGroups().map((headerGroup) => (
+                      <TableRow key={headerGroup.id}>
+                        {headerGroup.headers.map((header) => (
+                          <TableHead key={header.id}>
+                            {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                          </TableHead>
+                        ))}
+                      </TableRow>
+                    ))}
                   </TableHeader>
                   <TableBody>
-                    {maintenanceVisible.length === 0 ? (
+                    {maintenanceTable.getRowModel().rows.length ? (
+                      maintenanceTable.getRowModel().rows.map((row) => (
+                        <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
+                          {row.getVisibleCells().map((cell) => (
+                            <TableCell key={cell.id}>
+                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      ))
+                    ) : (
                       <TableRow>
-                        <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                        <TableCell colSpan={maintenanceColumns.length} className="h-24 text-center text-muted-foreground">
                           {t("equipmentRequisitions.noMaintenance")}
                         </TableCell>
                       </TableRow>
-                    ) : maintenanceVisible.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell>
-                          <div className="font-medium">{item.number}</div>
-                          <div className="text-xs text-muted-foreground">R{item.revisionNumber}</div>
-                        </TableCell>
-                        <TableCell>{formatDate(item.scheduledDate, locale)}</TableCell>
-                        <TableCell>{item.equipmentName}</TableCell>
-                        <TableCell>{item.supplierName}</TableCell>
-                        <TableCell>
-                          <Badge variant={statusBadgeVariant(item.status)}>
-                            {t(`equipmentRequisitions.statuses.${item.status}`)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer">
-                                <EllipsisVertical className="size-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              {canUpdate ? (
-                                <DropdownMenuItem
-                                  className="cursor-pointer"
-                                  onClick={() => setEditMaintenance(item)}
-                                  disabled={item.status === "completed" || item.status === "cancelled"}
-                                >
-                                  <Pencil className="mr-2 size-4" />
-                                  {t("common.saveChanges")}
-                                </DropdownMenuItem>
-                              ) : null}
-                              {canUpdate && item.status === "draft" ? (
-                                <DropdownMenuItem className="cursor-pointer" onClick={() => void handleIssue("maintenance", item.id)}>
-                                  <Check className="mr-2 size-4" />
-                                  {t("equipmentRequisitions.issue")}
-                                </DropdownMenuItem>
-                              ) : null}
-                              {item.status !== "draft" ? (
-                                <DropdownMenuItem className="cursor-pointer" onClick={() => void handleOpenPdf("maintenance", item.id)}>
-                                  <FileDown className="mr-2 size-4" />
-                                  {t("equipmentRequisitions.viewPdf")}
-                                </DropdownMenuItem>
-                              ) : null}
-                              {canUpdate && item.status === "issued" ? (
-                                <DropdownMenuItem className="cursor-pointer" onClick={() => setStatusDialog({ kind: "maintenance", id: item.id, status: "completed" })}>
-                                  <Check className="mr-2 size-4" />
-                                  {t("equipmentRequisitions.complete")}
-                                </DropdownMenuItem>
-                              ) : null}
-                              {canUpdate && item.status === "issued" ? (
-                                <DropdownMenuItem className="cursor-pointer" onClick={() => setStatusDialog({ kind: "maintenance", id: item.id, status: "cancelled" })}>
-                                  <X className="mr-2 size-4" />
-                                  {t("equipmentRequisitions.cancel")}
-                                </DropdownMenuItem>
-                              ) : null}
-                              {canDelete ? (
-                                <DropdownMenuItem className="cursor-pointer text-destructive" onClick={() => setDeleteMaintenance(item)} disabled={item.status !== "draft"}>
-                                  <Trash2 className="mr-2 size-4" />
-                                  {t("common.delete")}
-                                </DropdownMenuItem>
-                              ) : null}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    )}
                   </TableBody>
                 </Table>
               </AdminListTableCard>
+
+              <AdminListPaginationFooter
+                countLabel={t("equipmentRequisitions.maintenanceCount", { count: maintenanceTable.getFilteredRowModel().rows.length })}
+                previousLabel={t("common.previous")}
+                nextLabel={t("common.next")}
+                onPreviousPage={() => maintenanceTable.previousPage()}
+                onNextPage={() => maintenanceTable.nextPage()}
+                canPreviousPage={maintenanceTable.getCanPreviousPage()}
+                canNextPage={maintenanceTable.getCanNextPage()}
+              />
             </TabsContent>
 
             <TabsContent value="fuel" className="space-y-4">
               <AdminListToolbar>
-                <div className="grid min-w-[220px] flex-1 gap-2">
-                  <Label htmlFor="fuel-search">{t("equipmentRequisitions.search")}</Label>
-                  <div className="relative">
-                    <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      id="fuel-search"
-                      className="pl-9"
-                      value={fuelSearch}
-                      onChange={(event) => setFuelSearch(event.target.value)}
-                      placeholder={t("equipmentRequisitions.searchPlaceholder")}
-                    />
-                  </div>
+                <div className="relative min-w-[240px] flex-1">
+                  <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder={t("equipmentRequisitions.searchPlaceholder")}
+                    value={fuelSearch}
+                    onChange={(event) => setFuelSearch(event.target.value)}
+                    className="h-10 rounded-lg border-muted-foreground/20 bg-background pl-9"
+                  />
                 </div>
                 {canCreate ? (
                   <Button className="cursor-pointer" onClick={() => setCreateFuelOpen(true)}>
@@ -485,95 +804,67 @@ export default function EquipmentRequisitionsPage() {
                 ) : null}
               </AdminListToolbar>
 
+              {fuelSelectedCount > 0 ? (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/30 px-3 py-2">
+                  <span className="text-sm text-muted-foreground">
+                    {t("common.selectedCount", { count: fuelSelectedCount })}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="sm" className="cursor-pointer" onClick={() => fuelTable.resetRowSelection()} disabled={isMutating}>
+                      {t("common.clearSelection")}
+                    </Button>
+                    <Button variant="destructive" size="sm" className="cursor-pointer" onClick={() => setFuelBulkDeleteOpen(true)} disabled={isMutating}>
+                      <Trash2 className="mr-2 size-4" />
+                      {t("common.deleteSelected")}
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+
               <AdminListTableCard>
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>{t("equipmentRequisitions.number")}</TableHead>
-                      <TableHead>{t("equipmentRequisitions.scheduledDate")}</TableHead>
-                      <TableHead>{t("equipmentRequisitions.equipment")}</TableHead>
-                      <TableHead>{t("equipmentRequisitions.supplier")}</TableHead>
-                      <TableHead>{t("equipmentRequisitions.status")}</TableHead>
-                      <TableHead>{t("equipmentRequisitions.actions")}</TableHead>
-                    </TableRow>
+                    {fuelTable.getHeaderGroups().map((headerGroup) => (
+                      <TableRow key={headerGroup.id}>
+                        {headerGroup.headers.map((header) => (
+                          <TableHead key={header.id}>
+                            {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                          </TableHead>
+                        ))}
+                      </TableRow>
+                    ))}
                   </TableHeader>
                   <TableBody>
-                    {fuelVisible.length === 0 ? (
+                    {fuelTable.getRowModel().rows.length ? (
+                      fuelTable.getRowModel().rows.map((row) => (
+                        <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
+                          {row.getVisibleCells().map((cell) => (
+                            <TableCell key={cell.id}>
+                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      ))
+                    ) : (
                       <TableRow>
-                        <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                        <TableCell colSpan={fuelColumns.length} className="h-24 text-center text-muted-foreground">
                           {t("equipmentRequisitions.noFuel")}
                         </TableCell>
                       </TableRow>
-                    ) : fuelVisible.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell>
-                          <div className="font-medium">{item.number}</div>
-                          <div className="text-xs text-muted-foreground">R{item.revisionNumber}</div>
-                        </TableCell>
-                        <TableCell>{formatDate(item.scheduledDate, locale)}</TableCell>
-                        <TableCell>{item.equipmentName}</TableCell>
-                        <TableCell>{item.supplierName}</TableCell>
-                        <TableCell>
-                          <Badge variant={statusBadgeVariant(item.status)}>
-                            {t(`equipmentRequisitions.statuses.${item.status}`)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer">
-                                <EllipsisVertical className="size-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              {canUpdate ? (
-                                <DropdownMenuItem
-                                  className="cursor-pointer"
-                                  onClick={() => setEditFuel(item)}
-                                  disabled={item.status === "completed" || item.status === "cancelled"}
-                                >
-                                  <Pencil className="mr-2 size-4" />
-                                  {t("common.saveChanges")}
-                                </DropdownMenuItem>
-                              ) : null}
-                              {canUpdate && item.status === "draft" ? (
-                                <DropdownMenuItem className="cursor-pointer" onClick={() => void handleIssue("fuel", item.id)}>
-                                  <Check className="mr-2 size-4" />
-                                  {t("equipmentRequisitions.issue")}
-                                </DropdownMenuItem>
-                              ) : null}
-                              {item.status !== "draft" ? (
-                                <DropdownMenuItem className="cursor-pointer" onClick={() => void handleOpenPdf("fuel", item.id)}>
-                                  <FileDown className="mr-2 size-4" />
-                                  {t("equipmentRequisitions.viewPdf")}
-                                </DropdownMenuItem>
-                              ) : null}
-                              {canUpdate && item.status === "issued" ? (
-                                <DropdownMenuItem className="cursor-pointer" onClick={() => setStatusDialog({ kind: "fuel", id: item.id, status: "completed" })}>
-                                  <Check className="mr-2 size-4" />
-                                  {t("equipmentRequisitions.complete")}
-                                </DropdownMenuItem>
-                              ) : null}
-                              {canUpdate && item.status === "issued" ? (
-                                <DropdownMenuItem className="cursor-pointer" onClick={() => setStatusDialog({ kind: "fuel", id: item.id, status: "cancelled" })}>
-                                  <X className="mr-2 size-4" />
-                                  {t("equipmentRequisitions.cancel")}
-                                </DropdownMenuItem>
-                              ) : null}
-                              {canDelete ? (
-                                <DropdownMenuItem className="cursor-pointer text-destructive" onClick={() => setDeleteFuel(item)} disabled={item.status !== "draft"}>
-                                  <Trash2 className="mr-2 size-4" />
-                                  {t("common.delete")}
-                                </DropdownMenuItem>
-                              ) : null}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    )}
                   </TableBody>
                 </Table>
               </AdminListTableCard>
+
+              <AdminListPaginationFooter
+                countLabel={t("equipmentRequisitions.fuelCount", { count: fuelTable.getFilteredRowModel().rows.length })}
+                previousLabel={t("common.previous")}
+                nextLabel={t("common.next")}
+                onPreviousPage={() => fuelTable.previousPage()}
+                onNextPage={() => fuelTable.nextPage()}
+                canPreviousPage={fuelTable.getCanPreviousPage()}
+                canNextPage={fuelTable.getCanNextPage()}
+              />
             </TabsContent>
           </Tabs>
         )}
@@ -795,6 +1086,54 @@ export default function EquipmentRequisitionsPage() {
           setDeleteFuel(null);
         }}
         isLoading={isMutating}
+      />
+
+      <ConfirmDeleteDialog
+        open={maintenanceBulkDeleteOpen}
+        onOpenChange={setMaintenanceBulkDeleteOpen}
+        title={t("equipmentRequisitions.bulkDeleteTitle")}
+        description={t("equipmentRequisitions.bulkDeleteDescription", { count: maintenanceSelectedCount })}
+        onConfirm={async () => {
+          const selectedRows = maintenanceTable.getSelectedRowModel().rows;
+          const draftItems = selectedRows.filter((row) => row.original.status === "draft");
+          
+          if (draftItems.length === 0) {
+            toast.error(t("equipmentRequisitions.noDraftSelected"));
+            setMaintenanceBulkDeleteOpen(false);
+            return;
+          }
+
+          const ids = draftItems.map((row) => row.original.id);
+          await handleDeleteMaintenanceItems(ids);
+          maintenanceTable.resetRowSelection();
+          setMaintenanceBulkDeleteOpen(false);
+        }}
+        isLoading={isMutating}
+        confirmLabel={t("common.deleteSelected")}
+      />
+
+      <ConfirmDeleteDialog
+        open={fuelBulkDeleteOpen}
+        onOpenChange={setFuelBulkDeleteOpen}
+        title={t("equipmentRequisitions.bulkDeleteTitle")}
+        description={t("equipmentRequisitions.bulkDeleteDescription", { count: fuelSelectedCount })}
+        onConfirm={async () => {
+          const selectedRows = fuelTable.getSelectedRowModel().rows;
+          const draftItems = selectedRows.filter((row) => row.original.status === "draft");
+          
+          if (draftItems.length === 0) {
+            toast.error(t("equipmentRequisitions.noDraftSelected"));
+            setFuelBulkDeleteOpen(false);
+            return;
+          }
+
+          const ids = draftItems.map((row) => row.original.id);
+          await handleDeleteFuelItems(ids);
+          fuelTable.resetRowSelection();
+          setFuelBulkDeleteOpen(false);
+        }}
+        isLoading={isMutating}
+        confirmLabel={t("common.deleteSelected")}
       />
 
       <Dialog open={Boolean(statusDialog)} onOpenChange={(open) => {

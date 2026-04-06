@@ -4,6 +4,16 @@ export interface CalendarEvent {
   date: Date
   time: string
   duration: string
+  startTime?: string
+  endTime?: string
+  serviceOrderId?: string
+  serviceOrderNumber?: string
+  clientName?: string
+  equipmentName?: string
+  equipmentTypeName?: string
+  operatorName?: string
+  status?: "pending" | "scheduled" | "in_progress" | "completed" | "cancelled"
+  address?: string
   type: "meeting" | "event" | "personal" | "task" | "reminder"
   attendees: string[]
   location: string

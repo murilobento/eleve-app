@@ -168,6 +168,47 @@ export default function ServiceOrdersPage() {
     }, t(successKeyByStatus[status]), t("serviceOrders.updateError"));
   };
 
+  const handleCancelServiceOrders = async (ids: string[]) => {
+    if (!ids.length) {
+      return;
+    }
+
+    setIsMutating(true);
+
+    try {
+      const results = await Promise.allSettled(
+        ids.map(async (id) => {
+          await parseResponse(
+            await fetch(`/api/service-orders/${id}/status`, {
+              method: "PATCH",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ status: "cancelled" }),
+            }),
+            t,
+          );
+        }),
+      );
+
+      const successCount = results.filter((result) => result.status === "fulfilled").length;
+      const failedCount = ids.length - successCount;
+
+      await loadServiceOrders();
+
+      if (successCount > 0) {
+        toast.success(t("common.bulkCancelSuccess", { count: successCount }));
+      }
+
+      if (failedCount > 0) {
+        const message = t("common.bulkCancelPartialError", { failed: failedCount, total: ids.length });
+        toast.error(message);
+      }
+    } finally {
+      setIsMutating(false);
+    }
+  };
+
   return (
     <>
       <div className="px-4 lg:px-6">
@@ -193,6 +234,7 @@ export default function ServiceOrdersPage() {
             onCreateServiceOrder={handleCreateServiceOrder}
             onUpdateServiceOrder={handleUpdateServiceOrder}
             onChangeStatus={handleStatusChange}
+            onCancelServiceOrders={handleCancelServiceOrders}
             isMutating={isMutating}
           />
         )}

@@ -174,6 +174,47 @@ export default function BudgetsPage() {
     }, t("common.budgetRevertSuccess"), t("budgets.updateError"));
   };
 
+  const handleCancelBudgets = async (ids: string[]) => {
+    if (!ids.length) {
+      return;
+    }
+
+    setIsMutating(true);
+
+    try {
+      const results = await Promise.allSettled(
+        ids.map(async (id) => {
+          await parseResponse(
+            await fetch(`/api/budgets/${id}/status`, {
+              method: "PATCH",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ status: "cancelled" }),
+            }),
+            t,
+          );
+        }),
+      );
+
+      const successCount = results.filter((result) => result.status === "fulfilled").length;
+      const failedCount = ids.length - successCount;
+
+      await loadBudgets();
+
+      if (successCount > 0) {
+        toast.success(t("common.bulkCancelSuccess", { count: successCount }));
+      }
+
+      if (failedCount > 0) {
+        const message = t("common.bulkCancelPartialError", { failed: failedCount, total: ids.length });
+        toast.error(message);
+      }
+    } finally {
+      setIsMutating(false);
+    }
+  };
+
   return (
     <>
       <div className="px-4 lg:px-6">
@@ -200,6 +241,7 @@ export default function BudgetsPage() {
             onApproveBudget={handleApproveBudget}
             onCancelBudget={handleCancelBudget}
             onRevertBudget={handleRevertBudget}
+            onCancelBudgets={handleCancelBudgets}
             isMutating={isMutating}
           />
         )}

@@ -1,4 +1,5 @@
 import { createRequire } from "node:module";
+import { resolvePdfBrowserExecutablePath } from "@/lib/pdf-browser";
 
 import type { ManagedCompany } from "@/lib/company-admin";
 import type { ManagedFuelRequisition } from "@/lib/fuel-requisitions-admin";
@@ -220,7 +221,7 @@ export function renderFuelRequisitionPdfHtml(payload: FuelPdfPayload) {
     supplier: payload.supplier,
     requesterLabel,
     bodyBlockTitle: "Instrucoes",
-    bodyBlockContent: escapeHtml(payload.requisition.notes),
+    bodyBlockContent: payload.requisition.notes ? escapeHtml(payload.requisition.notes) : "-",
     completionNotes: payload.requisition.completionNotes,
     company: payload.company,
   });
@@ -231,7 +232,7 @@ async function renderPdfFromHtml(html: string) {
   const puppeteerModule = require("puppeteer-core") as typeof import("puppeteer-core");
   const puppeteer = puppeteerModule.default ?? puppeteerModule;
   const browser = await puppeteer.launch({
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || process.env.GOOGLE_CHROME_BIN || "/usr/bin/google-chrome",
+    executablePath: resolvePdfBrowserExecutablePath(),
     headless: true,
     pipe: true,
     args: [

@@ -2,9 +2,20 @@
 
 import { useMemo, useState } from "react";
 import { addDays, endOfDay, endOfMonth, startOfDay, startOfMonth, subDays, subMonths } from "date-fns";
-import { CalendarDays, CheckCircle2, Clock3, EllipsisVertical, Pencil, Play, RotateCcw, Search, XCircle } from "lucide-react";
+import { CalendarDays, CheckCircle2, ChevronDown, Clock3, EllipsisVertical, Pencil, Play, RotateCcw, Search, Trash2, XCircle } from "lucide-react";
 
 import { ServiceOrderFormDialog } from "./service-order-form-dialog";
+import {
+  type ColumnDef,
+  type ColumnFiltersState,
+  type SortingState,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
 import {
   AdminListPaginationFooter,
   AdminListTableCard,
@@ -13,6 +24,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
 import { StatusHistoryDialog } from "@/components/status-history-dialog";
 import { StatusTransitionDialog } from "@/components/status-transition-dialog";
 import {
@@ -25,6 +38,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
@@ -32,6 +46,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { usePersistentColumnVisibility } from "@/hooks/use-persistent-column-visibility";
 import {
   Select,
   SelectContent,
@@ -39,6 +54,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SortableHeader } from "@/components/sortable-header";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { ManagedBudget } from "@/lib/budgets-admin";
 import type { ManagedClient } from "@/lib/clients-admin";
@@ -65,6 +81,7 @@ type DataTableProps = {
   onCreateServiceOrder: (values: CreateServiceOrderInput) => Promise<void>;
   onUpdateServiceOrder: (id: string, values: UpdateServiceOrderInput) => Promise<void>;
   onChangeStatus: (id: string, status: "pending" | "scheduled" | "in_progress" | "completed" | "cancelled", reason?: string) => Promise<void>;
+  onCancelServiceOrders: (ids: string[]) => Promise<void>;
   isMutating: boolean;
 };
 
@@ -463,27 +480,33 @@ export function DataTable({
   onCreateServiceOrder,
   onUpdateServiceOrder,
   onChangeStatus,
+  onCancelServiceOrders,
   isMutating,
 }: DataTableProps) {
   const { t } = useI18n();
   const locale = useLocale();
-  const [search, setSearch] = useState("");
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const { columnVisibility, setColumnVisibility } = usePersistentColumnVisibility("table:service-orders:columns:v1", {
+    createdAt: false,
+  });
+  const [rowSelection, setRowSelection] = useState({});
+  const [globalFilter, setGlobalFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [createdDateFilter, setCreatedDateFilter] = useState<DateFilterValue>({ preset: "all" });
   const [serviceDateFilter, setServiceDateFilter] = useState<DateFilterValue>({ preset: "all" });
-  const [page, setPage] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
   const [editingServiceOrder, setEditingServiceOrder] = useState<ManagedServiceOrder | null>(null);
   const [pendingStatusAction, setPendingStatusAction] = useState<PendingStatusAction>(null);
   const [historyServiceOrder, setHistoryServiceOrder] = useState<ManagedServiceOrder | null>(null);
   const [serviceOrderHistory, setServiceOrderHistory] = useState<ManagedServiceOrderStatusHistory[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [bulkCancelDialog, setBulkCancelDialog] = useState(false);
+
   const createdDateRange = useMemo(() => resolveDateFilterRange(createdDateFilter), [createdDateFilter]);
   const serviceDateRange = useMemo(() => resolveDateFilterRange(serviceDateFilter), [serviceDateFilter]);
 
   const filteredServiceOrders = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase();
-
     return serviceOrders.filter((serviceOrder) => {
       if (statusFilter !== "all" && serviceOrder.status !== statusFilter) {
         return false;
@@ -497,49 +520,268 @@ export function DataTable({
         return false;
       }
 
-      if (!normalizedSearch) {
-        return true;
-      }
-
-      const haystack = [
-        serviceOrder.number,
-        serviceOrder.clientName,
-        serviceOrder.sourceBudgetNumber ?? "",
-        serviceOrder.serviceCity,
-        serviceOrder.serviceStreet,
-        ...serviceOrder.items.map((item) => item.serviceDescription),
-        ...serviceOrder.items.map((item) => item.equipmentName),
-        ...serviceOrder.items.map((item) => item.operatorName),
-      ]
-        .join(" ")
-        .toLowerCase();
-
-      return haystack.includes(normalizedSearch);
+      return true;
     });
-  }, [createdDateRange, search, serviceDateRange, serviceOrders, statusFilter]);
+  }, [createdDateRange, serviceDateRange, serviceOrders, statusFilter]);
 
-  const pageSize = 10;
-  const pageCount = Math.max(1, Math.ceil(filteredServiceOrders.length / pageSize));
-  const safePage = Math.min(page, pageCount - 1);
-  const paginatedServiceOrders = filteredServiceOrders.slice(safePage * pageSize, (safePage + 1) * pageSize);
+  const columns = useMemo<ColumnDef<ManagedServiceOrder>[]>(() => [
+    {
+      id: "select",
+      header: ({ table }) => (
+        <div className="flex items-center justify-center px-2">
+          <Checkbox
+            checked={table.getIsAllPageRowsSelected() || (table.getIsSomePageRowsSelected() && "indeterminate")}
+            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+            aria-label={t("common.selectAll")}
+          />
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="flex items-center justify-center px-2">
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            aria-label={t("common.selectRow")}
+          />
+        </div>
+      ),
+      enableSorting: false,
+      enableHiding: false,
+      size: 50,
+    },
+    {
+      accessorKey: "number",
+      header: ({ column }) => <SortableHeader column={column} title={t("serviceOrders.number")} className="-ml-3" />,
+      enableHiding: false,
+      cell: ({ row }) => (
+        <div className="space-y-1">
+          <div className="font-medium">{row.original.number}</div>
+          {row.original.sourceBudgetNumber ? (
+            <div className="text-xs text-muted-foreground">
+              {t("serviceOrders.fromBudget", { number: row.original.sourceBudgetNumber })}
+            </div>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "clientName",
+      header: ({ column }) => <SortableHeader column={column} title={t("serviceOrders.client")} className="-ml-3" />,
+      cell: ({ row }) => (
+        <div className="space-y-1">
+          <div>{row.original.clientName}</div>
+          <div className="text-xs text-muted-foreground">
+            {row.original.serviceCity} • {row.original.serviceState}
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "originType",
+      accessorFn: (row) => getOriginLabel(row.originType, t),
+      header: ({ column }) => <SortableHeader column={column} title={t("serviceOrders.originType")} className="-ml-3" />,
+      cell: ({ row }) => <Badge variant="outline">{getOriginLabel(row.original.originType, t)}</Badge>,
+    },
+    {
+      id: "schedule",
+      accessorFn: (row) => {
+        const firstDate = row.items[0]?.serviceDate;
+        const lastDate = row.items[row.items.length - 1]?.serviceDate;
+        return firstDate ? (firstDate === lastDate ? formatDate(firstDate, locale) : `${formatDate(firstDate, locale)} - ${formatDate(lastDate ?? firstDate, locale)}`) : "";
+      },
+      header: ({ column }) => <SortableHeader column={column} title={t("serviceOrders.schedule")} className="-ml-3" />,
+      cell: ({ row }) => (
+        <div className="space-y-1 text-sm">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="size-4 text-muted-foreground" />
+            {row.original.items[0]?.serviceDate
+              ? row.original.items[0].serviceDate === row.original.items[row.original.items.length - 1]?.serviceDate
+                ? formatDate(row.original.items[0].serviceDate, locale)
+                : `${formatDate(row.original.items[0].serviceDate, locale)} - ${formatDate(row.original.items[row.original.items.length - 1]?.serviceDate ?? row.original.items[0].serviceDate, locale)}`
+              : t("serviceOrders.noSchedule")}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {t("serviceOrders.itemsCountSummary", { count: row.original.itemCount })}
+          </div>
+        </div>
+      ),
+    },
+    {
+      accessorKey: "status",
+      header: ({ column }) => <SortableHeader column={column} title={t("serviceOrders.status")} className="-ml-3" />,
+      cell: ({ row }) => (
+        <Badge variant="secondary" className={getStatusBadgeClass(row.original.status)}>
+          {getStatusLabel(row.original.status, t)}
+        </Badge>
+      ),
+      filterFn: "equals",
+    },
+    {
+      accessorKey: "createdAt",
+      header: ({ column }) => <SortableHeader column={column} title={t("serviceOrders.createdAt")} className="-ml-3" />,
+      cell: ({ row }) => <span className="text-sm text-muted-foreground">{formatDateTime(row.original.createdAt, locale)}</span>,
+    },
+    {
+      id: "actions",
+      header: t("serviceOrders.actions"),
+      enableSorting: false,
+      enableHiding: false,
+      cell: ({ row }) => {
+        const serviceOrder = row.original;
 
-  const hasActiveFilters = Boolean(search.trim())
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer" disabled={isMutating}>
+                <EllipsisVertical className="size-4" />
+                <span className="sr-only">{t("serviceOrders.actions")}</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {serviceOrder.status !== "completed" && serviceOrder.status !== "cancelled" ? (
+                <DropdownMenuItem className="cursor-pointer" onClick={() => setEditingServiceOrder(serviceOrder)}>
+                  <Pencil className="mr-2 size-4" />
+                  {t("serviceOrders.editServiceOrder")}
+                </DropdownMenuItem>
+              ) : null}
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={async () => {
+                  setHistoryServiceOrder(serviceOrder);
+                  setIsHistoryLoading(true);
+
+                  try {
+                    const response = await fetch(`/api/service-orders/${serviceOrder.id}/history`, { cache: "no-store" });
+                    const payload = await response.json().catch(() => null);
+
+                    if (!response.ok) {
+                      throw new Error(payload?.error || t("serviceOrders.updateError"));
+                    }
+
+                    setServiceOrderHistory(payload.history ?? []);
+                  } catch (error) {
+                    toast.error(error instanceof Error ? error.message : t("serviceOrders.updateError"));
+                    setHistoryServiceOrder(null);
+                  } finally {
+                    setIsHistoryLoading(false);
+                  }
+                }}
+              >
+                <Clock3 className="mr-2 size-4" />
+                {t("serviceOrders.viewHistory")}
+              </DropdownMenuItem>
+              {serviceOrder.status === "pending" ? (
+                <DropdownMenuItem className="cursor-pointer" onClick={() => setPendingStatusAction({ serviceOrder, status: "scheduled" })}>
+                  <CheckCircle2 className="mr-2 size-4" />
+                  {t("serviceOrders.scheduleServiceOrder")}
+                </DropdownMenuItem>
+              ) : null}
+              {serviceOrder.status === "scheduled" ? (
+                <DropdownMenuItem className="cursor-pointer" onClick={() => setPendingStatusAction({ serviceOrder, status: "in_progress" })}>
+                  <Play className="mr-2 size-4" />
+                  {t("serviceOrders.startServiceOrder")}
+                </DropdownMenuItem>
+              ) : null}
+              {serviceOrder.status === "in_progress" ? (
+                <DropdownMenuItem className="cursor-pointer" onClick={() => setPendingStatusAction({ serviceOrder, status: "completed" })}>
+                  <CheckCircle2 className="mr-2 size-4" />
+                  {t("serviceOrders.completeServiceOrder")}
+                </DropdownMenuItem>
+              ) : null}
+              {(serviceOrder.status === "pending" || serviceOrder.status === "scheduled") ? (
+                <DropdownMenuItem className="cursor-pointer text-destructive" onClick={() => setPendingStatusAction({ serviceOrder, status: "cancelled" })}>
+                  <XCircle className="mr-2 size-4" />
+                  {t("serviceOrders.cancelServiceOrder")}
+                </DropdownMenuItem>
+              ) : null}
+              {(serviceOrder.status === "completed" || serviceOrder.status === "cancelled") ? (
+                <DropdownMenuItem className="cursor-pointer" onClick={() => setPendingStatusAction({ serviceOrder, status: "pending" })}>
+                  <RotateCcw className="mr-2 size-4" />
+                  {t("serviceOrders.revertServiceOrder")}
+                </DropdownMenuItem>
+              ) : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
+  ], [isMutating, locale, t]);
+
+  const columnVisibilityLabels = useMemo<Record<string, string>>(
+    () => ({
+      clientName: t("serviceOrders.client"),
+      originType: t("serviceOrders.originType"),
+      schedule: t("serviceOrders.schedule"),
+      status: t("serviceOrders.status"),
+      createdAt: t("serviceOrders.createdAt"),
+    }),
+    [t],
+  );
+
+  const table = useReactTable({
+    data: filteredServiceOrders,
+    columns,
+    getRowId: (row) => row.id,
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange: setRowSelection,
+    onGlobalFilterChange: setGlobalFilter,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    globalFilterFn: (row, _columnId, filterValue) => {
+      const value = String(filterValue).toLowerCase();
+
+      return [
+        row.original.number,
+        row.original.clientName,
+        row.original.sourceBudgetNumber ?? "",
+        row.original.serviceCity,
+        row.original.serviceStreet,
+        ...row.original.items.flatMap((item) => [item.serviceDescription, item.equipmentName, item.operatorName]),
+      ].some((item) => item.toLowerCase().includes(value));
+    },
+    state: {
+      sorting,
+      columnFilters,
+      columnVisibility,
+      rowSelection,
+      globalFilter,
+    },
+    initialState: {
+      pagination: {
+        pageSize: 10,
+      },
+    },
+  });
+
+  const selectedCount = table.getFilteredSelectedRowModel().rows.length;
+  const hasActiveFilters = Boolean(globalFilter.trim())
+    || columnFilters.length > 0
     || statusFilter !== "all"
     || createdDateFilter.preset !== "all"
     || serviceDateFilter.preset !== "all";
 
+  const handleClearFilters = () => {
+    setGlobalFilter("");
+    setColumnFilters([]);
+    setStatusFilter("all");
+    setCreatedDateFilter({ preset: "all" });
+    setServiceDateFilter({ preset: "all" });
+    table.setPageIndex(0);
+  };
+
   return (
-    <div className="space-y-4">
+    <div className="w-full space-y-4">
       <AdminListToolbar>
         <div className="relative min-w-[240px] flex-1">
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder={t("serviceOrders.searchPlaceholder")}
-            value={search}
-            onChange={(event) => {
-              setSearch(event.target.value);
-              setPage(0);
-            }}
+            value={globalFilter}
+            onChange={(event) => setGlobalFilter(event.target.value)}
             className="h-10 rounded-lg border-muted-foreground/20 bg-background pl-9"
           />
         </div>
@@ -552,7 +794,7 @@ export function DataTable({
             value={statusFilter}
             onValueChange={(value) => {
               setStatusFilter(value);
-              setPage(0);
+              table.getColumn("status")?.setFilterValue(value === "all" ? undefined : value);
             }}
           >
             <SelectTrigger id="service-order-status-filter" className="h-10 cursor-pointer rounded-lg">
@@ -574,18 +816,15 @@ export function DataTable({
           label={t("serviceOrders.createdDateFilter")}
           locale={locale}
           value={createdDateFilter}
-          onPresetChange={(preset) => {
+          onPresetChange={(preset) => setCreatedDateFilter({ preset })}
+          onRangeChange={({ from, to }) =>
             setCreatedDateFilter((current) => ({
-              preset,
-              from: preset === "custom" ? current.from : undefined,
-              to: preset === "custom" ? current.to : undefined,
-            }));
-            setPage(0);
-          }}
-          onRangeChange={(nextRange) => {
-            setCreatedDateFilter({ preset: "custom", ...nextRange });
-            setPage(0);
-          }}
+              ...current,
+              preset: "custom",
+              from,
+              to,
+            }))
+          }
           t={t}
         />
 
@@ -594,39 +833,68 @@ export function DataTable({
           label={t("serviceOrders.serviceDateFilter")}
           locale={locale}
           value={serviceDateFilter}
-          onPresetChange={(preset) => {
+          onPresetChange={(preset) => setServiceDateFilter({ preset })}
+          onRangeChange={({ from, to }) =>
             setServiceDateFilter((current) => ({
-              preset,
-              from: preset === "custom" ? current.from : undefined,
-              to: preset === "custom" ? current.to : undefined,
-            }));
-            setPage(0);
-          }}
-          onRangeChange={(nextRange) => {
-            setServiceDateFilter({ preset: "custom", ...nextRange });
-            setPage(0);
-          }}
+              ...current,
+              preset: "custom",
+              from,
+              to,
+            }))
+          }
           t={t}
         />
 
-        {hasActiveFilters ? (
+        <div className="ml-auto">
+          <div className="min-w-[180px] space-y-2">
+            <Label htmlFor="service-orders-column-visibility" className="text-sm font-medium">
+              {t("common.columnVisibility")}
+            </Label>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  id="service-orders-column-visibility"
+                  variant="outline"
+                  size="lg"
+                  className="h-10 w-full cursor-pointer justify-between rounded-lg px-3"
+                >
+                  {t("common.columns")} <ChevronDown className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {table
+                  .getAllColumns()
+                  .filter((column) => column.getCanHide())
+                  .map((column) => (
+                    <DropdownMenuCheckboxItem
+                      key={column.id}
+                      checked={column.getIsVisible()}
+                      onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                    >
+                      {columnVisibilityLabels[column.id] ?? column.id}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+
+        <div className="w-full min-w-[160px] space-y-2 sm:w-auto">
+          <Label className="text-sm font-medium text-transparent">
+            {t("common.clearFilters")}
+          </Label>
           <Button
             type="button"
             variant="outline"
-            className="cursor-pointer"
-            onClick={() => {
-              setSearch("");
-              setStatusFilter("all");
-              setCreatedDateFilter({ preset: "all" });
-              setServiceDateFilter({ preset: "all" });
-              setPage(0);
-            }}
+            className="h-10 w-full cursor-pointer rounded-lg sm:w-auto"
+            onClick={handleClearFilters}
+            disabled={!hasActiveFilters}
           >
             {t("common.clearFilters")}
           </Button>
-        ) : null}
+        </div>
 
-        <div className="ml-auto">
+        <div>
           <ServiceOrderFormDialog
             mode="create"
             open={createOpen}
@@ -642,154 +910,62 @@ export function DataTable({
         </div>
       </AdminListToolbar>
 
+      {selectedCount > 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/30 px-3 py-2">
+          <span className="text-sm text-muted-foreground">
+            {t("common.selectedCount", { count: selectedCount })}
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="cursor-pointer"
+              onClick={() => table.resetRowSelection()}
+              disabled={isMutating}
+            >
+              {t("common.clearSelection")}
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              className="cursor-pointer"
+              onClick={() => setBulkCancelDialog(true)}
+              disabled={isMutating}
+            >
+              <Trash2 className="mr-2 size-4" />
+              {t("serviceOrders.cancelSelected")}
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
       <AdminListTableCard>
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead>{t("serviceOrders.number")}</TableHead>
-              <TableHead>{t("serviceOrders.client")}</TableHead>
-              <TableHead>{t("serviceOrders.originType")}</TableHead>
-              <TableHead>{t("serviceOrders.schedule")}</TableHead>
-              <TableHead>{t("serviceOrders.status")}</TableHead>
-              <TableHead>{t("serviceOrders.createdAt")}</TableHead>
-              <TableHead className="text-right">{t("serviceOrders.actions")}</TableHead>
-            </TableRow>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
+                  <TableHead key={header.id}>
+                    {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
           </TableHeader>
           <TableBody>
-            {paginatedServiceOrders.length > 0 ? paginatedServiceOrders.map((serviceOrder) => {
-              const firstDate = serviceOrder.items[0]?.serviceDate;
-              const lastDate = serviceOrder.items[serviceOrder.items.length - 1]?.serviceDate;
-
-              return (
-                <TableRow key={serviceOrder.id}>
-                  <TableCell>
-                    <div className="space-y-1">
-                      <div className="font-medium">{serviceOrder.number}</div>
-                      {serviceOrder.sourceBudgetNumber ? (
-                        <div className="text-xs text-muted-foreground">
-                          {t("serviceOrders.fromBudget", { number: serviceOrder.sourceBudgetNumber })}
-                        </div>
-                      ) : null}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      <div>{serviceOrder.clientName}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {serviceOrder.serviceCity} • {serviceOrder.serviceState}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{getOriginLabel(serviceOrder.originType, t)}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1 text-sm">
-                      <div className="flex items-center gap-2">
-                        <CalendarDays className="size-4 text-muted-foreground" />
-                        {firstDate
-                          ? firstDate === lastDate
-                            ? formatDate(firstDate, locale)
-                            : `${formatDate(firstDate, locale)} - ${formatDate(lastDate ?? firstDate, locale)}`
-                          : t("serviceOrders.noSchedule")}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {t("serviceOrders.itemsCountSummary", { count: serviceOrder.itemCount })}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary" className={getStatusBadgeClass(serviceOrder.status)}>
-                      {getStatusLabel(serviceOrder.status, t)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {formatDateTime(serviceOrder.createdAt, locale)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer" disabled={isMutating}>
-                          <EllipsisVertical className="size-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {serviceOrder.status !== "completed" && serviceOrder.status !== "cancelled" ? (
-                          <DropdownMenuItem className="cursor-pointer" onClick={() => setEditingServiceOrder(serviceOrder)}>
-                            <Pencil className="mr-2 size-4" />
-                            {t("serviceOrders.editServiceOrder")}
-                          </DropdownMenuItem>
-                        ) : null}
-
-                        <DropdownMenuItem
-                          className="cursor-pointer"
-                          onClick={async () => {
-                            setHistoryServiceOrder(serviceOrder);
-                            setIsHistoryLoading(true);
-
-                            try {
-                              const response = await fetch(`/api/service-orders/${serviceOrder.id}/history`, { cache: "no-store" });
-                              const payload = await response.json().catch(() => null);
-
-                              if (!response.ok) {
-                                throw new Error(payload?.error || t("serviceOrders.updateError"));
-                              }
-
-                              setServiceOrderHistory(payload.history ?? []);
-                            } catch (error) {
-                              toast.error(error instanceof Error ? error.message : t("serviceOrders.updateError"));
-                              setHistoryServiceOrder(null);
-                            } finally {
-                              setIsHistoryLoading(false);
-                            }
-                          }}
-                        >
-                          <Clock3 className="mr-2 size-4" />
-                          {t("serviceOrders.viewHistory")}
-                        </DropdownMenuItem>
-
-                        {serviceOrder.status === "pending" ? (
-                          <DropdownMenuItem className="cursor-pointer" onClick={() => setPendingStatusAction({ serviceOrder, status: "scheduled" })}>
-                            <CheckCircle2 className="mr-2 size-4" />
-                            {t("serviceOrders.scheduleServiceOrder")}
-                          </DropdownMenuItem>
-                        ) : null}
-
-                        {serviceOrder.status === "scheduled" ? (
-                          <DropdownMenuItem className="cursor-pointer" onClick={() => setPendingStatusAction({ serviceOrder, status: "in_progress" })}>
-                            <Play className="mr-2 size-4" />
-                            {t("serviceOrders.startServiceOrder")}
-                          </DropdownMenuItem>
-                        ) : null}
-
-                        {serviceOrder.status === "in_progress" ? (
-                          <DropdownMenuItem className="cursor-pointer" onClick={() => setPendingStatusAction({ serviceOrder, status: "completed" })}>
-                            <CheckCircle2 className="mr-2 size-4" />
-                            {t("serviceOrders.completeServiceOrder")}
-                          </DropdownMenuItem>
-                        ) : null}
-
-                        {(serviceOrder.status === "pending" || serviceOrder.status === "scheduled") ? (
-                          <DropdownMenuItem className="cursor-pointer text-destructive" onClick={() => setPendingStatusAction({ serviceOrder, status: "cancelled" })}>
-                            <XCircle className="mr-2 size-4" />
-                            {t("serviceOrders.cancelServiceOrder")}
-                          </DropdownMenuItem>
-                        ) : null}
-
-                        {(serviceOrder.status === "completed" || serviceOrder.status === "cancelled") ? (
-                          <DropdownMenuItem className="cursor-pointer" onClick={() => setPendingStatusAction({ serviceOrder, status: "pending" })}>
-                            <RotateCcw className="mr-2 size-4" />
-                            {t("serviceOrders.revertServiceOrder")}
-                          </DropdownMenuItem>
-                        ) : null}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+            {table.getRowModel().rows.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  ))}
                 </TableRow>
-              );
-            }) : (
+              ))
+            ) : (
               <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
                   {t("serviceOrders.noServiceOrders")}
                 </TableCell>
               </TableRow>
@@ -799,13 +975,13 @@ export function DataTable({
       </AdminListTableCard>
 
       <AdminListPaginationFooter
-        countLabel={t("serviceOrders.serviceOrderCount", { count: filteredServiceOrders.length })}
+        countLabel={t("serviceOrders.serviceOrderCount", { count: table.getFilteredRowModel().rows.length })}
         previousLabel={t("common.previous")}
         nextLabel={t("common.next")}
-        onPreviousPage={() => setPage((current) => Math.max(current - 1, 0))}
-        onNextPage={() => setPage((current) => Math.min(current + 1, pageCount - 1))}
-        canPreviousPage={safePage > 0}
-        canNextPage={safePage < pageCount - 1}
+        onPreviousPage={() => table.previousPage()}
+        onNextPage={() => table.nextPage()}
+        canPreviousPage={table.getCanPreviousPage()}
+        canNextPage={table.getCanNextPage()}
       />
 
       <ServiceOrderFormDialog
@@ -904,6 +1080,32 @@ export function DataTable({
         isLoading={isHistoryLoading}
         emptyMessage={t("serviceOrders.noHistory")}
         getStatusLabel={(status) => getStatusLabel(status as ManagedServiceOrder["status"], t)}
+      />
+
+      <ConfirmDeleteDialog
+        open={bulkCancelDialog}
+        onOpenChange={setBulkCancelDialog}
+        title={t("serviceOrders.bulkCancelTitle")}
+        description={t("serviceOrders.bulkCancelDescription", { count: selectedCount })}
+        onConfirm={async () => {
+          const selectedRows = table.getSelectedRowModel().rows;
+          const cancellableOrders = selectedRows.filter(
+            (row) => row.original.status === "pending" || row.original.status === "scheduled"
+          );
+
+          if (cancellableOrders.length === 0) {
+            toast.error(t("serviceOrders.noCancellableSelected"));
+            setBulkCancelDialog(false);
+            return;
+          }
+
+          const ids = cancellableOrders.map((row) => row.original.id);
+          await onCancelServiceOrders(ids);
+          table.resetRowSelection();
+          setBulkCancelDialog(false);
+        }}
+        isLoading={isMutating}
+        confirmLabel={t("serviceOrders.cancelSelected")}
       />
     </div>
   );

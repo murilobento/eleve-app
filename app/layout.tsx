@@ -19,7 +19,7 @@ export default function RootLayout({
 
   return (
     <html lang={getHtmlLang(locale)} suppressHydrationWarning>
-      <body className="font-sans antialiased" style={{ fontFamily: 'var(--font-inter)' }}>
+      <body className="font-sans antialiased">
         <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
           {children}
           <Toaster />

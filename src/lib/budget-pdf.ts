@@ -1,4 +1,5 @@
 import { createRequire } from "node:module";
+import { resolvePdfBrowserExecutablePath } from "@/lib/pdf-browser";
 
 import type { ManagedBudget } from "@/lib/budgets-admin";
 import type { ManagedClient } from "@/lib/clients-admin";
@@ -430,7 +431,7 @@ export async function renderBudgetPdf(payload: BudgetPdfPayload) {
   const puppeteerModule = require("puppeteer-core") as typeof import("puppeteer-core");
   const puppeteer = puppeteerModule.default ?? puppeteerModule;
   const browser = await puppeteer.launch({
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || process.env.GOOGLE_CHROME_BIN || "/usr/bin/google-chrome",
+    executablePath: resolvePdfBrowserExecutablePath(),
     headless: true,
     pipe: true,
     args: [

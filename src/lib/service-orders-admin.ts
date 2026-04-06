@@ -216,6 +216,7 @@ export type ManagedServiceOrderItem = {
   serviceTypeBillingUnit: string;
   equipmentId: string;
   equipmentName: string;
+  equipmentTypeName: string;
   equipmentBrand: string;
   equipmentModel: string;
   operatorId: string;
