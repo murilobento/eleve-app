@@ -10,6 +10,16 @@ export const GET = handler.GET;
 export async function POST(request: Request) {
   const pathname = new URL(request.url).pathname;
 
+  if (pathname.includes("/sign-up")) {
+    return NextResponse.json(
+      {
+        error: "Public sign up is disabled. Ask an administrator to create your account.",
+        code: "SIGN_UP_DISABLED",
+      },
+      { status: 403 },
+    );
+  }
+
   if (pathname.endsWith("/sign-in/email")) {
     const body = await request.clone().json().catch(() => null);
     const email = typeof body?.email === "string" ? body.email : null;

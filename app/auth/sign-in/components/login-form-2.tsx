@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -123,12 +122,6 @@ export function LoginForm2({
         <Button type="submit" className="w-full cursor-pointer" disabled={loading}>
           {loading ? t("auth.loginLoading") : t("auth.loginButton")}
         </Button>
-      </div>
-      <div className="text-center text-sm">
-        {t("auth.noAccount")}{" "}
-        <Link href={getAppUrl("/auth/sign-up", locale)} className="underline underline-offset-4">
-          {t("common.signUp")}
-        </Link>
       </div>
     </form>
   )

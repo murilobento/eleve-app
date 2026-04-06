@@ -12,6 +12,13 @@ import {
   type ManagedBudgetItem,
   type ManagedBudgetStatusHistory,
 } from "@/lib/budgets-admin";
+import type {
+  FuelFinancialStatus,
+  FuelMeterKind,
+  FuelType,
+  ManagedFuelRecord,
+} from "@/lib/fuel-admin";
+import type { ManagedFuelRequisition, UpdateFuelRequisitionStatusInput } from "@/lib/fuel-requisitions-admin";
 import {
   PERMISSION_CATALOG,
   type PermissionKey,
@@ -19,6 +26,18 @@ import {
   type UserRoleSummary,
 } from "@/lib/rbac-shared";
 import type { EquipmentOption } from "@/lib/equipment-admin";
+import type {
+  MaintenanceFinancialStatus,
+  MaintenanceMeterKind,
+  MaintenanceStatus,
+  MaintenanceType,
+  ManagedMaintenanceRecord,
+} from "@/lib/maintenance-admin";
+import type {
+  ManagedMaintenanceRequisition,
+  RequisitionStatus,
+  UpdateMaintenanceRequisitionStatusInput,
+} from "@/lib/maintenance-requisitions-admin";
 import type {
   ManagedServiceOrder,
   ManagedServiceOrderItem,
@@ -28,6 +47,12 @@ import type {
   ServiceOrderTransitionStatus,
 } from "@/lib/service-orders-admin";
 import type { ManagedServiceType } from "@/lib/service-types-admin";
+import type {
+  ManagedSupplier,
+  SupplierOption,
+  SupplierStatus,
+  SupplierType,
+} from "@/lib/suppliers-admin";
 
 export type RoleWithDetails = RoleRecord & {
   permissions: PermissionKey[];
@@ -80,6 +105,129 @@ type EquipmentRow = {
   year: number;
   plate: string | null;
   lifting_capacity_tons: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type MaintenanceRecordRow = {
+  id: string;
+  equipment_id: string;
+  equipment_name: string;
+  equipment_brand: string;
+  equipment_model: string;
+  maintenance_type: MaintenanceType;
+  status: MaintenanceStatus;
+  financial_status: MaintenanceFinancialStatus;
+  planned_date: string;
+  performed_date: string | null;
+  description: string;
+  supplier_name: string | null;
+  document_number: string | null;
+  notes: string | null;
+  amount_total: string | number | null;
+  payment_due_date: string | null;
+  paid_at: string | null;
+  meter_kind: MaintenanceMeterKind | null;
+  meter_value: string | number | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type FuelRecordRow = {
+  id: string;
+  equipment_id: string | null;
+  equipment_name: string | null;
+  equipment_brand: string | null;
+  equipment_model: string | null;
+  fuel_date: string;
+  financial_status: FuelFinancialStatus;
+  fuel_type: FuelType | null;
+  total_amount: string | number;
+  liters: string | number | null;
+  meter_kind: FuelMeterKind | null;
+  meter_reading: string | number | null;
+  supplier_name: string | null;
+  document_number: string | null;
+  notes: string | null;
+  payment_due_date: string | null;
+  paid_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type SupplierRow = {
+  id: string;
+  supplier_type: SupplierType;
+  status: SupplierStatus;
+  legal_name: string;
+  trade_name: string | null;
+  document: string;
+  contact_name: string | null;
+  contact_phone: string | null;
+  email: string | null;
+  phone: string;
+  website: string | null;
+  postal_code: string;
+  street: string;
+  number: string;
+  complement: string | null;
+  district: string;
+  city: string;
+  state: string;
+  country: string;
+  created_at: string;
+  updated_at: string;
+};
+
+type MaintenanceRequisitionRow = {
+  id: string;
+  number: string;
+  revision_number: string | number;
+  equipment_id: string;
+  equipment_name: string;
+  equipment_brand: string;
+  equipment_model: string;
+  supplier_id: string;
+  supplier_name: string;
+  supplier_type: SupplierType;
+  requester_user_id: string | null;
+  requester_name_snapshot: string | null;
+  requester_email_snapshot: string | null;
+  status: RequisitionStatus;
+  scheduled_date: string;
+  description: string;
+  notes: string | null;
+  completion_notes: string | null;
+  issued_at: string | null;
+  last_issued_at: string | null;
+  completed_at: string | null;
+  cancelled_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type FuelRequisitionRow = {
+  id: string;
+  number: string;
+  revision_number: string | number;
+  equipment_id: string;
+  equipment_name: string;
+  equipment_brand: string;
+  equipment_model: string;
+  supplier_id: string;
+  supplier_name: string;
+  supplier_type: SupplierType;
+  requester_user_id: string | null;
+  requester_name_snapshot: string | null;
+  requester_email_snapshot: string | null;
+  status: RequisitionStatus;
+  scheduled_date: string;
+  notes: string;
+  completion_notes: string | null;
+  issued_at: string | null;
+  last_issued_at: string | null;
+  completed_at: string | null;
+  cancelled_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -429,6 +577,158 @@ async function ensureSchema() {
       created_at timestamptz NOT NULL DEFAULT now(),
       updated_at timestamptz NOT NULL DEFAULT now()
     );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS maintenance_records (
+      id text PRIMARY KEY,
+      equipment_id text NOT NULL REFERENCES equipment(id) ON DELETE RESTRICT,
+      maintenance_type text NOT NULL,
+      status text NOT NULL DEFAULT 'planned',
+      financial_status text NOT NULL DEFAULT 'pending',
+      planned_date date NOT NULL,
+      performed_date date,
+      description text NOT NULL,
+      supplier_name text,
+      document_number text,
+      notes text,
+      amount_total numeric(12, 2),
+      payment_due_date date,
+      paid_at date,
+      meter_kind text,
+      meter_value numeric(12, 2),
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS maintenance_records_equipment_id_idx
+    ON maintenance_records (equipment_id, planned_date DESC);
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS maintenance_records_status_idx
+    ON maintenance_records (status, financial_status);
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS fuel_records (
+      id text PRIMARY KEY,
+      equipment_id text REFERENCES equipment(id) ON DELETE SET NULL,
+      fuel_date date NOT NULL,
+      financial_status text NOT NULL DEFAULT 'pending',
+      fuel_type text,
+      total_amount numeric(12, 2) NOT NULL,
+      liters numeric(12, 3),
+      meter_kind text,
+      meter_reading numeric(12, 2),
+      supplier_name text,
+      document_number text,
+      notes text,
+      payment_due_date date,
+      paid_at date,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS fuel_records_equipment_id_idx
+    ON fuel_records (equipment_id, fuel_date DESC);
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS fuel_records_financial_status_idx
+    ON fuel_records (financial_status, fuel_date DESC);
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS suppliers (
+      id text PRIMARY KEY,
+      supplier_type text NOT NULL,
+      status text NOT NULL DEFAULT 'active',
+      legal_name text NOT NULL,
+      trade_name text,
+      document text NOT NULL,
+      contact_name text,
+      contact_phone text,
+      email text,
+      phone text NOT NULL,
+      website text,
+      postal_code text NOT NULL,
+      street text NOT NULL,
+      number text NOT NULL,
+      complement text,
+      district text NOT NULL,
+      city text NOT NULL,
+      state text NOT NULL,
+      country text NOT NULL DEFAULT 'Brasil',
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+  `);
+
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS suppliers_legal_name_document_idx
+    ON suppliers ((lower(legal_name)), document);
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS maintenance_requisitions (
+      id text PRIMARY KEY,
+      number text NOT NULL UNIQUE,
+      revision_number integer NOT NULL DEFAULT 1,
+      equipment_id text NOT NULL REFERENCES equipment(id) ON DELETE RESTRICT,
+      supplier_id text NOT NULL REFERENCES suppliers(id) ON DELETE RESTRICT,
+      requester_user_id text REFERENCES "user"(id) ON DELETE SET NULL,
+      requester_name_snapshot text,
+      requester_email_snapshot text,
+      status text NOT NULL DEFAULT 'draft',
+      scheduled_date date NOT NULL,
+      description text NOT NULL,
+      notes text,
+      completion_notes text,
+      issued_at timestamptz,
+      last_issued_at timestamptz,
+      completed_at date,
+      cancelled_at timestamptz,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS maintenance_requisitions_status_idx
+    ON maintenance_requisitions (status, scheduled_date DESC);
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS fuel_requisitions (
+      id text PRIMARY KEY,
+      number text NOT NULL UNIQUE,
+      revision_number integer NOT NULL DEFAULT 1,
+      equipment_id text NOT NULL REFERENCES equipment(id) ON DELETE RESTRICT,
+      supplier_id text NOT NULL REFERENCES suppliers(id) ON DELETE RESTRICT,
+      requester_user_id text REFERENCES "user"(id) ON DELETE SET NULL,
+      requester_name_snapshot text,
+      requester_email_snapshot text,
+      status text NOT NULL DEFAULT 'draft',
+      scheduled_date date NOT NULL,
+      notes text NOT NULL,
+      completion_notes text,
+      issued_at timestamptz,
+      last_issued_at timestamptz,
+      completed_at date,
+      cancelled_at timestamptz,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS fuel_requisitions_status_idx
+    ON fuel_requisitions (status, scheduled_date DESC);
   `);
 
   await pool.query(`
@@ -1256,6 +1556,208 @@ function mapEquipmentRow(row: EquipmentRow) {
   };
 }
 
+function formatDateOnly(value: string | null) {
+  return value ? value.slice(0, 10) : null;
+}
+
+function mapMaintenanceRecordRow(row: MaintenanceRecordRow): ManagedMaintenanceRecord {
+  return {
+    id: row.id,
+    equipmentId: row.equipment_id,
+    equipmentName: row.equipment_name,
+    equipmentBrand: row.equipment_brand,
+    equipmentModel: row.equipment_model,
+    maintenanceType: row.maintenance_type,
+    status: row.status,
+    financialStatus: row.financial_status,
+    plannedDate: row.planned_date.slice(0, 10),
+    performedDate: formatDateOnly(row.performed_date),
+    description: row.description,
+    supplierName: row.supplier_name,
+    documentNumber: row.document_number,
+    notes: row.notes,
+    amountTotal: row.amount_total === null ? null : Number(row.amount_total),
+    paymentDueDate: formatDateOnly(row.payment_due_date),
+    paidAt: formatDateOnly(row.paid_at),
+    meterKind: row.meter_kind,
+    meterValue: row.meter_value === null ? null : Number(row.meter_value),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function calculateFuelAverage(
+  current: Pick<FuelRecordRow, "equipment_id" | "fuel_date" | "liters" | "meter_kind" | "meter_reading">,
+  previous: Pick<FuelRecordRow, "meter_kind" | "meter_reading"> | null,
+) {
+  if (
+    !current.equipment_id
+    || current.liters == null
+    || current.meter_kind == null
+    || current.meter_reading == null
+    || !previous
+    || previous.meter_kind !== current.meter_kind
+    || previous.meter_reading == null
+  ) {
+    return {
+      averageLabel: null,
+      averageValue: null,
+    };
+  }
+
+  const currentMeter = Number(current.meter_reading);
+  const previousMeter = Number(previous.meter_reading);
+  const liters = Number(current.liters);
+
+  if (current.meter_kind === "km") {
+    const distance = currentMeter - previousMeter;
+
+    if (distance <= 0 || liters <= 0) {
+      return { averageLabel: null, averageValue: null };
+    }
+
+    return {
+      averageLabel: "km/l",
+      averageValue: Math.round(((distance / liters) + Number.EPSILON) * 100) / 100,
+    };
+  }
+
+  const elapsed = currentMeter - previousMeter;
+
+  if (elapsed <= 0 || liters <= 0) {
+    return { averageLabel: null, averageValue: null };
+  }
+
+  return {
+    averageLabel: "l/h",
+    averageValue: Math.round(((liters / elapsed) + Number.EPSILON) * 100) / 100,
+  };
+}
+
+function mapFuelRecordRow(
+  row: FuelRecordRow,
+  previous: Pick<FuelRecordRow, "meter_kind" | "meter_reading"> | null,
+): ManagedFuelRecord {
+  const average = calculateFuelAverage(row, previous);
+
+  return {
+    id: row.id,
+    equipmentId: row.equipment_id,
+    equipmentName: row.equipment_name,
+    equipmentBrand: row.equipment_brand,
+    equipmentModel: row.equipment_model,
+    fuelDate: row.fuel_date.slice(0, 10),
+    financialStatus: row.financial_status,
+    fuelType: row.fuel_type,
+    totalAmount: Number(row.total_amount),
+    liters: row.liters === null ? null : Number(row.liters),
+    meterKind: row.meter_kind,
+    meterReading: row.meter_reading === null ? null : Number(row.meter_reading),
+    averageLabel: average.averageLabel,
+    averageValue: average.averageValue,
+    supplierName: row.supplier_name,
+    documentNumber: row.document_number,
+    notes: row.notes,
+    paymentDueDate: formatDateOnly(row.payment_due_date),
+    paidAt: formatDateOnly(row.paid_at),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapSupplierRow(row: SupplierRow): ManagedSupplier {
+  return {
+    id: row.id,
+    supplierType: row.supplier_type,
+    status: row.status,
+    legalName: row.legal_name,
+    tradeName: row.trade_name,
+    document: row.document,
+    contactName: row.contact_name,
+    contactPhone: row.contact_phone,
+    email: row.email,
+    phone: row.phone,
+    website: row.website,
+    postalCode: row.postal_code,
+    street: row.street,
+    number: row.number,
+    complement: row.complement,
+    district: row.district,
+    city: row.city,
+    state: row.state,
+    country: row.country,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapSupplierOptionRow(row: Pick<SupplierRow, "id" | "legal_name" | "trade_name" | "supplier_type" | "status">): SupplierOption {
+  return {
+    id: row.id,
+    legalName: row.legal_name,
+    tradeName: row.trade_name,
+    supplierType: row.supplier_type,
+    status: row.status,
+  };
+}
+
+function mapMaintenanceRequisitionRow(row: MaintenanceRequisitionRow): ManagedMaintenanceRequisition {
+  return {
+    id: row.id,
+    number: row.number,
+    revisionNumber: Number(row.revision_number),
+    equipmentId: row.equipment_id,
+    equipmentName: row.equipment_name,
+    equipmentBrand: row.equipment_brand,
+    equipmentModel: row.equipment_model,
+    supplierId: row.supplier_id,
+    supplierName: row.supplier_name,
+    supplierType: row.supplier_type,
+    requesterUserId: row.requester_user_id,
+    requesterNameSnapshot: row.requester_name_snapshot,
+    requesterEmailSnapshot: row.requester_email_snapshot,
+    status: row.status,
+    scheduledDate: row.scheduled_date.slice(0, 10),
+    description: row.description,
+    notes: row.notes,
+    completionNotes: row.completion_notes,
+    issuedAt: row.issued_at,
+    lastIssuedAt: row.last_issued_at,
+    completedAt: formatDateOnly(row.completed_at),
+    cancelledAt: row.cancelled_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapFuelRequisitionRow(row: FuelRequisitionRow): ManagedFuelRequisition {
+  return {
+    id: row.id,
+    number: row.number,
+    revisionNumber: Number(row.revision_number),
+    equipmentId: row.equipment_id,
+    equipmentName: row.equipment_name,
+    equipmentBrand: row.equipment_brand,
+    equipmentModel: row.equipment_model,
+    supplierId: row.supplier_id,
+    supplierName: row.supplier_name,
+    supplierType: row.supplier_type,
+    requesterUserId: row.requester_user_id,
+    requesterNameSnapshot: row.requester_name_snapshot,
+    requesterEmailSnapshot: row.requester_email_snapshot,
+    status: row.status,
+    scheduledDate: row.scheduled_date.slice(0, 10),
+    notes: row.notes,
+    completionNotes: row.completion_notes,
+    issuedAt: row.issued_at,
+    lastIssuedAt: row.last_issued_at,
+    completedAt: formatDateOnly(row.completed_at),
+    cancelledAt: row.cancelled_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 function mapServiceTypeRow(row: ServiceTypeRow): ManagedServiceType {
   const equipment = row.equipment_json ? JSON.parse(row.equipment_json) as ManagedServiceType["equipment"] : [];
 
@@ -1494,6 +1996,14 @@ function formatBudgetNumber(sequence: number) {
 
 function formatServiceOrderNumber(sequence: number) {
   return `OS-${sequence.toString().padStart(6, "0")}`;
+}
+
+function formatMaintenanceRequisitionNumber(sequence: number) {
+  return `REQ-MN-${sequence.toString().padStart(6, "0")}`;
+}
+
+function formatFuelRequisitionNumber(sequence: number) {
+  return `REQ-AB-${sequence.toString().padStart(6, "0")}`;
 }
 
 async function assertBudgetRelationsExist(input: {
@@ -2786,6 +3296,42 @@ export async function deleteEquipment(equipmentId: string) {
     throw new Error("Remove budgets linked to this equipment before deleting it.");
   }
 
+  const maintenanceCount = await pool.query<{ total: string }>(
+    `SELECT COUNT(*)::text AS total FROM maintenance_records WHERE equipment_id = $1`,
+    [equipmentId],
+  );
+
+  if (Number(maintenanceCount.rows[0]?.total ?? "0") > 0) {
+    throw new Error("Remove maintenance records linked to this equipment before deleting it.");
+  }
+
+  const fuelCount = await pool.query<{ total: string }>(
+    `SELECT COUNT(*)::text AS total FROM fuel_records WHERE equipment_id = $1`,
+    [equipmentId],
+  );
+
+  if (Number(fuelCount.rows[0]?.total ?? "0") > 0) {
+    throw new Error("Remove fuel records linked to this equipment before deleting it.");
+  }
+
+  const maintenanceReqCount = await pool.query<{ total: string }>(
+    `SELECT COUNT(*)::text AS total FROM maintenance_requisitions WHERE equipment_id = $1`,
+    [equipmentId],
+  );
+
+  if (Number(maintenanceReqCount.rows[0]?.total ?? "0") > 0) {
+    throw new Error("Remove maintenance requisitions linked to this equipment before deleting it.");
+  }
+
+  const fuelReqCount = await pool.query<{ total: string }>(
+    `SELECT COUNT(*)::text AS total FROM fuel_requisitions WHERE equipment_id = $1`,
+    [equipmentId],
+  );
+
+  if (Number(fuelReqCount.rows[0]?.total ?? "0") > 0) {
+    throw new Error("Remove fuel requisitions linked to this equipment before deleting it.");
+  }
+
   await pool.query(`DELETE FROM equipment WHERE id = $1`, [equipmentId]);
 }
 
@@ -2800,6 +3346,1375 @@ export async function listEquipmentOptions(): Promise<EquipmentOption[]> {
   );
 
   return result.rows;
+}
+
+async function assertEquipmentExists(equipmentId: string) {
+  const equipment = await getEquipmentById(equipmentId);
+
+  if (!equipment) {
+    throw new Error("Equipment not found.");
+  }
+}
+
+export async function listMaintenanceRecords(): Promise<ManagedMaintenanceRecord[]> {
+  await bootstrapRbac();
+  const result = await pool.query<MaintenanceRecordRow>(
+    `
+      SELECT
+        mr.id,
+        mr.equipment_id,
+        e.name AS equipment_name,
+        e.brand AS equipment_brand,
+        e.model AS equipment_model,
+        mr.maintenance_type,
+        mr.status,
+        mr.financial_status,
+        mr.planned_date::text,
+        mr.performed_date::text,
+        mr.description,
+        mr.supplier_name,
+        mr.document_number,
+        mr.notes,
+        mr.amount_total::text,
+        mr.payment_due_date::text,
+        mr.paid_at::text,
+        mr.meter_kind,
+        mr.meter_value::text,
+        mr.created_at,
+        mr.updated_at
+      FROM maintenance_records mr
+      INNER JOIN equipment e ON e.id = mr.equipment_id
+      ORDER BY mr.planned_date DESC, mr.updated_at DESC
+    `,
+  );
+
+  return result.rows.map(mapMaintenanceRecordRow);
+}
+
+export async function getMaintenanceRecordById(recordId: string): Promise<ManagedMaintenanceRecord | null> {
+  await bootstrapRbac();
+  const result = await pool.query<MaintenanceRecordRow>(
+    `
+      SELECT
+        mr.id,
+        mr.equipment_id,
+        e.name AS equipment_name,
+        e.brand AS equipment_brand,
+        e.model AS equipment_model,
+        mr.maintenance_type,
+        mr.status,
+        mr.financial_status,
+        mr.planned_date::text,
+        mr.performed_date::text,
+        mr.description,
+        mr.supplier_name,
+        mr.document_number,
+        mr.notes,
+        mr.amount_total::text,
+        mr.payment_due_date::text,
+        mr.paid_at::text,
+        mr.meter_kind,
+        mr.meter_value::text,
+        mr.created_at,
+        mr.updated_at
+      FROM maintenance_records mr
+      INNER JOIN equipment e ON e.id = mr.equipment_id
+      WHERE mr.id = $1
+      LIMIT 1
+    `,
+    [recordId],
+  );
+
+  const row = result.rows[0];
+  return row ? mapMaintenanceRecordRow(row) : null;
+}
+
+export async function createMaintenanceRecord(input: {
+  equipmentId: string;
+  maintenanceType: MaintenanceType;
+  status: MaintenanceStatus;
+  financialStatus: MaintenanceFinancialStatus;
+  plannedDate: string;
+  performedDate?: string;
+  description: string;
+  supplierName?: string;
+  documentNumber?: string;
+  notes?: string;
+  amountTotal?: number;
+  paymentDueDate?: string;
+  paidAt?: string;
+  meterKind?: MaintenanceMeterKind;
+  meterValue?: number;
+}) {
+  await bootstrapRbac();
+  await assertEquipmentExists(input.equipmentId);
+
+  const id = randomUUID();
+  const financialStatus = input.status === "cancelled" ? "cancelled" : input.financialStatus;
+
+  await pool.query(
+    `
+      INSERT INTO maintenance_records (
+        id,
+        equipment_id,
+        maintenance_type,
+        status,
+        financial_status,
+        planned_date,
+        performed_date,
+        description,
+        supplier_name,
+        document_number,
+        notes,
+        amount_total,
+        payment_due_date,
+        paid_at,
+        meter_kind,
+        meter_value
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+    `,
+    [
+      id,
+      input.equipmentId,
+      input.maintenanceType,
+      input.status,
+      financialStatus,
+      input.plannedDate,
+      input.performedDate ?? null,
+      input.description.trim(),
+      input.supplierName?.trim() || null,
+      input.documentNumber?.trim() || null,
+      input.notes?.trim() || null,
+      input.amountTotal ?? null,
+      input.paymentDueDate ?? null,
+      financialStatus === "paid" ? input.paidAt ?? null : null,
+      input.meterKind ?? null,
+      input.meterValue ?? null,
+    ],
+  );
+
+  return id;
+}
+
+export async function updateMaintenanceRecord(
+  recordId: string,
+  input: {
+    equipmentId: string;
+    maintenanceType: MaintenanceType;
+    status: MaintenanceStatus;
+    financialStatus: MaintenanceFinancialStatus;
+    plannedDate: string;
+    performedDate?: string;
+    description: string;
+    supplierName?: string;
+    documentNumber?: string;
+    notes?: string;
+    amountTotal?: number;
+    paymentDueDate?: string;
+    paidAt?: string;
+    meterKind?: MaintenanceMeterKind;
+    meterValue?: number;
+  },
+) {
+  await bootstrapRbac();
+  const current = await getMaintenanceRecordById(recordId);
+
+  if (!current) {
+    throw new Error("Maintenance record not found.");
+  }
+
+  await assertEquipmentExists(input.equipmentId);
+
+  const financialStatus = input.status === "cancelled" ? "cancelled" : input.financialStatus;
+
+  await pool.query(
+    `
+      UPDATE maintenance_records
+      SET equipment_id = $2,
+          maintenance_type = $3,
+          status = $4,
+          financial_status = $5,
+          planned_date = $6,
+          performed_date = $7,
+          description = $8,
+          supplier_name = $9,
+          document_number = $10,
+          notes = $11,
+          amount_total = $12,
+          payment_due_date = $13,
+          paid_at = $14,
+          meter_kind = $15,
+          meter_value = $16,
+          updated_at = now()
+      WHERE id = $1
+    `,
+    [
+      recordId,
+      input.equipmentId,
+      input.maintenanceType,
+      input.status,
+      financialStatus,
+      input.plannedDate,
+      input.performedDate ?? null,
+      input.description.trim(),
+      input.supplierName?.trim() || null,
+      input.documentNumber?.trim() || null,
+      input.notes?.trim() || null,
+      input.amountTotal ?? null,
+      input.paymentDueDate ?? null,
+      financialStatus === "paid" ? input.paidAt ?? null : null,
+      input.meterKind ?? null,
+      input.meterValue ?? null,
+    ],
+  );
+}
+
+export async function updateMaintenanceRecordStatus(
+  recordId: string,
+  input: {
+    status: MaintenanceStatus;
+    performedDate?: string;
+    amountTotal?: number;
+  },
+) {
+  await bootstrapRbac();
+  const current = await getMaintenanceRecordById(recordId);
+
+  if (!current) {
+    throw new Error("Maintenance record not found.");
+  }
+
+  const nextFinancialStatus =
+    input.status === "cancelled" ? "cancelled" : current.financialStatus;
+  const nextPaidAt = input.status === "cancelled" ? null : current.paidAt;
+
+  await pool.query(
+    `
+      UPDATE maintenance_records
+      SET status = $2,
+          financial_status = $3,
+          performed_date = $4,
+          amount_total = $5,
+          paid_at = $6,
+          updated_at = now()
+      WHERE id = $1
+    `,
+    [
+      recordId,
+      input.status,
+      nextFinancialStatus,
+      input.status === "completed"
+        ? input.performedDate ?? current.performedDate
+        : input.status === "planned"
+          ? null
+          : current.performedDate,
+      input.status === "completed"
+        ? input.amountTotal ?? current.amountTotal
+        : input.status === "planned"
+          ? current.amountTotal
+          : current.amountTotal,
+      nextPaidAt,
+    ],
+  );
+}
+
+export async function updateMaintenanceRecordPayment(
+  recordId: string,
+  input: {
+    financialStatus: MaintenanceFinancialStatus;
+    paymentDueDate?: string;
+    paidAt?: string;
+  },
+) {
+  await bootstrapRbac();
+  const current = await getMaintenanceRecordById(recordId);
+
+  if (!current) {
+    throw new Error("Maintenance record not found.");
+  }
+
+  if (current.status === "cancelled" && input.financialStatus !== "cancelled") {
+    throw new Error("Cancelled maintenance cannot have active financial status.");
+  }
+
+  await pool.query(
+    `
+      UPDATE maintenance_records
+      SET financial_status = $2,
+          payment_due_date = $3,
+          paid_at = $4,
+          updated_at = now()
+      WHERE id = $1
+    `,
+    [
+      recordId,
+      input.financialStatus,
+      input.paymentDueDate ?? null,
+      input.financialStatus === "paid" ? input.paidAt ?? null : null,
+    ],
+  );
+}
+
+export async function deleteMaintenanceRecord(recordId: string) {
+  await bootstrapRbac();
+  const current = await getMaintenanceRecordById(recordId);
+
+  if (!current) {
+    throw new Error("Maintenance record not found.");
+  }
+
+  await pool.query(`DELETE FROM maintenance_records WHERE id = $1`, [recordId]);
+}
+
+export async function listFuelRecords(): Promise<ManagedFuelRecord[]> {
+  await bootstrapRbac();
+  const result = await pool.query<
+    FuelRecordRow & {
+      previous_meter_kind: FuelMeterKind | null;
+      previous_meter_reading: string | number | null;
+    }
+  >(
+    `
+      SELECT
+        fr.id,
+        fr.equipment_id,
+        e.name AS equipment_name,
+        e.brand AS equipment_brand,
+        e.model AS equipment_model,
+        fr.fuel_date::text,
+        fr.financial_status,
+        fr.fuel_type,
+        fr.total_amount::text,
+        fr.liters::text,
+        fr.meter_kind,
+        fr.meter_reading::text,
+        fr.supplier_name,
+        fr.document_number,
+        fr.notes,
+        fr.payment_due_date::text,
+        fr.paid_at::text,
+        fr.created_at,
+        fr.updated_at,
+        previous.previous_meter_kind,
+        previous.previous_meter_reading
+      FROM fuel_records fr
+      LEFT JOIN equipment e ON e.id = fr.equipment_id
+      LEFT JOIN LATERAL (
+        SELECT
+          prev.meter_kind AS previous_meter_kind,
+          prev.meter_reading::text AS previous_meter_reading
+        FROM fuel_records prev
+        WHERE prev.equipment_id = fr.equipment_id
+          AND prev.id <> fr.id
+          AND prev.meter_kind = fr.meter_kind
+          AND prev.meter_reading IS NOT NULL
+          AND (
+            prev.fuel_date < fr.fuel_date
+            OR (prev.fuel_date = fr.fuel_date AND prev.created_at < fr.created_at)
+          )
+        ORDER BY prev.fuel_date DESC, prev.created_at DESC
+        LIMIT 1
+      ) previous ON true
+      ORDER BY fr.fuel_date DESC, fr.updated_at DESC
+    `,
+  );
+
+  return result.rows.map((row) =>
+    mapFuelRecordRow(row, {
+      meter_kind: row.previous_meter_kind,
+      meter_reading: row.previous_meter_reading,
+    }),
+  );
+}
+
+export async function getFuelRecordById(recordId: string): Promise<ManagedFuelRecord | null> {
+  const records = await listFuelRecords();
+  return records.find((record) => record.id === recordId) ?? null;
+}
+
+export async function createFuelRecord(input: {
+  equipmentId?: string;
+  fuelDate: string;
+  financialStatus: FuelFinancialStatus;
+  fuelType?: FuelType;
+  totalAmount: number;
+  liters?: number;
+  meterKind?: FuelMeterKind;
+  meterReading?: number;
+  supplierName?: string;
+  documentNumber?: string;
+  notes?: string;
+  paymentDueDate?: string;
+  paidAt?: string;
+}) {
+  await bootstrapRbac();
+
+  if (input.equipmentId) {
+    await assertEquipmentExists(input.equipmentId);
+  }
+
+  const id = randomUUID();
+  await pool.query(
+    `
+      INSERT INTO fuel_records (
+        id,
+        equipment_id,
+        fuel_date,
+        financial_status,
+        fuel_type,
+        total_amount,
+        liters,
+        meter_kind,
+        meter_reading,
+        supplier_name,
+        document_number,
+        notes,
+        payment_due_date,
+        paid_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+    `,
+    [
+      id,
+      input.equipmentId ?? null,
+      input.fuelDate,
+      input.financialStatus,
+      input.fuelType ?? null,
+      input.totalAmount,
+      input.liters ?? null,
+      input.meterKind ?? null,
+      input.meterReading ?? null,
+      input.supplierName?.trim() || null,
+      input.documentNumber?.trim() || null,
+      input.notes?.trim() || null,
+      input.paymentDueDate ?? null,
+      input.financialStatus === "paid" ? input.paidAt ?? null : null,
+    ],
+  );
+
+  return id;
+}
+
+export async function updateFuelRecord(
+  recordId: string,
+  input: {
+    equipmentId?: string;
+    fuelDate: string;
+    financialStatus: FuelFinancialStatus;
+    fuelType?: FuelType;
+    totalAmount: number;
+    liters?: number;
+    meterKind?: FuelMeterKind;
+    meterReading?: number;
+    supplierName?: string;
+    documentNumber?: string;
+    notes?: string;
+    paymentDueDate?: string;
+    paidAt?: string;
+  },
+) {
+  await bootstrapRbac();
+  const current = await getFuelRecordById(recordId);
+
+  if (!current) {
+    throw new Error("Fuel record not found.");
+  }
+
+  if (input.equipmentId) {
+    await assertEquipmentExists(input.equipmentId);
+  }
+
+  await pool.query(
+    `
+      UPDATE fuel_records
+      SET equipment_id = $2,
+          fuel_date = $3,
+          financial_status = $4,
+          fuel_type = $5,
+          total_amount = $6,
+          liters = $7,
+          meter_kind = $8,
+          meter_reading = $9,
+          supplier_name = $10,
+          document_number = $11,
+          notes = $12,
+          payment_due_date = $13,
+          paid_at = $14,
+          updated_at = now()
+      WHERE id = $1
+    `,
+    [
+      recordId,
+      input.equipmentId ?? null,
+      input.fuelDate,
+      input.financialStatus,
+      input.fuelType ?? null,
+      input.totalAmount,
+      input.liters ?? null,
+      input.meterKind ?? null,
+      input.meterReading ?? null,
+      input.supplierName?.trim() || null,
+      input.documentNumber?.trim() || null,
+      input.notes?.trim() || null,
+      input.paymentDueDate ?? null,
+      input.financialStatus === "paid" ? input.paidAt ?? null : null,
+    ],
+  );
+}
+
+export async function updateFuelRecordPayment(
+  recordId: string,
+  input: {
+    financialStatus: FuelFinancialStatus;
+    paymentDueDate?: string;
+    paidAt?: string;
+  },
+) {
+  await bootstrapRbac();
+  const current = await getFuelRecordById(recordId);
+
+  if (!current) {
+    throw new Error("Fuel record not found.");
+  }
+
+  await pool.query(
+    `
+      UPDATE fuel_records
+      SET financial_status = $2,
+          payment_due_date = $3,
+          paid_at = $4,
+          updated_at = now()
+      WHERE id = $1
+    `,
+    [
+      recordId,
+      input.financialStatus,
+      input.paymentDueDate ?? null,
+      input.financialStatus === "paid" ? input.paidAt ?? null : null,
+    ],
+  );
+}
+
+export async function deleteFuelRecord(recordId: string) {
+  await bootstrapRbac();
+  const current = await getFuelRecordById(recordId);
+
+  if (!current) {
+    throw new Error("Fuel record not found.");
+  }
+
+  await pool.query(`DELETE FROM fuel_records WHERE id = $1`, [recordId]);
+}
+
+async function assertSupplierExists(supplierId: string) {
+  const supplier = await getSupplierById(supplierId);
+
+  if (!supplier) {
+    throw new Error("Supplier not found.");
+  }
+}
+
+async function nextMaintenanceRequisitionNumber() {
+  const result = await pool.query<{ max_sequence: string }>(
+    `
+      SELECT COALESCE(MAX(CAST(SUBSTRING(number FROM 8) AS integer)), 0)::text AS max_sequence
+      FROM maintenance_requisitions
+      WHERE number LIKE 'REQ-MN-%'
+    `,
+  );
+
+  const current = Number(result.rows[0]?.max_sequence ?? "0");
+  return formatMaintenanceRequisitionNumber(current + 1);
+}
+
+async function nextFuelRequisitionNumber() {
+  const result = await pool.query<{ max_sequence: string }>(
+    `
+      SELECT COALESCE(MAX(CAST(SUBSTRING(number FROM 8) AS integer)), 0)::text AS max_sequence
+      FROM fuel_requisitions
+      WHERE number LIKE 'REQ-AB-%'
+    `,
+  );
+
+  const current = Number(result.rows[0]?.max_sequence ?? "0");
+  return formatFuelRequisitionNumber(current + 1);
+}
+
+export async function listSuppliers(): Promise<ManagedSupplier[]> {
+  await bootstrapRbac();
+  const result = await pool.query<SupplierRow>(
+    `
+      SELECT
+        id,
+        supplier_type,
+        status,
+        legal_name,
+        trade_name,
+        document,
+        contact_name,
+        contact_phone,
+        email,
+        phone,
+        website,
+        postal_code,
+        street,
+        number,
+        complement,
+        district,
+        city,
+        state,
+        country,
+        created_at,
+        updated_at
+      FROM suppliers
+      ORDER BY updated_at DESC, legal_name ASC
+    `,
+  );
+
+  return result.rows.map(mapSupplierRow);
+}
+
+export async function listSupplierOptions(onlyActive = true): Promise<SupplierOption[]> {
+  await bootstrapRbac();
+  const result = await pool.query<Pick<SupplierRow, "id" | "legal_name" | "trade_name" | "supplier_type" | "status">>(
+    `
+      SELECT id, legal_name, trade_name, supplier_type, status
+      FROM suppliers
+      ${onlyActive ? "WHERE status = 'active'" : ""}
+      ORDER BY legal_name ASC
+    `,
+  );
+
+  return result.rows.map(mapSupplierOptionRow);
+}
+
+export async function getSupplierById(supplierId: string): Promise<ManagedSupplier | null> {
+  await bootstrapRbac();
+  const result = await pool.query<SupplierRow>(
+    `
+      SELECT
+        id,
+        supplier_type,
+        status,
+        legal_name,
+        trade_name,
+        document,
+        contact_name,
+        contact_phone,
+        email,
+        phone,
+        website,
+        postal_code,
+        street,
+        number,
+        complement,
+        district,
+        city,
+        state,
+        country,
+        created_at,
+        updated_at
+      FROM suppliers
+      WHERE id = $1
+      LIMIT 1
+    `,
+    [supplierId],
+  );
+
+  const row = result.rows[0];
+  return row ? mapSupplierRow(row) : null;
+}
+
+export async function createSupplier(input: {
+  supplierType: SupplierType;
+  status: SupplierStatus;
+  legalName: string;
+  tradeName?: string;
+  document: string;
+  contactName?: string;
+  contactPhone?: string;
+  email?: string;
+  phone: string;
+  website?: string;
+  postalCode: string;
+  street: string;
+  number: string;
+  complement?: string;
+  district: string;
+  city: string;
+  state: string;
+  country: string;
+}) {
+  await bootstrapRbac();
+
+  const duplicate = await pool.query<{ id: string }>(
+    `SELECT id FROM suppliers WHERE lower(legal_name) = lower($1) AND document = $2 LIMIT 1`,
+    [input.legalName, input.document],
+  );
+
+  if (duplicate.rows[0]) {
+    throw new Error("A supplier with this legal name and document already exists.");
+  }
+
+  const id = randomUUID();
+  await pool.query(
+    `
+      INSERT INTO suppliers (
+        id,
+        supplier_type,
+        status,
+        legal_name,
+        trade_name,
+        document,
+        contact_name,
+        contact_phone,
+        email,
+        phone,
+        website,
+        postal_code,
+        street,
+        number,
+        complement,
+        district,
+        city,
+        state,
+        country
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+    `,
+    [
+      id,
+      input.supplierType,
+      input.status,
+      input.legalName.trim(),
+      input.tradeName?.trim() || null,
+      input.document.trim(),
+      input.contactName?.trim() || null,
+      input.contactPhone?.trim() || null,
+      input.email?.trim().toLowerCase() || null,
+      input.phone.trim(),
+      input.website?.trim() || null,
+      input.postalCode.trim(),
+      input.street.trim(),
+      input.number.trim(),
+      input.complement?.trim() || null,
+      input.district.trim(),
+      input.city.trim(),
+      input.state.trim(),
+      input.country.trim(),
+    ],
+  );
+
+  return id;
+}
+
+export async function updateSupplier(
+  supplierId: string,
+  input: {
+    supplierType: SupplierType;
+    status: SupplierStatus;
+    legalName: string;
+    tradeName?: string;
+    document: string;
+    contactName?: string;
+    contactPhone?: string;
+    email?: string;
+    phone: string;
+    website?: string;
+    postalCode: string;
+    street: string;
+    number: string;
+    complement?: string;
+    district: string;
+    city: string;
+    state: string;
+    country: string;
+  },
+) {
+  await bootstrapRbac();
+  const current = await getSupplierById(supplierId);
+
+  if (!current) {
+    throw new Error("Supplier not found.");
+  }
+
+  const duplicate = await pool.query<{ id: string }>(
+    `SELECT id FROM suppliers WHERE lower(legal_name) = lower($1) AND document = $2 AND id <> $3 LIMIT 1`,
+    [input.legalName, input.document, supplierId],
+  );
+
+  if (duplicate.rows[0]) {
+    throw new Error("A supplier with this legal name and document already exists.");
+  }
+
+  await pool.query(
+    `
+      UPDATE suppliers
+      SET supplier_type = $2,
+          status = $3,
+          legal_name = $4,
+          trade_name = $5,
+          document = $6,
+          contact_name = $7,
+          contact_phone = $8,
+          email = $9,
+          phone = $10,
+          website = $11,
+          postal_code = $12,
+          street = $13,
+          number = $14,
+          complement = $15,
+          district = $16,
+          city = $17,
+          state = $18,
+          country = $19,
+          updated_at = now()
+      WHERE id = $1
+    `,
+    [
+      supplierId,
+      input.supplierType,
+      input.status,
+      input.legalName.trim(),
+      input.tradeName?.trim() || null,
+      input.document.trim(),
+      input.contactName?.trim() || null,
+      input.contactPhone?.trim() || null,
+      input.email?.trim().toLowerCase() || null,
+      input.phone.trim(),
+      input.website?.trim() || null,
+      input.postalCode.trim(),
+      input.street.trim(),
+      input.number.trim(),
+      input.complement?.trim() || null,
+      input.district.trim(),
+      input.city.trim(),
+      input.state.trim(),
+      input.country.trim(),
+    ],
+  );
+}
+
+export async function deleteSupplier(supplierId: string) {
+  await bootstrapRbac();
+  const current = await getSupplierById(supplierId);
+
+  if (!current) {
+    throw new Error("Supplier not found.");
+  }
+
+  const maintenanceReqCount = await pool.query<{ total: string }>(
+    `SELECT COUNT(*)::text AS total FROM maintenance_requisitions WHERE supplier_id = $1`,
+    [supplierId],
+  );
+
+  if (Number(maintenanceReqCount.rows[0]?.total ?? "0") > 0) {
+    throw new Error("Remove maintenance requisitions linked to this supplier before deleting it.");
+  }
+
+  const fuelReqCount = await pool.query<{ total: string }>(
+    `SELECT COUNT(*)::text AS total FROM fuel_requisitions WHERE supplier_id = $1`,
+    [supplierId],
+  );
+
+  if (Number(fuelReqCount.rows[0]?.total ?? "0") > 0) {
+    throw new Error("Remove fuel requisitions linked to this supplier before deleting it.");
+  }
+
+  await pool.query(`DELETE FROM suppliers WHERE id = $1`, [supplierId]);
+}
+
+type RequisitionRequester = {
+  userId?: string | null;
+  name?: string | null;
+  email?: string | null;
+};
+
+function normalizeRequester(requester?: RequisitionRequester) {
+  return {
+    userId: requester?.userId ?? null,
+    name: requester?.name?.trim() || null,
+    email: requester?.email?.trim().toLowerCase() || null,
+  };
+}
+
+function assertValidRequisitionStatusTransition(current: RequisitionStatus, next: RequisitionStatus) {
+  if (current === next) {
+    return;
+  }
+
+  if (current === "draft" && next === "issued") {
+    return;
+  }
+
+  if (current === "issued" && (next === "completed" || next === "cancelled")) {
+    return;
+  }
+
+  throw new Error("This requisition status transition is not allowed.");
+}
+
+export async function listMaintenanceRequisitions(): Promise<ManagedMaintenanceRequisition[]> {
+  await bootstrapRbac();
+  const result = await pool.query<MaintenanceRequisitionRow>(
+    `
+      SELECT
+        mr.id,
+        mr.number,
+        mr.revision_number,
+        mr.equipment_id,
+        e.name AS equipment_name,
+        e.brand AS equipment_brand,
+        e.model AS equipment_model,
+        mr.supplier_id,
+        s.legal_name AS supplier_name,
+        s.supplier_type,
+        mr.requester_user_id,
+        mr.requester_name_snapshot,
+        mr.requester_email_snapshot,
+        mr.status,
+        mr.scheduled_date::text,
+        mr.description,
+        mr.notes,
+        mr.completion_notes,
+        mr.issued_at,
+        mr.last_issued_at,
+        mr.completed_at::text,
+        mr.cancelled_at,
+        mr.created_at,
+        mr.updated_at
+      FROM maintenance_requisitions mr
+      INNER JOIN equipment e ON e.id = mr.equipment_id
+      INNER JOIN suppliers s ON s.id = mr.supplier_id
+      ORDER BY mr.updated_at DESC, mr.number DESC
+    `,
+  );
+
+  return result.rows.map(mapMaintenanceRequisitionRow);
+}
+
+export async function getMaintenanceRequisitionById(id: string): Promise<ManagedMaintenanceRequisition | null> {
+  await bootstrapRbac();
+  const result = await pool.query<MaintenanceRequisitionRow>(
+    `
+      SELECT
+        mr.id,
+        mr.number,
+        mr.revision_number,
+        mr.equipment_id,
+        e.name AS equipment_name,
+        e.brand AS equipment_brand,
+        e.model AS equipment_model,
+        mr.supplier_id,
+        s.legal_name AS supplier_name,
+        s.supplier_type,
+        mr.requester_user_id,
+        mr.requester_name_snapshot,
+        mr.requester_email_snapshot,
+        mr.status,
+        mr.scheduled_date::text,
+        mr.description,
+        mr.notes,
+        mr.completion_notes,
+        mr.issued_at,
+        mr.last_issued_at,
+        mr.completed_at::text,
+        mr.cancelled_at,
+        mr.created_at,
+        mr.updated_at
+      FROM maintenance_requisitions mr
+      INNER JOIN equipment e ON e.id = mr.equipment_id
+      INNER JOIN suppliers s ON s.id = mr.supplier_id
+      WHERE mr.id = $1
+      LIMIT 1
+    `,
+    [id],
+  );
+
+  const row = result.rows[0];
+  return row ? mapMaintenanceRequisitionRow(row) : null;
+}
+
+export async function createMaintenanceRequisition(input: {
+  equipmentId: string;
+  supplierId: string;
+  scheduledDate: string;
+  description: string;
+  notes?: string;
+  requester?: RequisitionRequester;
+}) {
+  await bootstrapRbac();
+  await assertEquipmentExists(input.equipmentId);
+  await assertSupplierExists(input.supplierId);
+
+  const number = await nextMaintenanceRequisitionNumber();
+  const normalizedRequester = normalizeRequester(input.requester);
+  const id = randomUUID();
+
+  await pool.query(
+    `
+      INSERT INTO maintenance_requisitions (
+        id,
+        number,
+        revision_number,
+        equipment_id,
+        supplier_id,
+        requester_user_id,
+        requester_name_snapshot,
+        requester_email_snapshot,
+        status,
+        scheduled_date,
+        description,
+        notes
+      )
+      VALUES ($1, $2, 1, $3, $4, $5, $6, $7, 'draft', $8, $9, $10)
+    `,
+    [
+      id,
+      number,
+      input.equipmentId,
+      input.supplierId,
+      normalizedRequester.userId,
+      normalizedRequester.name,
+      normalizedRequester.email,
+      input.scheduledDate,
+      input.description.trim(),
+      input.notes?.trim() || null,
+    ],
+  );
+
+  return id;
+}
+
+export async function updateMaintenanceRequisition(
+  id: string,
+  input: {
+    equipmentId: string;
+    supplierId: string;
+    scheduledDate: string;
+    description: string;
+    notes?: string;
+  },
+) {
+  await bootstrapRbac();
+  const current = await getMaintenanceRequisitionById(id);
+
+  if (!current) {
+    throw new Error("Maintenance requisition not found.");
+  }
+
+  if (current.status === "completed" || current.status === "cancelled") {
+    throw new Error("Completed or cancelled requisitions cannot be edited.");
+  }
+
+  await assertEquipmentExists(input.equipmentId);
+  await assertSupplierExists(input.supplierId);
+
+  const revisionIncrement = current.status === "issued" ? 1 : 0;
+  await pool.query(
+    `
+      UPDATE maintenance_requisitions
+      SET equipment_id = $2,
+          supplier_id = $3,
+          scheduled_date = $4,
+          description = $5,
+          notes = $6,
+          revision_number = revision_number + $7,
+          last_issued_at = CASE WHEN status = 'issued' THEN now() ELSE last_issued_at END,
+          updated_at = now()
+      WHERE id = $1
+    `,
+    [
+      id,
+      input.equipmentId,
+      input.supplierId,
+      input.scheduledDate,
+      input.description.trim(),
+      input.notes?.trim() || null,
+      revisionIncrement,
+    ],
+  );
+}
+
+export async function updateMaintenanceRequisitionStatus(
+  id: string,
+  input: UpdateMaintenanceRequisitionStatusInput,
+) {
+  await bootstrapRbac();
+  const current = await getMaintenanceRequisitionById(id);
+
+  if (!current) {
+    throw new Error("Maintenance requisition not found.");
+  }
+
+  assertValidRequisitionStatusTransition(current.status, input.status);
+
+  await pool.query(
+    `
+      UPDATE maintenance_requisitions
+      SET status = $2,
+          issued_at = CASE WHEN $2 = 'issued' AND issued_at IS NULL THEN now() ELSE issued_at END,
+          last_issued_at = CASE WHEN $2 = 'issued' THEN now() ELSE last_issued_at END,
+          completed_at = CASE WHEN $2 = 'completed' THEN $3::date ELSE completed_at END,
+          completion_notes = CASE
+            WHEN $2 = 'completed' THEN $4
+            WHEN $2 = 'cancelled' THEN $4
+            ELSE completion_notes
+          END,
+          cancelled_at = CASE WHEN $2 = 'cancelled' THEN now() ELSE cancelled_at END,
+          updated_at = now()
+      WHERE id = $1
+    `,
+    [
+      id,
+      input.status,
+      input.completedAt ?? null,
+      input.completionNotes?.trim() || null,
+    ],
+  );
+}
+
+export async function deleteMaintenanceRequisition(id: string) {
+  await bootstrapRbac();
+  const current = await getMaintenanceRequisitionById(id);
+
+  if (!current) {
+    throw new Error("Maintenance requisition not found.");
+  }
+
+  if (current.status !== "draft") {
+    throw new Error("Only draft requisitions can be deleted.");
+  }
+
+  await pool.query(`DELETE FROM maintenance_requisitions WHERE id = $1`, [id]);
+}
+
+export async function listFuelRequisitions(): Promise<ManagedFuelRequisition[]> {
+  await bootstrapRbac();
+  const result = await pool.query<FuelRequisitionRow>(
+    `
+      SELECT
+        fr.id,
+        fr.number,
+        fr.revision_number,
+        fr.equipment_id,
+        e.name AS equipment_name,
+        e.brand AS equipment_brand,
+        e.model AS equipment_model,
+        fr.supplier_id,
+        s.legal_name AS supplier_name,
+        s.supplier_type,
+        fr.requester_user_id,
+        fr.requester_name_snapshot,
+        fr.requester_email_snapshot,
+        fr.status,
+        fr.scheduled_date::text,
+        fr.notes,
+        fr.completion_notes,
+        fr.issued_at,
+        fr.last_issued_at,
+        fr.completed_at::text,
+        fr.cancelled_at,
+        fr.created_at,
+        fr.updated_at
+      FROM fuel_requisitions fr
+      INNER JOIN equipment e ON e.id = fr.equipment_id
+      INNER JOIN suppliers s ON s.id = fr.supplier_id
+      ORDER BY fr.updated_at DESC, fr.number DESC
+    `,
+  );
+
+  return result.rows.map(mapFuelRequisitionRow);
+}
+
+export async function getFuelRequisitionById(id: string): Promise<ManagedFuelRequisition | null> {
+  await bootstrapRbac();
+  const result = await pool.query<FuelRequisitionRow>(
+    `
+      SELECT
+        fr.id,
+        fr.number,
+        fr.revision_number,
+        fr.equipment_id,
+        e.name AS equipment_name,
+        e.brand AS equipment_brand,
+        e.model AS equipment_model,
+        fr.supplier_id,
+        s.legal_name AS supplier_name,
+        s.supplier_type,
+        fr.requester_user_id,
+        fr.requester_name_snapshot,
+        fr.requester_email_snapshot,
+        fr.status,
+        fr.scheduled_date::text,
+        fr.notes,
+        fr.completion_notes,
+        fr.issued_at,
+        fr.last_issued_at,
+        fr.completed_at::text,
+        fr.cancelled_at,
+        fr.created_at,
+        fr.updated_at
+      FROM fuel_requisitions fr
+      INNER JOIN equipment e ON e.id = fr.equipment_id
+      INNER JOIN suppliers s ON s.id = fr.supplier_id
+      WHERE fr.id = $1
+      LIMIT 1
+    `,
+    [id],
+  );
+
+  const row = result.rows[0];
+  return row ? mapFuelRequisitionRow(row) : null;
+}
+
+export async function createFuelRequisition(input: {
+  equipmentId: string;
+  supplierId: string;
+  scheduledDate: string;
+  notes: string;
+  requester?: RequisitionRequester;
+}) {
+  await bootstrapRbac();
+  await assertEquipmentExists(input.equipmentId);
+  await assertSupplierExists(input.supplierId);
+
+  const number = await nextFuelRequisitionNumber();
+  const normalizedRequester = normalizeRequester(input.requester);
+  const id = randomUUID();
+
+  await pool.query(
+    `
+      INSERT INTO fuel_requisitions (
+        id,
+        number,
+        revision_number,
+        equipment_id,
+        supplier_id,
+        requester_user_id,
+        requester_name_snapshot,
+        requester_email_snapshot,
+        status,
+        scheduled_date,
+        notes
+      )
+      VALUES ($1, $2, 1, $3, $4, $5, $6, $7, 'draft', $8, $9)
+    `,
+    [
+      id,
+      number,
+      input.equipmentId,
+      input.supplierId,
+      normalizedRequester.userId,
+      normalizedRequester.name,
+      normalizedRequester.email,
+      input.scheduledDate,
+      input.notes.trim(),
+    ],
+  );
+
+  return id;
+}
+
+export async function updateFuelRequisition(
+  id: string,
+  input: {
+    equipmentId: string;
+    supplierId: string;
+    scheduledDate: string;
+    notes: string;
+  },
+) {
+  await bootstrapRbac();
+  const current = await getFuelRequisitionById(id);
+
+  if (!current) {
+    throw new Error("Fuel requisition not found.");
+  }
+
+  if (current.status === "completed" || current.status === "cancelled") {
+    throw new Error("Completed or cancelled requisitions cannot be edited.");
+  }
+
+  await assertEquipmentExists(input.equipmentId);
+  await assertSupplierExists(input.supplierId);
+
+  const revisionIncrement = current.status === "issued" ? 1 : 0;
+  await pool.query(
+    `
+      UPDATE fuel_requisitions
+      SET equipment_id = $2,
+          supplier_id = $3,
+          scheduled_date = $4,
+          notes = $5,
+          revision_number = revision_number + $6,
+          last_issued_at = CASE WHEN status = 'issued' THEN now() ELSE last_issued_at END,
+          updated_at = now()
+      WHERE id = $1
+    `,
+    [
+      id,
+      input.equipmentId,
+      input.supplierId,
+      input.scheduledDate,
+      input.notes.trim(),
+      revisionIncrement,
+    ],
+  );
+}
+
+export async function updateFuelRequisitionStatus(
+  id: string,
+  input: UpdateFuelRequisitionStatusInput,
+) {
+  await bootstrapRbac();
+  const current = await getFuelRequisitionById(id);
+
+  if (!current) {
+    throw new Error("Fuel requisition not found.");
+  }
+
+  assertValidRequisitionStatusTransition(current.status, input.status);
+
+  await pool.query(
+    `
+      UPDATE fuel_requisitions
+      SET status = $2,
+          issued_at = CASE WHEN $2 = 'issued' AND issued_at IS NULL THEN now() ELSE issued_at END,
+          last_issued_at = CASE WHEN $2 = 'issued' THEN now() ELSE last_issued_at END,
+          completed_at = CASE WHEN $2 = 'completed' THEN $3::date ELSE completed_at END,
+          completion_notes = CASE
+            WHEN $2 = 'completed' THEN $4
+            WHEN $2 = 'cancelled' THEN $4
+            ELSE completion_notes
+          END,
+          cancelled_at = CASE WHEN $2 = 'cancelled' THEN now() ELSE cancelled_at END,
+          updated_at = now()
+      WHERE id = $1
+    `,
+    [
+      id,
+      input.status,
+      input.completedAt ?? null,
+      input.completionNotes?.trim() || null,
+    ],
+  );
+}
+
+export async function deleteFuelRequisition(id: string) {
+  await bootstrapRbac();
+  const current = await getFuelRequisitionById(id);
+
+  if (!current) {
+    throw new Error("Fuel requisition not found.");
+  }
+
+  if (current.status !== "draft") {
+    throw new Error("Only draft requisitions can be deleted.");
+  }
+
+  await pool.query(`DELETE FROM fuel_requisitions WHERE id = $1`, [id]);
 }
 
 export async function listServiceTypes() {

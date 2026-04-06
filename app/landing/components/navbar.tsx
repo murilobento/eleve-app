@@ -145,9 +145,6 @@ export function LandingNavbar() {
           <Button variant="ghost" asChild className="cursor-pointer">
             <a href={getAppUrl("/auth/sign-in", locale)}>{t("common.signIn")}</a>
           </Button>
-          <Button asChild className="cursor-pointer">
-            <a href={getAppUrl("/auth/sign-up", locale)}>{t("common.signUp")}</a>
-          </Button>
         </div>
 
         {/* Mobile Menu */}
@@ -262,11 +259,8 @@ export function LandingNavbar() {
                   </Button>
 
                   <div className="grid grid-cols-2 gap-3">
-                    <Button variant="outline" size="lg" asChild className="cursor-pointer">
+                    <Button variant="outline" size="lg" asChild className="cursor-pointer col-span-2">
                       <a href={getAppUrl("/auth/sign-in", locale)}>{t("common.signIn")}</a>
-                    </Button>
-                    <Button asChild size="lg" className="cursor-pointer" >
-                      <a href={getAppUrl("/auth/sign-up", locale)}>{t("common.signUp")}</a>
                     </Button>
                   </div>
                 </div>
