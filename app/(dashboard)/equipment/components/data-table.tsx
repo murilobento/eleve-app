@@ -48,6 +48,7 @@ import type {
   UpdateEquipmentInput,
 } from "@/lib/equipment-admin";
 import type { ManagedEquipmentType } from "@/lib/equipment-types-admin";
+import { getSemanticStatusBadgeClass } from "@/lib/status-badge";
 import { useRbac } from "@/hooks/use-rbac";
 import { usePersistentColumnVisibility } from "@/hooks/use-persistent-column-visibility";
 import { useI18n, useLocale } from "@/i18n/provider";
@@ -199,12 +200,9 @@ export function DataTable({
       header: ({ column }) => <SortableHeader column={column} title={t("equipment.status")} className="-ml-3" />,
       cell: ({ row }) => {
         const isActive = row.original.status === "active";
-        const className = isActive
-          ? "text-primary bg-primary/10"
-          : "text-destructive bg-destructive/10";
 
         return (
-          <Badge variant="secondary" className={className}>
+          <Badge variant="secondary" className={getSemanticStatusBadgeClass(row.original.status)}>
             {isActive ? t("equipment.active") : t("equipment.inactive")}
           </Badge>
         );

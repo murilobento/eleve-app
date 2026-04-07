@@ -3,7 +3,8 @@
 import { useState, useCallback } from "react"
 import { toast } from "sonner"
 import { type CalendarEvent } from "./types"
-import { useI18n } from "@/i18n/provider"
+import { useI18n, useLocale } from "@/i18n/provider"
+import { getAppUrl } from "@/lib/utils"
 
 export interface UseCalendarState {
   selectedDate: Date
@@ -30,6 +31,7 @@ export interface UseCalendarReturn extends UseCalendarState, UseCalendarActions 
 
 export function useCalendar(initialEvents: CalendarEvent[] = []): UseCalendarReturn {
   const { t } = useI18n()
+  const locale = useLocale()
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [showEventForm, setShowEventForm] = useState(false)
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
@@ -43,9 +45,9 @@ export function useCalendar(initialEvents: CalendarEvent[] = []): UseCalendarRet
   }, [])
 
   const handleNewEvent = useCallback(() => {
-    setEditingEvent(null)
-    setShowEventForm(true)
-  }, [])
+    const serviceOrdersUrl = `${getAppUrl("/service-orders", locale)}?create=1`
+    window.location.assign(serviceOrdersUrl)
+  }, [locale])
 
   const handleNewCalendar = useCallback(() => {
     console.log("Creating new calendar")

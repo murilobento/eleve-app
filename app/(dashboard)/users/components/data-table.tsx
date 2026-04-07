@@ -56,6 +56,7 @@ import {
 } from "@/lib/users-admin";
 import { usePersistentColumnVisibility } from "@/hooks/use-persistent-column-visibility";
 import type { RoleRecord } from "@/lib/rbac-shared";
+import { getSemanticStatusBadgeClass } from "@/lib/status-badge";
 import { useI18n, useLocale } from "@/i18n/provider";
 
 import { UserFormDialog } from "./user-form-dialog";
@@ -185,14 +186,10 @@ export function DataTable({
         header: ({ column }) => <SortableHeader column={column} title={t("users.status")} className="-ml-3" />,
         cell: ({ row }) => {
           const user = row.original;
-          const className =
-            user.status === "active"
-              ? "text-primary bg-primary/10"
-              : "text-destructive bg-destructive/10";
           const statusLabel = user.status === "active" ? t("users.active") : t("users.inactive");
 
           return (
-            <Badge variant="secondary" className={className}>
+            <Badge variant="secondary" className={getSemanticStatusBadgeClass(user.status)}>
               {statusLabel}
             </Badge>
           );

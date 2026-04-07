@@ -31,6 +31,7 @@ import {
 
 const routePermissions = [
   { path: "/dashboard", permission: "dashboard.read" },
+  { path: "/service-schedule", permission: "calendar.read" },
   { path: "/calendar", permission: "calendar.read" },
   { path: "/budgets", permission: "budgets.read" },
   { path: "/service-orders", permission: "service-orders.read" },

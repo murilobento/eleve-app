@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useI18n, useLocale } from "@/i18n/provider";
+import { getSemanticStatusBadgeClass } from "@/lib/status-badge";
 
 type HistoryItem = {
   id: string;
@@ -77,12 +78,14 @@ export function StatusHistoryDialog({
                 <div key={entry.id} className="rounded-lg border p-4">
                   <div className="flex flex-wrap items-center gap-2">
                     {entry.previousStatus ? (
-                      <Badge variant="outline">{getStatusLabel(entry.previousStatus)}</Badge>
+                      <Badge variant="outline" className={getSemanticStatusBadgeClass(entry.previousStatus)}>
+                        {getStatusLabel(entry.previousStatus)}
+                      </Badge>
                     ) : (
                       <Badge variant="outline">{t("common.created")}</Badge>
                     )}
                     <span className="text-sm text-muted-foreground">→</span>
-                    <Badge>{getStatusLabel(entry.nextStatus)}</Badge>
+                    <Badge className={getSemanticStatusBadgeClass(entry.nextStatus)}>{getStatusLabel(entry.nextStatus)}</Badge>
                   </div>
                   <div className="mt-2 text-sm">
                     <div className="font-medium">{getActorLabel(entry)}</div>

@@ -46,6 +46,7 @@ export function SiteHeader() {
   React.useEffect(() => {
     const pageTitleMap: Record<string, string> = {
       "/dashboard": t("navigation.dashboard"),
+      "/service-schedule": t("navigation.calendar"),
       "/calendar": t("navigation.calendar"),
       "/budgets": t("navigation.budgets"),
       "/service-orders": t("navigation.serviceOrders"),

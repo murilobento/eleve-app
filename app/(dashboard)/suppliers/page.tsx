@@ -74,6 +74,7 @@ import {
   createSupplierSchema,
   updateSupplierSchema,
 } from "@/lib/suppliers-admin";
+import { getSemanticStatusBadgeClass } from "@/lib/status-badge";
 import { formatCnpj, formatCpf, formatPhone, formatPostalCode } from "@/lib/utils";
 
 type SuppliersResponse = {
@@ -516,10 +517,9 @@ export default function SuppliersPage() {
       header: ({ column }) => <SortableHeader column={column} title={t("suppliers.status")} className="-ml-3" />,
       cell: ({ row }) => {
         const isActive = row.original.status === "active";
-        const className = isActive ? "text-primary bg-primary/10" : "text-destructive bg-destructive/10";
 
         return (
-          <Badge variant="secondary" className={className}>
+          <Badge variant="secondary" className={getSemanticStatusBadgeClass(row.original.status)}>
             {isActive ? t("suppliers.active") : t("suppliers.inactive")}
           </Badge>
         );
@@ -1206,7 +1206,7 @@ export default function SuppliersPage() {
           <Badge
             key="status"
             variant="secondary"
-            className={viewing.status === "active" ? "text-primary bg-primary/10" : "text-destructive bg-destructive/10"}
+            className={getSemanticStatusBadgeClass(viewing.status)}
           >
             {viewing.status === "active" ? t("suppliers.active") : t("suppliers.inactive")}
           </Badge>,

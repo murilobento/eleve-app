@@ -58,6 +58,7 @@ import { useI18n, useLocale } from "@/i18n/provider";
 import type { EquipmentOption } from "@/lib/equipment-admin";
 import type { ManagedFuelRequisition } from "@/lib/fuel-requisitions-admin";
 import type { ManagedMaintenanceRequisition } from "@/lib/maintenance-requisitions-admin";
+import { getSemanticStatusBadgeClass } from "@/lib/status-badge";
 import type { SupplierOption } from "@/lib/suppliers-admin";
 
 type MaintenanceResponse = {
@@ -118,18 +119,6 @@ async function parseResponse<T>(response: Response): Promise<T> {
 
 function formatDate(value: string, locale: string) {
   return new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(`${value}T12:00:00`));
-}
-
-function statusBadgeVariant(status: string): React.ComponentProps<typeof Badge>["variant"] {
-  if (status === "cancelled") {
-    return "destructive";
-  }
-
-  if (status === "completed") {
-    return "default";
-  }
-
-  return "secondary";
 }
 
 export default function EquipmentRequisitionsPage() {
@@ -461,7 +450,7 @@ export default function EquipmentRequisitionsPage() {
       accessorKey: "status",
       header: ({ column }) => <SortableHeader column={column} title={t("equipmentRequisitions.status")} className="-ml-3" />,
       cell: ({ row }) => (
-        <Badge variant={statusBadgeVariant(row.original.status)}>
+        <Badge variant="secondary" className={getSemanticStatusBadgeClass(row.original.status)}>
           {t(`equipmentRequisitions.statuses.${row.original.status}`)}
         </Badge>
       ),
@@ -575,7 +564,7 @@ export default function EquipmentRequisitionsPage() {
       accessorKey: "status",
       header: ({ column }) => <SortableHeader column={column} title={t("equipmentRequisitions.status")} className="-ml-3" />,
       cell: ({ row }) => (
-        <Badge variant={statusBadgeVariant(row.original.status)}>
+        <Badge variant="secondary" className={getSemanticStatusBadgeClass(row.original.status)}>
           {t(`equipmentRequisitions.statuses.${row.original.status}`)}
         </Badge>
       ),

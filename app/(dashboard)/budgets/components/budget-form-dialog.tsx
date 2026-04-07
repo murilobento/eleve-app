@@ -54,6 +54,7 @@ import type { ManagedClient, PostalCodeLookupResult } from "@/lib/clients-admin"
 import type { EquipmentOption } from "@/lib/equipment-admin";
 import type { ManagedOperator } from "@/lib/operators-admin";
 import type { ManagedServiceType } from "@/lib/service-types-admin";
+import { getSemanticStatusBadgeClass } from "@/lib/status-badge";
 import { useI18n, useLocale } from "@/i18n/provider";
 import { cn, formatPostalCode } from "@/lib/utils";
 
@@ -94,14 +95,7 @@ async function parseResponse<T>(response: Response): Promise<T> {
 }
 
 function getStatusBadgeClass(status: ManagedBudget["status"]) {
-  switch (status) {
-    case "approved":
-      return "bg-primary/10 text-primary";
-    case "cancelled":
-      return "bg-destructive/10 text-destructive";
-    default:
-      return "bg-amber-500/10 text-amber-700 dark:text-amber-400";
-  }
+  return getSemanticStatusBadgeClass(status, "bg-amber-500/10 text-amber-700 dark:text-amber-400");
 }
 
 function createEmptyItem(): BudgetServiceItemInput {

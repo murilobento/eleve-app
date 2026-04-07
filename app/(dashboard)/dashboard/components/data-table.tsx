@@ -49,6 +49,7 @@ import {
   useReactTable,
   type VisibilityState,
 } from "@tanstack/react-table"
+import { getSemanticStatusBadgeClass } from "@/lib/status-badge"
 import { toast } from "sonner"
 import { z } from "zod"
 
@@ -179,7 +180,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
     accessorKey: "status",
     header: "Status",
     cell: ({ row }) => (
-      <Badge variant="secondary" className="px-1.5">
+      <Badge variant="secondary" className={`px-1.5 ${getSemanticStatusBadgeClass(row.original.status)}`}>
         {row.original.status === "Done" ? (
           <CircleCheckBig className="text-primary" />
         ) : (

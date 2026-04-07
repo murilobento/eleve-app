@@ -64,6 +64,32 @@ export default function ServiceOrdersPage() {
   const [approvedBudgets, setApprovedBudgets] = useState<ManagedBudget[]>([]);
   const [loading, setLoading] = useState(true);
   const [isMutating, setIsMutating] = useState(false);
+  const [openCreateDialogFromQuery, setOpenCreateDialogFromQuery] = useState(false);
+  const [editServiceOrderIdFromQuery, setEditServiceOrderIdFromQuery] = useState<string | null>(null);
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const shouldOpenCreate = searchParams.get("create") === "1";
+    const editServiceOrderId = searchParams.get("edit");
+
+    if (!shouldOpenCreate && !editServiceOrderId) {
+      return;
+    }
+
+    if (shouldOpenCreate) {
+      setOpenCreateDialogFromQuery(true);
+    }
+
+    if (editServiceOrderId) {
+      setEditServiceOrderIdFromQuery(editServiceOrderId);
+    }
+
+    searchParams.delete("create");
+    searchParams.delete("edit");
+    const nextSearch = searchParams.toString();
+    const nextUrl = nextSearch ? `${window.location.pathname}?${nextSearch}` : window.location.pathname;
+    window.history.replaceState({}, "", nextUrl);
+  }, []);
 
   const loadServiceOrders = async () => {
     setLoading(true);
@@ -231,6 +257,8 @@ export default function ServiceOrdersPage() {
             serviceTypes={serviceTypes}
             operators={operators}
             approvedBudgets={approvedBudgets}
+            openCreateDialogFromQuery={openCreateDialogFromQuery}
+            editServiceOrderIdFromQuery={editServiceOrderIdFromQuery}
             onCreateServiceOrder={handleCreateServiceOrder}
             onUpdateServiceOrder={handleUpdateServiceOrder}
             onChangeStatus={handleStatusChange}

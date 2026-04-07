@@ -104,7 +104,7 @@ export function useAppNavigation() {
       items: [
         {
           title: t("navigation.calendar"),
-          url: getAppUrl("/calendar", locale),
+          url: getAppUrl("/service-schedule", locale),
           icon: Calendar,
           visible: hasPermission("calendar.read"),
         },

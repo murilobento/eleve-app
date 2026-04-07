@@ -40,6 +40,7 @@ export function DatePicker({ selectedDate, onDateSelect, events = [] }: DatePick
         mode="single"
         locale={dateLocale}
         selected={date}
+        month={date}
         onSelect={handleDateSelect}
         className="w-full [&_[role=gridcell]_button]:cursor-pointer [&_button]:cursor-pointer"
         modifiers={{

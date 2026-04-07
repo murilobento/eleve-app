@@ -53,6 +53,7 @@ import type {
   ManagedMaintenanceRecord,
   UpdateMaintenanceInput,
 } from "@/lib/maintenance-admin";
+import { getSemanticStatusBadgeClass } from "@/lib/status-badge";
 
 type EquipmentResponse = {
   equipment: ManagedEquipment[];
@@ -720,12 +721,15 @@ export default function EquipmentCostsPage() {
                         </TableCell>
                         <TableCell>{record.amountTotal != null ? formatMoney(record.amountTotal, locale) : "—"}</TableCell>
                         <TableCell>
-                          <Badge variant={record.status === "cancelled" ? "destructive" : "secondary"}>
+                          <Badge variant="secondary" className={getSemanticStatusBadgeClass(record.status)}>
                             {t(`equipmentCosts.maintenanceStatuses.${record.status}`)}
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge variant={record.financialStatus === "paid" ? "default" : "secondary"}>
+                          <Badge
+                            variant={record.financialStatus === "paid" ? "default" : "secondary"}
+                            className={getSemanticStatusBadgeClass(record.financialStatus)}
+                          >
                             {t(`equipmentCosts.financialStatuses.${record.financialStatus}`)}
                           </Badge>
                         </TableCell>
@@ -912,7 +916,10 @@ export default function EquipmentCostsPage() {
                           {record.averageValue != null && record.averageLabel ? `${record.averageValue.toFixed(2)} ${record.averageLabel}` : "—"}
                         </TableCell>
                         <TableCell>
-                          <Badge variant={record.financialStatus === "paid" ? "default" : "secondary"}>
+                          <Badge
+                            variant={record.financialStatus === "paid" ? "default" : "secondary"}
+                            className={getSemanticStatusBadgeClass(record.financialStatus)}
+                          >
                             {t(`equipmentCosts.financialStatuses.${record.financialStatus}`)}
                           </Badge>
                         </TableCell>

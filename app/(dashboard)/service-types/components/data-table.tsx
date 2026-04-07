@@ -49,6 +49,7 @@ import type {
   ManagedServiceType,
   UpdateServiceTypeInput,
 } from "@/lib/service-types-admin";
+import { getSemanticStatusBadgeClass } from "@/lib/status-badge";
 
 import { ServiceTypeFormDialog } from "./service-type-form-dialog";
 
@@ -181,12 +182,9 @@ export function DataTable({
       header: ({ column }) => <SortableHeader column={column} title={t("serviceTypes.status")} className="-ml-3" />,
       cell: ({ row }) => {
         const isActive = row.original.status === "active";
-        const className = isActive
-          ? "text-primary bg-primary/10"
-          : "text-destructive bg-destructive/10";
 
         return (
-          <Badge variant="secondary" className={className}>
+          <Badge variant="secondary" className={getSemanticStatusBadgeClass(row.original.status)}>
             {isActive ? t("serviceTypes.active") : t("serviceTypes.inactive")}
           </Badge>
         );

@@ -8,11 +8,6 @@ import {
   Clock,
   MapPin,
   Truck,
-  Users,
-  MoreHorizontal,
-  Search,
-  List,
-  ChevronDown,
   Menu,
   UserCog
 } from "lucide-react"
@@ -21,14 +16,6 @@ import { format, addDays, subDays, isToday, isSameDay } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Input } from "@/components/ui/input"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from "@/components/ui/dropdown-menu"
 import {
   Dialog,
   DialogContent,
@@ -36,13 +23,13 @@ import {
   DialogHeader,
   DialogTitle
 } from "@/components/ui/dialog"
-import { cn } from "@/lib/utils"
+import { cn, getAppUrl } from "@/lib/utils"
 import { useI18n, useLocale } from "@/i18n/provider"
 import { getDateFnsLocale } from "@/lib/date-locale"
 import { type CalendarEvent } from "../types"
 
-const HOUR_ROW_HEIGHT = 72
-const TIMELINE_VERTICAL_PADDING = 16
+const HOUR_ROW_HEIGHT = 60
+const TIMELINE_VERTICAL_PADDING = 12
 const DEFAULT_TIMELINE_START_MINUTES = 7 * 60
 const DEFAULT_TIMELINE_END_MINUTES = 17 * 60
 
@@ -125,7 +112,6 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
   const calendarEvents = events ?? []
 
   const [currentDate, setCurrentDate] = useState(selectedDate || new Date())
-  const [viewMode, setViewMode] = useState<"day" | "list">("day")
   const [showEventDialog, setShowEventDialog] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
 
@@ -305,11 +291,11 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
       : weekdayLabel
 
     return (
-      <div className="flex-1 p-6">
-        <div className="mb-6 flex items-center justify-between rounded-xl border bg-muted/20 p-4">
+      <div className="flex-1 p-4">
+        <div className="mb-4 flex items-center justify-between rounded-xl border bg-muted/20 p-3">
           <div>
             <div className="text-sm text-muted-foreground">{daySummary}</div>
-            <div className="text-xl font-semibold">
+            <div className="text-lg font-semibold">
               {dateLabel}
             </div>
           </div>
@@ -324,7 +310,7 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
           </div>
         ) : (
           <div className="overflow-hidden rounded-xl border bg-background">
-            <div className="grid grid-cols-[72px_minmax(0,1fr)] border-b bg-muted/30 px-4 py-3 text-sm">
+            <div className="grid grid-cols-[64px_minmax(0,1fr)] border-b bg-muted/30 px-3 py-2 text-sm">
               <div className="font-medium text-muted-foreground">{t("calendar.time")}</div>
               <div className="font-medium text-muted-foreground">{t("calendar.eventDetails")}</div>
             </div>
@@ -336,18 +322,18 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
                   minHeight: `${dayTimeline.totalMinutes / 60 * HOUR_ROW_HEIGHT + TIMELINE_VERTICAL_PADDING * 2}px`,
                 }}
               >
-                <div className="grid grid-cols-[72px_minmax(0,1fr)]">
+                <div className="grid grid-cols-[64px_minmax(0,1fr)]">
                   <div className="border-r bg-muted/10">
                     {dayTimeline.hourSlots.slice(0, -1).map((slot) => (
                       <div
                         key={slot}
-                        className="border-b px-3 pt-2 text-right text-xs font-medium text-muted-foreground"
+                        className="border-b px-2.5 pt-1.5 text-right text-xs font-medium text-muted-foreground"
                         style={{ height: `${HOUR_ROW_HEIGHT}px` }}
                       >
                         {formatHourLabel(slot)}
                       </div>
                     ))}
-                    <div className="px-3 pt-2 text-right text-xs font-medium text-muted-foreground">
+                    <div className="px-2.5 pt-1.5 text-right text-xs font-medium text-muted-foreground">
                       {formatHourLabel(dayTimeline.hourSlots[dayTimeline.hourSlots.length - 1])}
                     </div>
                   </div>
@@ -363,10 +349,12 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
 
                     {dayTimeline.events.map(({ event, startTime, endTime, startMinutes, endMinutes, columnIndex, groupColumns }) => {
                       const top = ((startMinutes as number) - dayTimeline.timelineStartMinutes) / 60 * HOUR_ROW_HEIGHT + TIMELINE_VERTICAL_PADDING
-                      const height = 52
+                      const eventDurationMinutes = Math.max(15, (endMinutes as number) - (startMinutes as number))
+                      const maxHeightForSlot = (eventDurationMinutes / 60) * HOUR_ROW_HEIGHT - 6
+                      const height = Math.max(28, Math.min(34, maxHeightForSlot))
                       const timeRange = formatTimeRange(startTime, endTime)
-                      const horizontalGap = 8
-                      const horizontalPadding = 12
+                      const horizontalGap = 6
+                      const horizontalPadding = 10
                       const width = `calc((100% - ${horizontalPadding * 2}px - ${(groupColumns - 1) * horizontalGap}px) / ${groupColumns})`
                       const left = `calc(${horizontalPadding}px + ${columnIndex} * (${width} + ${horizontalGap}px))`
 
@@ -375,37 +363,38 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
                           key={event.id}
                           type="button"
                           className={cn(
-                            "absolute right-3 flex items-center rounded-lg border px-3 py-2 text-left shadow-sm transition-shadow hover:shadow-md",
+                            "absolute right-3 flex items-center rounded-md border px-2 py-1 text-left shadow-sm transition-shadow hover:shadow-md",
                             event.color
                           )}
                           style={{
-                            top: `${top}px`,
+                            top: `${top + 2}px`,
                             left,
                             width,
-                            minHeight: `${height}px`,
+                            height: `${height}px`,
                           }}
                           onClick={() => handleEventClick(event)}
                         >
-                          <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
-                            <div className="flex min-w-0 flex-1 items-center gap-3 text-xs text-white/90 uppercase">
-                              <div className="flex min-w-0 items-center gap-1.5">
-                                <Truck className="h-3.5 w-3.5 shrink-0" />
-                                <span className="truncate text-sm font-semibold text-white">
-                                  {event.equipmentName || event.title}
-                                </span>
-                              </div>
-                              <div className="flex shrink-0 items-center gap-1.5">
-                                <Clock className="h-3.5 w-3.5" />
-                                <span>{formatTimeLabel(startTime)}</span>
+                          <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                            <div className="flex min-w-0 flex-1 items-center gap-2 text-[11px] uppercase text-white/95">
+                              <Truck className="h-3.5 w-3.5 shrink-0" />
+                              <span className="truncate font-semibold">
+                                {event.equipmentName || event.title}
+                              </span>
+                              {event.clientName ? (
+                                <span className="truncate text-white/85">{event.clientName}</span>
+                              ) : null}
+                              <div className="flex shrink-0 items-center gap-1 text-white/90">
+                                <Clock className="h-3 w-3 shrink-0" />
+                                <span>{timeRange || formatTimeLabel(startTime)}</span>
                               </div>
                               {event.operatorName ? (
-                                <div className="flex min-w-0 items-center gap-1.5">
-                                  <UserCog className="h-3.5 w-3.5 shrink-0" />
+                                <div className="flex min-w-0 items-center gap-1 text-white/90">
+                                  <UserCog className="h-3 w-3 shrink-0" />
                                   <span className="truncate">{event.operatorName}</span>
                                 </div>
                               ) : null}
                             </div>
-                            <Badge variant="secondary" className="shrink-0 bg-white/15 text-white hover:bg-white/15">
+                            <Badge variant="secondary" className="shrink-0 px-1.5 py-0 text-[10px] bg-white/15 text-white hover:bg-white/15">
                               {event.equipmentTypeName || getEventTypeLabel(event.type)}
                             </Badge>
                           </div>
@@ -425,99 +414,20 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
       </div>
     )
   }
+  const currentPeriodLabel = format(currentDate, "PPP", { locale: dateLocale })
+  const handleOpenServiceOrderEdit = () => {
+    if (!selectedEvent?.serviceOrderId) {
+      return
+    }
 
-  const renderListView = () => {
-    const upcomingEvents = calendarEvents
-      .filter(event => event.date >= new Date())
-      .sort((a, b) => a.date.getTime() - b.date.getTime())
-
-    return (
-      <div className="flex-1 p-6">
-        <div className="space-y-4">
-          {upcomingEvents.map(event => (
-              <Card key={event.id} className="cursor-pointer transition-shadow hover:shadow-md" onClick={() => handleEventClick(event)}>
-                <CardContent className="px-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-3">
-                      <div className={cn("w-3 h-3 rounded-full mt-1.5", event.color)} />
-                      <div className="flex-1 uppercase">
-                      <h3 className="font-medium">{event.title}</h3>
-                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        {event.serviceOrderNumber ? (
-                          <span className="rounded-full bg-muted px-2 py-0.5 font-medium">
-                            OS {event.serviceOrderNumber}
-                          </span>
-                        ) : null}
-                        {event.status ? (
-                          <span className="rounded-full bg-muted px-2 py-0.5">
-                            {getEventStatusLabel(event.status)}
-                          </span>
-                        ) : null}
-                      </div>
-                      <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                        <div className="flex items-center flex-wrap gap-1">
-                          <CalendarIcon className="w-4 h-4" />
-                          {format(event.date, 'PPP', { locale: dateLocale })}
-                        </div>
-                        <div className="flex items-center flex-wrap gap-1">
-                          <Clock className="w-4 h-4" />
-                          {formatTimeRange(event.startTime, event.endTime) || event.time}
-                        </div>
-                        <div className="flex items-center flex-wrap gap-1">
-                          <MapPin className="w-4 h-4" />
-                          {event.location}
-                        </div>
-                      </div>
-                      <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                        {event.equipmentName ? (
-                          <div className="flex items-center gap-1">
-                            <span className="font-medium">{t("serviceOrders.equipment")}:</span>
-                            <span>{event.equipmentName}</span>
-                          </div>
-                        ) : null}
-                        {event.operatorName ? (
-                          <div className="flex items-center gap-1">
-                            <span className="font-medium">{t("serviceOrders.operator")}:</span>
-                            <span>{event.operatorName}</span>
-                          </div>
-                        ) : null}
-                      </div>
-                      {event.clientName ? (
-                        <div className="mt-2 text-sm text-muted-foreground">
-                          <span className="font-medium">{t("serviceOrders.client")}:</span> {event.clientName}
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex -space-x-2">
-                      {event.attendees.slice(0, 3).map((attendee, index) => (
-                        <Avatar key={index} className="border-2 border-background">
-                          <AvatarFallback className="text-xs">{attendee}</AvatarFallback>
-                        </Avatar>
-                      ))}
-                    </div>
-                    <Button variant="ghost" size="sm" className="cursor-pointer">
-                      <MoreHorizontal className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-    )
+    const targetUrl = `${getAppUrl("/service-orders", locale)}?edit=${encodeURIComponent(selectedEvent.serviceOrderId)}`
+    window.location.assign(targetUrl)
   }
-
-  const currentPeriodLabel = viewMode === "day"
-    ? format(currentDate, "PPP", { locale: dateLocale })
-    : format(currentDate, "MMMM yyyy", { locale: dateLocale })
 
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex flex-col flex-wrap gap-4 p-6 border-b md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col flex-wrap gap-3 border-b p-4 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-4 flex-wrap">
           {/* Mobile Menu Button */}
           <Button
@@ -541,44 +451,16 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
             </Button>
           </div>
 
-          <h1 className="text-2xl font-semibold">
+          <h1 className="text-xl font-semibold">
             {currentPeriodLabel}
           </h1>
         </div>
 
-        <div className="flex flex-col gap-3 md:flex-row md:items-center">
-          {/* Search */}
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
-            <Input placeholder={t("calendar.searchPlaceholder")} className="pl-10 w-64" />
-          </div>
-
-          {/* View Mode Toggle */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="cursor-pointer">
-                {viewMode === "day" && <CalendarIcon className="w-4 h-4 mr-2" />}
-                {viewMode === "list" && <List className="w-4 h-4 mr-2" />}
-                {viewMode === "day" ? t("calendar.day") : t("calendar.list")}
-                <ChevronDown className="w-4 h-4 ml-2" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => setViewMode("day")} className="cursor-pointer">
-                <CalendarIcon className="w-4 h-4 mr-2" />
-                {t("calendar.day")}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setViewMode("list")} className="cursor-pointer">
-                <List className="w-4 h-4 mr-2" />
-                {t("calendar.list")}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+        <div />
       </div>
 
       {/* Calendar Content */}
-      {viewMode === "day" ? renderDayView() : renderListView()}
+      {renderDayView()}
 
       {/* Event Detail Dialog */}
       <Dialog open={showEventDialog} onOpenChange={setShowEventDialog}>
@@ -664,25 +546,6 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
                 </Card>
               </div>
 
-              {selectedEvent.attendees.length > 0 ? (
-                <div className="rounded-xl border p-4">
-                  <div className="mb-3 flex items-center gap-2">
-                    <Users className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">{t("calendar.attendees")}</span>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedEvent.attendees.map((attendee: string, index: number) => (
-                      <div key={index} className="flex items-center gap-2 rounded-full border px-3 py-1">
-                        <Avatar className="w-6 h-6">
-                          <AvatarFallback className="text-xs">{attendee}</AvatarFallback>
-                        </Avatar>
-                        <span className="text-sm uppercase">{attendee}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-
               {selectedEvent.description ? (
                 <div className="rounded-xl border p-4">
                   <div className="text-sm font-medium">{t("serviceOrders.notes")}</div>
@@ -690,7 +553,14 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
                 </div>
               ) : null}
 
-              <div className="flex justify-end pt-2">
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  className="cursor-pointer"
+                  onClick={handleOpenServiceOrderEdit}
+                  disabled={!selectedEvent.serviceOrderId}
+                >
+                  {t("serviceOrders.editServiceOrder")}
+                </Button>
                 <Button variant="outline" className="cursor-pointer" onClick={() => {
                   setShowEventDialog(false)
                 }}>

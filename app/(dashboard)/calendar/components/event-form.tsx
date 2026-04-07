@@ -35,6 +35,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useI18n } from "@/i18n/provider"
 import { cn } from "@/lib/utils"
 import { type CalendarEvent } from "../types"
+import { getAvatarInitials } from "../utils"
 
 interface EventFormProps {
   event?: CalendarEvent | null
@@ -348,7 +349,7 @@ export function EventForm({ event, open, onOpenChange, onSave, onDelete }: Event
                   <Badge key={index} variant="secondary" className="flex items-center gap-2 px-2 py-1">
                     <Avatar className="w-5 h-5">
                       <AvatarFallback className="text-[10px] font-medium">
-                        {attendee.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                        {getAvatarInitials(attendee)}
                       </AvatarFallback>
                     </Avatar>
                     <span className="text-sm">{attendee}</span>

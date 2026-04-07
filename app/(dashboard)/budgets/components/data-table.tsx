@@ -67,6 +67,7 @@ import { usePersistentColumnVisibility } from "@/hooks/use-persistent-column-vis
 import { useI18n, useLocale } from "@/i18n/provider";
 import type { ManagedOperator } from "@/lib/operators-admin";
 import type { ManagedServiceType } from "@/lib/service-types-admin";
+import { getSemanticStatusBadgeClass } from "@/lib/status-badge";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -442,14 +443,7 @@ function DateFilterControl({
 }
 
 function getStatusBadgeClass(status: ManagedBudget["status"]) {
-  switch (status) {
-    case "approved":
-      return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400";
-    case "cancelled":
-      return "bg-rose-500/10 text-rose-700 dark:text-rose-400";
-    default:
-      return "bg-amber-500/10 text-amber-700 dark:text-amber-400";
-  }
+  return getSemanticStatusBadgeClass(status, "bg-amber-500/10 text-amber-700 dark:text-amber-400");
 }
 
 function getBudgetStatusLabel(status: ManagedBudget["status"], t: ReturnType<typeof useI18n>["t"]) {

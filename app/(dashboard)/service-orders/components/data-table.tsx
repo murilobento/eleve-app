@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { addDays, endOfDay, endOfMonth, startOfDay, startOfMonth, subDays, subMonths } from "date-fns";
 import { CalendarDays, CheckCircle2, ChevronDown, Clock3, EllipsisVertical, Pencil, Play, RotateCcw, Search, Trash2, XCircle } from "lucide-react";
 
@@ -67,6 +67,7 @@ import type {
   UpdateServiceOrderInput,
 } from "@/lib/service-orders-admin";
 import type { ManagedServiceType } from "@/lib/service-types-admin";
+import { getSemanticStatusBadgeClass } from "@/lib/status-badge";
 import { useI18n, useLocale } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -78,6 +79,8 @@ type DataTableProps = {
   serviceTypes: ManagedServiceType[];
   operators: ManagedOperator[];
   approvedBudgets: ManagedBudget[];
+  openCreateDialogFromQuery?: boolean;
+  editServiceOrderIdFromQuery?: string | null;
   onCreateServiceOrder: (values: CreateServiceOrderInput) => Promise<void>;
   onUpdateServiceOrder: (id: string, values: UpdateServiceOrderInput) => Promise<void>;
   onChangeStatus: (id: string, status: "pending" | "scheduled" | "in_progress" | "completed" | "cancelled", reason?: string) => Promise<void>;
@@ -436,16 +439,12 @@ function DateFilterControl({
 
 function getStatusBadgeClass(status: ManagedServiceOrder["status"]) {
   switch (status) {
-    case "completed":
-      return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400";
-    case "cancelled":
-      return "bg-red-500/10 text-red-700 dark:text-red-400";
     case "in_progress":
       return "bg-blue-500/10 text-blue-700 dark:text-blue-400";
     case "scheduled":
       return "bg-amber-500/10 text-amber-700 dark:text-amber-400";
     default:
-      return "bg-muted text-muted-foreground";
+      return getSemanticStatusBadgeClass(status, "bg-muted text-muted-foreground");
   }
 }
 
@@ -477,6 +476,8 @@ export function DataTable({
   serviceTypes,
   operators,
   approvedBudgets,
+  openCreateDialogFromQuery = false,
+  editServiceOrderIdFromQuery = null,
   onCreateServiceOrder,
   onUpdateServiceOrder,
   onChangeStatus,
@@ -496,13 +497,31 @@ export function DataTable({
   const [statusFilter, setStatusFilter] = useState("all");
   const [createdDateFilter, setCreatedDateFilter] = useState<DateFilterValue>({ preset: "all" });
   const [serviceDateFilter, setServiceDateFilter] = useState<DateFilterValue>({ preset: "all" });
-  const [createOpen, setCreateOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(openCreateDialogFromQuery);
   const [editingServiceOrder, setEditingServiceOrder] = useState<ManagedServiceOrder | null>(null);
   const [pendingStatusAction, setPendingStatusAction] = useState<PendingStatusAction>(null);
   const [historyServiceOrder, setHistoryServiceOrder] = useState<ManagedServiceOrder | null>(null);
   const [serviceOrderHistory, setServiceOrderHistory] = useState<ManagedServiceOrderStatusHistory[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [bulkCancelDialog, setBulkCancelDialog] = useState(false);
+
+  useEffect(() => {
+    if (openCreateDialogFromQuery) {
+      setCreateOpen(true);
+    }
+  }, [openCreateDialogFromQuery]);
+
+  useEffect(() => {
+    if (!editServiceOrderIdFromQuery) {
+      return;
+    }
+
+    const serviceOrder = serviceOrders.find((item) => item.id === editServiceOrderIdFromQuery);
+
+    if (serviceOrder) {
+      setEditingServiceOrder(serviceOrder);
+    }
+  }, [editServiceOrderIdFromQuery, serviceOrders]);
 
   const createdDateRange = useMemo(() => resolveDateFilterRange(createdDateFilter), [createdDateFilter]);
   const serviceDateRange = useMemo(() => resolveDateFilterRange(serviceDateFilter), [serviceDateFilter]);

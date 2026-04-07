@@ -77,7 +77,7 @@ export function EntityDetailsDialog({
           <div className="grid gap-3 lg:grid-cols-2">
           {sections.map((section) => (
             <Card key={section.title} className="gap-0 py-0">
-              <CardHeader className="border-b px-4 py-3">
+              <CardHeader className="border-b px-4 py-2 gap-0 grid-rows-[auto] [.border-b]:pb-2">
                 <CardTitle className="text-sm">{section.title}</CardTitle>
                 {section.description ? <CardDescription className="text-xs">{section.description}</CardDescription> : null}
               </CardHeader>

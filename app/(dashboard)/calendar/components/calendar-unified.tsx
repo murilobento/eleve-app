@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import { type CalendarEvent } from "../types"
+import { getAvatarInitials } from "../utils"
 
 // Import data
 import eventsData from "../data/events.json"
@@ -353,7 +354,7 @@ export function CalendarMain({ eventDates = [] }: CalendarMainProps) {
                     {selectedEvent.attendees.map((attendee, index) => (
                       <Avatar key={index} className="h-6 w-6">
                         <AvatarFallback className="text-xs">
-                          {attendee}
+                          {getAvatarInitials(attendee)}
                         </AvatarFallback>
                       </Avatar>
                     ))}

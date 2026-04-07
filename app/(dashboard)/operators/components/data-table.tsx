@@ -46,6 +46,7 @@ import type {
   ManagedOperator,
   UpdateOperatorInput,
 } from "@/lib/operators-admin";
+import { getSemanticStatusBadgeClass } from "@/lib/status-badge";
 import { usePersistentColumnVisibility } from "@/hooks/use-persistent-column-visibility";
 import { useI18n, useLocale } from "@/i18n/provider";
 
@@ -140,12 +141,9 @@ export function DataTable({
       header: ({ column }) => <SortableHeader column={column} title={t("operators.status")} className="-ml-3" />,
       cell: ({ row }) => {
         const isActive = row.original.status === "active";
-        const className = isActive
-          ? "text-primary bg-primary/10"
-          : "text-destructive bg-destructive/10";
 
         return (
-          <Badge variant="secondary" className={className}>
+          <Badge variant="secondary" className={getSemanticStatusBadgeClass(row.original.status)}>
             {isActive ? t("operators.active") : t("operators.inactive")}
           </Badge>
         );
