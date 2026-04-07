@@ -487,8 +487,9 @@ export function DataTable({
   const locale = useLocale();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const { columnVisibility, setColumnVisibility } = usePersistentColumnVisibility("table:service-orders:columns:v1", {
+  const { columnVisibility, setColumnVisibility } = usePersistentColumnVisibility("table:service-orders:columns:v2", {
     createdAt: false,
+    originType: false,
   });
   const [rowSelection, setRowSelection] = useState({});
   const [globalFilter, setGlobalFilter] = useState("");

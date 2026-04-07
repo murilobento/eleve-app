@@ -28,12 +28,33 @@ export function IdleLockScreen({
   const { t } = useI18n();
   const [password, setPassword] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
+  const passwordInputRef = React.useRef<HTMLInputElement | null>(null);
 
   React.useEffect(() => {
     if (!open) {
       setPassword("");
       setError(null);
+      if (passwordInputRef.current) {
+        passwordInputRef.current.value = "";
+      }
+      return;
     }
+
+    // Some browsers/password managers try to restore password fields on reload.
+    // Clear the DOM value again after mount/open so the lockscreen always starts blank.
+    const clearRestoredPassword = () => {
+      setPassword("");
+      if (passwordInputRef.current) {
+        passwordInputRef.current.value = "";
+      }
+    };
+
+    clearRestoredPassword();
+    const timeoutId = window.setTimeout(clearRestoredPassword, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
   }, [open]);
 
   if (!open) {
@@ -72,7 +93,7 @@ export function IdleLockScreen({
             ) : null}
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
               {error ? (
                 <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">{error}</div>
               ) : null}
@@ -80,12 +101,18 @@ export function IdleLockScreen({
                 <Label htmlFor="lockscreen-password">{t("auth.password")}</Label>
                 <Input
                   id="lockscreen-password"
+                  ref={passwordInputRef}
+                  name="lockscreen-passcode"
                   type="password"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   required
                   autoFocus
-                  autoComplete="current-password"
+                  autoComplete="new-password"
+                  data-1p-ignore="true"
+                  data-lpignore="true"
+                  data-form-type="other"
+                  spellCheck={false}
                 />
               </div>
               <p className="text-xs text-muted-foreground">
@@ -106,4 +133,3 @@ export function IdleLockScreen({
     </div>
   );
 }
-

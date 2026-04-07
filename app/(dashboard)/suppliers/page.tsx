@@ -136,8 +136,10 @@ export default function SuppliersPage() {
   const [isMutating, setIsMutating] = useState(false);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const { columnVisibility, setColumnVisibility } = usePersistentColumnVisibility("table:suppliers:columns:v1", {
+  const { columnVisibility, setColumnVisibility } = usePersistentColumnVisibility("table:suppliers:columns:v2", {
     updatedAt: false,
+    document: false,
+    email: false,
   });
   const [rowSelection, setRowSelection] = useState({});
   const [globalFilter, setGlobalFilter] = useState("");

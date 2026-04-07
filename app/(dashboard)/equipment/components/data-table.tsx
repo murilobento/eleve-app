@@ -86,8 +86,9 @@ export function DataTable({
   const { hasPermission } = useRbac();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const { columnVisibility, setColumnVisibility } = usePersistentColumnVisibility("table:equipment:columns:v2", {
+  const { columnVisibility, setColumnVisibility } = usePersistentColumnVisibility("table:equipment:columns:v3", {
     updatedAt: false,
+    plate: false,
   });
   const [rowSelection, setRowSelection] = useState({});
   const [globalFilter, setGlobalFilter] = useState("");
