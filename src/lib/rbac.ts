@@ -53,6 +53,7 @@ import type {
   SupplierStatus,
   SupplierType,
 } from "@/lib/suppliers-admin";
+import { logRequestSecurityEvent } from "@/lib/security-events";
 
 export type RoleWithDetails = RoleRecord & {
   permissions: PermissionKey[];
@@ -3984,13 +3985,22 @@ export async function listSuppliers(): Promise<ManagedSupplier[]> {
 
 export async function listSupplierOptions(onlyActive = true): Promise<SupplierOption[]> {
   await bootstrapRbac();
+  const query = onlyActive
+    ? `
+        SELECT id, legal_name, trade_name, supplier_type, status
+        FROM suppliers
+        WHERE status = $1
+        ORDER BY legal_name ASC
+      `
+    : `
+        SELECT id, legal_name, trade_name, supplier_type, status
+        FROM suppliers
+        ORDER BY legal_name ASC
+      `;
+  const params = onlyActive ? ["active"] : [];
   const result = await pool.query<Pick<SupplierRow, "id" | "legal_name" | "trade_name" | "supplier_type" | "status">>(
-    `
-      SELECT id, legal_name, trade_name, supplier_type, status
-      FROM suppliers
-      ${onlyActive ? "WHERE status = 'active'" : ""}
-      ORDER BY legal_name ASC
-    `,
+    query,
+    params,
   );
 
   return result.rows.map(mapSupplierOptionRow);
@@ -6433,12 +6443,29 @@ export async function getCurrentSessionState(request: Request) {
 
 export async function requirePermission(request: Request, permission: PermissionKey) {
   const state = await getCurrentSessionState(request);
+  const path = new URL(request.url).pathname;
 
   if (!state) {
+    logRequestSecurityEvent("authz.unauthorized", request, {
+      level: "warn",
+      details: {
+        permission,
+        path,
+      },
+    });
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
   if (!state.accessState.isActive) {
+    logRequestSecurityEvent("authz.inactive_denied", request, {
+      level: "warn",
+      userId: state.session.user.id,
+      details: {
+        permission,
+        path,
+        reason: state.accessState.reason,
+      },
+    });
     return NextResponse.json(
       { error: state.accessState.reason || "Your account is inactive." },
       { status: 403 },
@@ -6446,6 +6473,14 @@ export async function requirePermission(request: Request, permission: Permission
   }
 
   if (!state.permissions.includes(permission)) {
+    logRequestSecurityEvent("authz.permission_denied", request, {
+      level: "warn",
+      userId: state.session.user.id,
+      details: {
+        permission,
+        path,
+      },
+    });
     return NextResponse.json({ error: "You do not have permission to perform this action." }, { status: 403 });
   }
 

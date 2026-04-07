@@ -6,6 +6,7 @@ import {
   listRolesWithDetails,
   requirePermission,
 } from "@/lib/rbac";
+import { logRequestSecurityEvent } from "@/lib/security-events";
 
 function getErrorResponse(error: unknown) {
   const message = error instanceof Error ? error.message : "Unexpected error while processing the request.";
@@ -51,6 +52,14 @@ export async function POST(request: Request) {
     const roleId = await createRole(payload);
     const roles = await listRolesWithDetails();
     const role = roles.find((item) => item.id === roleId);
+
+    logRequestSecurityEvent("roles.created", request, {
+      userId: permission.session.user.id,
+      details: {
+        roleId,
+        permissionKeysCount: payload.permissionKeys.length,
+      },
+    });
 
     return NextResponse.json({ role: role ? serializeRole(role) : null });
   } catch (error) {

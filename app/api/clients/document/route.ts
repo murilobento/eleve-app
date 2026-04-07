@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 
 import type { CnpjLookupResult } from "@/lib/clients-admin";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { requirePermission } from "@/lib/rbac";
+
+const LOOKUP_WINDOW_MS = 60_000;
+const DOCUMENT_LIMIT = 10;
 
 type BrasilApiCnpjResponse = {
   cnpj?: string;
@@ -84,6 +88,23 @@ export async function GET(request: Request) {
 
     if (cnpj.length !== 14) {
       return NextResponse.json({ error: "Enter a valid CNPJ." }, { status: 400 });
+    }
+
+    const rateLimitResponse = enforceRateLimit({
+      key: `lookup:cnpj:clients:${permission.session.user.id}`,
+      limit: DOCUMENT_LIMIT,
+      windowMs: LOOKUP_WINDOW_MS,
+      request,
+      userId: permission.session.user.id,
+      event: "lookup.rate_limited",
+      message: "Too many CNPJ lookups. Try again later.",
+      details: {
+        scope: "clients.document",
+      },
+    });
+
+    if (rateLimitResponse) {
+      return rateLimitResponse;
     }
 
     const result = await lookupCnpj(cnpj);

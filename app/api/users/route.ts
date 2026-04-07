@@ -16,6 +16,7 @@ import {
   createManagedUserSchema,
   mapAuthUserToManagedUser,
 } from "@/lib/users-admin";
+import { logRequestSecurityEvent } from "@/lib/security-events";
 
 type RouteError = Error & {
   status?: number;
@@ -113,6 +114,15 @@ export async function POST(request: Request) {
     await assignRolesToUser(result.user.id, payload.roleIds);
     await setUserAccessState(result.user.id, payload.status === "active");
     const userRoles = await getUserRoleAssignments(result.user.id, result.user.role);
+
+    logRequestSecurityEvent("users.created", request, {
+      userId: state.session.user.id,
+      details: {
+        targetUserId: result.user.id,
+        assignedRolesCount: payload.roleIds.length,
+        status: payload.status,
+      },
+    });
 
     return NextResponse.json({
       user: mapAuthUserToManagedUser(result.user, userRoles, {

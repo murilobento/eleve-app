@@ -14,6 +14,7 @@ import {
   mapAuthUserToManagedUser,
   updateManagedUserSchema,
 } from "@/lib/users-admin";
+import { logRequestSecurityEvent } from "@/lib/security-events";
 
 type RouteError = Error & {
   status?: number;
@@ -79,11 +80,27 @@ export async function PUT(
           newPassword: payload.password,
         },
       });
+
+      logRequestSecurityEvent("users.password_reset", request, {
+        userId: permission.session.user.id,
+        details: {
+          targetUserId: id,
+        },
+      });
     }
 
     await assignRolesToUser(id, payload.roleIds);
     await setUserAccessState(id, payload.status === "active");
     const userRoles = await getUserRoleAssignments(id, compatibilityRole);
+
+    logRequestSecurityEvent("users.updated", request, {
+      userId: permission.session.user.id,
+      details: {
+        targetUserId: id,
+        assignedRolesCount: payload.roleIds.length,
+        status: payload.status,
+      },
+    });
 
     return NextResponse.json({
       user: mapAuthUserToManagedUser(result.user ?? result, userRoles, {
@@ -114,6 +131,13 @@ export async function DELETE(
       headers: request.headers,
       body: {
         userId: id,
+      },
+    });
+
+    logRequestSecurityEvent("users.deleted", request, {
+      userId: permission.session.user.id,
+      details: {
+        targetUserId: id,
       },
     });
 

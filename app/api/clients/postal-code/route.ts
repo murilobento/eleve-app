@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 
 import type { PostalCodeLookupResult } from "@/lib/clients-admin";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { requirePermission } from "@/lib/rbac";
+
+const LOOKUP_WINDOW_MS = 60_000;
+const POSTAL_CODE_LIMIT = 20;
 
 type ViaCepResponse = {
   cep?: string;
@@ -56,6 +60,23 @@ export async function GET(request: Request) {
 
     if (postalCode.length !== 8) {
       return NextResponse.json({ error: "Enter a valid postal code." }, { status: 400 });
+    }
+
+    const rateLimitResponse = enforceRateLimit({
+      key: `lookup:postal-code:clients:${permission.session.user.id}`,
+      limit: POSTAL_CODE_LIMIT,
+      windowMs: LOOKUP_WINDOW_MS,
+      request,
+      userId: permission.session.user.id,
+      event: "lookup.rate_limited",
+      message: "Too many postal code lookups. Try again later.",
+      details: {
+        scope: "clients.postal-code",
+      },
+    });
+
+    if (rateLimitResponse) {
+      return rateLimitResponse;
     }
 
     const result = await lookupPostalCode(postalCode);
