@@ -12,7 +12,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { ChevronDown, EllipsisVertical, Pencil, Search, Trash2 } from "lucide-react";
+import { ChevronDown, EllipsisVertical, Eye, Pencil, Search, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ import {
   AdminListToolbar,
 } from "@/components/admin-list-layout";
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
+import { EntityDetailsDialog } from "@/components/entity-details-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
@@ -100,8 +101,77 @@ export function DataTable({
   const [rowSelection, setRowSelection] = useState({});
   const [globalFilter, setGlobalFilter] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
+  const [viewingClient, setViewingClient] = useState<ManagedClient | null>(null);
   const [editingClient, setEditingClient] = useState<ManagedClient | null>(null);
   const [deletingClient, setDeletingClient] = useState<ManagedClient | null>(null);
+
+  const getDisplayValue = (value?: string | null) => {
+    if (!value?.trim()) {
+      return t("common.notProvided");
+    }
+
+    return value;
+  };
+
+  const renderLinkValue = (value?: string | null, href?: string) => {
+    if (!value?.trim() || !href) {
+      return getDisplayValue(value);
+    }
+
+    return (
+      <a className="text-primary underline-offset-4 hover:underline" href={href} target="_blank" rel="noreferrer">
+        {value}
+      </a>
+    );
+  };
+
+  const clientDetailsSections = viewingClient ? [
+    {
+      title: t("common.registrationData"),
+      fields: [
+        { label: t("clients.name"), value: getDisplayValue(viewingClient.legalName) },
+        { label: t("clients.tradeName"), value: getDisplayValue(viewingClient.tradeName) },
+        {
+          label: t("clients.personType"),
+          value: viewingClient.personType === "PF" ? t("clients.individual") : t("clients.legalEntity"),
+        },
+        { label: t("clients.document"), value: formatDocument(viewingClient.document, viewingClient.personType) },
+      ],
+    },
+    {
+      title: t("common.contactInfo"),
+      fields: [
+        { label: t("clients.contactName"), value: getDisplayValue(viewingClient.contactName) },
+        { label: t("clients.contactPhone"), value: getDisplayValue(viewingClient.contactPhone) },
+        { label: t("clients.phone"), value: getDisplayValue(viewingClient.phone) },
+        { label: t("clients.email"), value: renderLinkValue(viewingClient.email, viewingClient.email ? `mailto:${viewingClient.email}` : undefined) },
+        { label: t("clients.website"), value: renderLinkValue(viewingClient.website, viewingClient.website ?? undefined), fullWidth: true },
+      ],
+    },
+    {
+      title: t("common.addressInfo"),
+      fields: [
+        {
+          label: t("common.addressInfo"),
+          value: `${viewingClient.street}, ${viewingClient.number}${viewingClient.complement ? ` - ${viewingClient.complement}` : ""}`,
+          fullWidth: true,
+        },
+        { label: t("clients.postalCode"), value: getDisplayValue(viewingClient.postalCode) },
+        { label: t("clients.district"), value: getDisplayValue(viewingClient.district) },
+        { label: t("clients.city"), value: getDisplayValue(viewingClient.city) },
+        { label: t("clients.state"), value: getDisplayValue(viewingClient.state) },
+        { label: t("clients.country"), value: getDisplayValue(viewingClient.country) },
+      ],
+    },
+    {
+      title: t("common.recordInfo"),
+      fields: [
+        { label: "ID", value: viewingClient.id },
+        { label: t("common.created"), value: formatDate(viewingClient.createdAt, locale) },
+        { label: t("clients.updated"), value: formatDate(viewingClient.updatedAt, locale) },
+      ],
+    },
+  ] : [];
 
   const columns = useMemo<ColumnDef<ManagedClient>[]>(() => [
     {
@@ -223,6 +293,10 @@ export function DataTable({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem className="cursor-pointer" onClick={() => setViewingClient(client)}>
+                <Eye className="mr-2 size-4" />
+                {t("common.details")}
+              </DropdownMenuItem>
               <DropdownMenuItem className="cursor-pointer" onClick={() => setEditingClient(client)}>
                 <Pencil className="mr-2 size-4" />
                 {t("clients.editClient")}
@@ -304,6 +378,18 @@ export function DataTable({
     setGlobalFilter("");
     setColumnFilters([]);
     table.setPageIndex(0);
+  };
+
+  const shouldIgnoreRowClick = (target: EventTarget | null) => {
+    if (!(target instanceof HTMLElement)) {
+      return false;
+    }
+
+    return Boolean(
+      target.closest(
+        'button, a, input, select, textarea, [role="checkbox"], [role="menu"], [role="menuitem"], [data-no-row-click="true"]',
+      ),
+    );
   };
 
   return (
@@ -472,9 +558,23 @@ export function DataTable({
           <TableBody>
             {table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() && "selected"}
+                  className="cursor-pointer"
+                  onClick={(event) => {
+                    if (shouldIgnoreRowClick(event.target)) {
+                      return;
+                    }
+
+                    setViewingClient(row.original);
+                  }}
+                >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell
+                      key={cell.id}
+                      data-no-row-click={cell.column.id === "select" || cell.column.id === "actions" ? "true" : undefined}
+                    >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
@@ -518,6 +618,45 @@ export function DataTable({
         }}
         isSubmitting={isMutating}
         client={editingClient}
+      />
+
+      <EntityDetailsDialog
+        open={Boolean(viewingClient)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setViewingClient(null);
+          }
+        }}
+        title={viewingClient?.legalName ?? ""}
+        description={t("clients.detailsDescription")}
+        subtitle={viewingClient ? (viewingClient.tradeName || viewingClient.contactName || viewingClient.email || null) : null}
+        badges={viewingClient ? [
+          <Badge key="personType" variant="outline">
+            {viewingClient.personType === "PF" ? t("clients.individual") : t("clients.legalEntity")}
+          </Badge>,
+          <Badge
+            key="status"
+            variant="secondary"
+            className={viewingClient.status === "active" ? "text-primary bg-primary/10" : "text-destructive bg-destructive/10"}
+          >
+            {viewingClient.status === "active" ? t("clients.active") : t("clients.inactive")}
+          </Badge>,
+        ] : []}
+        sections={clientDetailsSections}
+        footer={viewingClient ? (
+          <div className="flex justify-end">
+            <Button
+              className="cursor-pointer"
+              onClick={() => {
+                setEditingClient(viewingClient);
+                setViewingClient(null);
+              }}
+            >
+              <Pencil className="mr-2 size-4" />
+              {t("clients.editClient")}
+            </Button>
+          </div>
+        ) : null}
       />
 
       <ConfirmDeleteDialog

@@ -14,7 +14,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { ChevronDown, EllipsisVertical, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { ChevronDown, EllipsisVertical, Eye, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -25,6 +25,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
+import { EntityDetailsDialog } from "@/components/entity-details-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -144,6 +145,7 @@ export default function SuppliersPage() {
   const [rowSelection, setRowSelection] = useState({});
   const [globalFilter, setGlobalFilter] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
+  const [viewing, setViewing] = useState<ManagedSupplier | null>(null);
   const [editing, setEditing] = useState<ManagedSupplier | null>(null);
   const [deleting, setDeleting] = useState<ManagedSupplier | null>(null);
   const [isLookingUpDocument, setIsLookingUpDocument] = useState(false);
@@ -152,6 +154,71 @@ export default function SuppliersPage() {
   const isEdit = Boolean(editing);
   const schema = isEdit ? updateSupplierSchema : createSupplierSchema;
   const open = createOpen || isEdit;
+
+  const getDisplayValue = (value?: string | null) => {
+    if (!value?.trim()) {
+      return t("common.notProvided");
+    }
+
+    return value;
+  };
+
+  const renderLinkValue = (value?: string | null, href?: string) => {
+    if (!value?.trim() || !href) {
+      return getDisplayValue(value);
+    }
+
+    return (
+      <a className="text-primary underline-offset-4 hover:underline" href={href} target="_blank" rel="noreferrer">
+        {value}
+      </a>
+    );
+  };
+
+  const supplierDetailsSections = viewing ? [
+    {
+      title: t("common.registrationData"),
+      fields: [
+        { label: t("suppliers.name"), value: getDisplayValue(viewing.legalName) },
+        { label: t("suppliers.tradeName"), value: getDisplayValue(viewing.tradeName) },
+        { label: t("suppliers.type"), value: t(`suppliers.types.${viewing.supplierType}`) },
+        { label: t("suppliers.document"), value: formatSupplierDocument(viewing.document) },
+      ],
+    },
+    {
+      title: t("common.contactInfo"),
+      fields: [
+        { label: t("suppliers.contactName"), value: getDisplayValue(viewing.contactName) },
+        { label: t("suppliers.contactPhone"), value: getDisplayValue(viewing.contactPhone) },
+        { label: t("suppliers.phone"), value: getDisplayValue(viewing.phone) },
+        { label: t("suppliers.email"), value: renderLinkValue(viewing.email, viewing.email ? `mailto:${viewing.email}` : undefined) },
+        { label: t("suppliers.website"), value: renderLinkValue(viewing.website, viewing.website ?? undefined), fullWidth: true },
+      ],
+    },
+    {
+      title: t("common.addressInfo"),
+      fields: [
+        {
+          label: t("common.addressInfo"),
+          value: `${viewing.street}, ${viewing.number}${viewing.complement ? ` - ${viewing.complement}` : ""}`,
+          fullWidth: true,
+        },
+        { label: t("suppliers.postalCode"), value: getDisplayValue(viewing.postalCode) },
+        { label: t("suppliers.district"), value: getDisplayValue(viewing.district) },
+        { label: t("suppliers.city"), value: getDisplayValue(viewing.city) },
+        { label: t("suppliers.state"), value: getDisplayValue(viewing.state) },
+        { label: t("suppliers.country"), value: getDisplayValue(viewing.country) },
+      ],
+    },
+    {
+      title: t("common.recordInfo"),
+      fields: [
+        { label: "ID", value: viewing.id },
+        { label: t("common.created"), value: formatDate(viewing.createdAt, locale) },
+        { label: t("suppliers.updated"), value: formatDate(viewing.updatedAt, locale) },
+      ],
+    },
+  ] : [];
 
   const form = useForm<CreateSupplierInput | UpdateSupplierInput>({
     resolver: zodResolver(schema),
@@ -476,6 +543,10 @@ export default function SuppliersPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem className="cursor-pointer" onClick={() => setViewing(supplier)}>
+                <Eye className="mr-2 size-4" />
+                {t("common.details")}
+              </DropdownMenuItem>
               <DropdownMenuItem className="cursor-pointer" onClick={() => setEditing(supplier)}>
                 <Pencil className="mr-2 size-4" />
                 {t("suppliers.edit")}
@@ -557,6 +628,18 @@ export default function SuppliersPage() {
     setGlobalFilter("");
     setColumnFilters([]);
     table.setPageIndex(0);
+  };
+
+  const shouldIgnoreRowClick = (target: EventTarget | null) => {
+    if (!(target instanceof HTMLElement)) {
+      return false;
+    }
+
+    return Boolean(
+      target.closest(
+        'button, a, input, select, textarea, [role="checkbox"], [role="menu"], [role="menuitem"], [data-no-row-click="true"]',
+      ),
+    );
   };
 
   return (
@@ -739,9 +822,23 @@ export default function SuppliersPage() {
                 <TableBody>
                   {table.getRowModel().rows.length ? (
                     table.getRowModel().rows.map((row) => (
-                      <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
+                      <TableRow
+                        key={row.id}
+                        data-state={row.getIsSelected() && "selected"}
+                        className="cursor-pointer"
+                        onClick={(event) => {
+                          if (shouldIgnoreRowClick(event.target)) {
+                            return;
+                          }
+
+                          setViewing(row.original);
+                        }}
+                      >
                         {row.getVisibleCells().map((cell) => (
-                          <TableCell key={cell.id}>
+                          <TableCell
+                            key={cell.id}
+                            data-no-row-click={cell.column.id === "select" || cell.column.id === "actions" ? "true" : undefined}
+                          >
                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                           </TableCell>
                         ))}
@@ -1091,6 +1188,45 @@ export default function SuppliersPage() {
           </Form>
         </DialogContent>
       </Dialog>
+
+      <EntityDetailsDialog
+        open={Boolean(viewing)}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            setViewing(null);
+          }
+        }}
+        title={viewing?.legalName ?? ""}
+        description={t("suppliers.detailsDescription")}
+        subtitle={viewing ? (viewing.tradeName || viewing.contactName || viewing.email || null) : null}
+        badges={viewing ? [
+          <Badge key="type" variant="outline">
+            {t(`suppliers.types.${viewing.supplierType}`)}
+          </Badge>,
+          <Badge
+            key="status"
+            variant="secondary"
+            className={viewing.status === "active" ? "text-primary bg-primary/10" : "text-destructive bg-destructive/10"}
+          >
+            {viewing.status === "active" ? t("suppliers.active") : t("suppliers.inactive")}
+          </Badge>,
+        ] : []}
+        sections={supplierDetailsSections}
+        footer={viewing ? (
+          <div className="flex justify-end">
+            <Button
+              className="cursor-pointer"
+              onClick={() => {
+                setEditing(viewing);
+                setViewing(null);
+              }}
+            >
+              <Pencil className="mr-2 size-4" />
+              {t("suppliers.edit")}
+            </Button>
+          </div>
+        ) : null}
+      />
 
       <ConfirmDeleteDialog
         open={Boolean(deleting)}
