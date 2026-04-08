@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import { AppSidebar } from "@/components/app-sidebar"
-import { AppTopbar } from "@/components/app-navigation"
 import { SiteHeader } from "@/components/site-header"
 import { CompanyDisplayNameProvider } from "@/hooks/use-company-display-name"
 import { useSidebarConfig } from "@/hooks/use-sidebar-config"
@@ -26,6 +25,7 @@ import {
   LOCK_STORAGE_KEY,
   LOCK_USER_STORAGE_KEY,
   MANUAL_LOCK_EVENT,
+  consumeLockscreenResetOnNextLogin,
   resetLockscreenStorage,
 } from "@/lib/lockscreen"
 
@@ -161,6 +161,17 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
   React.useEffect(() => {
     if (isPending || !session) {
+      return
+    }
+
+    if (consumeLockscreenResetOnNextLogin()) {
+      resetLockscreenStorage()
+      const now = Date.now()
+      window.localStorage.setItem(LAST_ACTIVITY_STORAGE_KEY, String(now))
+      setIsLocked(false)
+      setFailedAttempts(0)
+      updateBodyScrollLock(false)
+      scheduleLockFromActivity(now)
       return
     }
 
@@ -315,7 +326,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   }
 
   const showSidebar = config.navigationMode === "sidebar" || isMobile
-  const showTopbar = config.navigationMode === "topbar" && !isMobile
 
   return (
     <CompanyDisplayNameProvider>
@@ -348,7 +358,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             ) : null}
             <SidebarInset>
               <SiteHeader />
-              {showTopbar ? <AppTopbar /> : null}
               <div className="flex flex-1 flex-col">
                 <div className="@container/main flex flex-1 flex-col gap-2">
                   <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
@@ -362,7 +371,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           <>
             <SidebarInset>
               <SiteHeader />
-              {showTopbar ? <AppTopbar /> : null}
               <div className="flex flex-1 flex-col">
                 <div className="@container/main flex flex-1 flex-col gap-2">
                   <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">

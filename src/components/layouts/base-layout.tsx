@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import { AppSidebar } from "@/components/app-sidebar"
-import { AppTopbar } from "@/components/app-navigation"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { useSidebarConfig } from "@/hooks/use-sidebar-config"
@@ -22,7 +21,6 @@ export function BaseLayout({ children, title, description }: BaseLayoutProps) {
   const { config } = useSidebarConfig()
   const isMobile = useIsMobile()
   const showSidebar = config.navigationMode === "sidebar" || isMobile
-  const showTopbar = config.navigationMode === "topbar" && !isMobile
 
   return (
     <SidebarProvider
@@ -46,7 +44,6 @@ export function BaseLayout({ children, title, description }: BaseLayoutProps) {
           ) : null}
           <SidebarInset>
             <SiteHeader />
-            {showTopbar ? <AppTopbar /> : null}
             <div className="flex flex-1 flex-col">
               <div className="@container/main flex flex-1 flex-col gap-2">
                 <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
@@ -71,7 +68,6 @@ export function BaseLayout({ children, title, description }: BaseLayoutProps) {
         <>
           <SidebarInset>
             <SiteHeader />
-            {showTopbar ? <AppTopbar /> : null}
             <div className="flex flex-1 flex-col">
               <div className="@container/main flex flex-1 flex-col gap-2">
                 <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">

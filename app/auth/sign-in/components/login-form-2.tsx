@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { signIn } from "@/lib/auth-client"
 import { useI18n, useLocale } from "@/i18n/provider"
 import { getAppUrl } from "@/lib/utils"
-import { resetLockscreenStorage } from "@/lib/lockscreen"
+import { markLockscreenResetOnNextLogin, resetLockscreenStorage } from "@/lib/lockscreen"
 
 export function LoginForm2({
   className,
@@ -22,6 +22,10 @@ export function LoginForm2({
   const [error, setError] = React.useState<string | null>(null)
   const { t } = useI18n()
   const locale = useLocale()
+
+  React.useEffect(() => {
+    resetLockscreenStorage()
+  }, [])
 
   const getLoginErrorMessage = React.useCallback((rawMessage?: string | null, status?: number) => {
     const normalizedMessage = rawMessage?.toLowerCase() ?? ""
@@ -59,6 +63,7 @@ export function LoginForm2({
       callbackURL: getAppUrl("/dashboard", locale)
     }, {
       onSuccess: () => {
+        markLockscreenResetOnNextLogin()
         resetLockscreenStorage()
         router.push(getAppUrl("/dashboard", locale))
       },

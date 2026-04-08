@@ -4,6 +4,7 @@ export const LOCK_USER_STORAGE_KEY = "app:lockscreen:locked-user"
 export const LAST_ACTIVITY_STORAGE_KEY = "app:lockscreen:last-active-at"
 export const FAILED_ATTEMPTS_STORAGE_KEY = "app:lockscreen:failed-attempts"
 export const MANUAL_LOCK_EVENT = "app:lockscreen:manual-lock"
+export const POST_LOGIN_RESET_SESSION_KEY = "app:lockscreen:post-login-reset"
 
 export function resetLockscreenStorage() {
   if (typeof window === "undefined") {
@@ -14,6 +15,28 @@ export function resetLockscreenStorage() {
   window.localStorage.removeItem(LOCK_USER_STORAGE_KEY)
   window.localStorage.removeItem(LAST_ACTIVITY_STORAGE_KEY)
   window.localStorage.setItem(FAILED_ATTEMPTS_STORAGE_KEY, "0")
+}
+
+export function markLockscreenResetOnNextLogin() {
+  if (typeof window === "undefined") {
+    return
+  }
+
+  window.sessionStorage.setItem(POST_LOGIN_RESET_SESSION_KEY, "1")
+}
+
+export function consumeLockscreenResetOnNextLogin() {
+  if (typeof window === "undefined") {
+    return false
+  }
+
+  const shouldReset = window.sessionStorage.getItem(POST_LOGIN_RESET_SESSION_KEY) === "1"
+
+  if (shouldReset) {
+    window.sessionStorage.removeItem(POST_LOGIN_RESET_SESSION_KEY)
+  }
+
+  return shouldReset
 }
 
 export function triggerManualLock() {
