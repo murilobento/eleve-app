@@ -17,6 +17,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { useFormValidationToast } from "@/hooks/use-form-validation-toast";
 import { useI18n } from "@/i18n/provider";
 import type { CnpjLookupResult, ManagedCompany, PostalCodeLookupResult, UpdateCompanyInput } from "@/lib/company-admin";
 import { updateCompanySchema } from "@/lib/company-admin";
@@ -94,7 +95,14 @@ export default function CompanyPage() {
 
   const form = useForm<UpdateCompanyInput>({
     resolver: zodResolver(updateCompanySchema),
+    mode: "onBlur",
+    reValidateMode: "onBlur",
     defaultValues: EMPTY_VALUES,
+  });
+  const { formClassName, handleInvalidSubmit } = useFormValidationToast({
+    form,
+    title: t("common.validationToastTitle"),
+    fallback: t("common.validationToastFallback"),
   });
 
   const loadCompany = async () => {
@@ -124,6 +132,7 @@ export default function CompanyPage() {
 
     if (normalizedCnpj.length !== 14) {
       form.setError("cnpj", { message: t("company.cnpjInvalid") });
+      toast.error(t("company.cnpjInvalid"));
       return;
     }
 
@@ -189,6 +198,7 @@ export default function CompanyPage() {
 
     if (normalizedPostalCode.length !== 8) {
       form.setError("postalCode", { message: t("company.postalCodeInvalid") });
+      toast.error(t("company.postalCodeInvalid"));
       return;
     }
 
@@ -271,7 +281,7 @@ export default function CompanyPage() {
             </CardHeader>
             <CardContent>
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+                <form onSubmit={form.handleSubmit(handleSubmit, handleInvalidSubmit)} className={`space-y-4 ${formClassName}`}>
                   <div className="grid gap-3">
                     <div className="grid gap-3 xl:grid-cols-[220px_minmax(320px,1fr)]">
                       <FormField

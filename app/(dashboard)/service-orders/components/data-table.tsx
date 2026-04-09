@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { addDays, endOfDay, endOfMonth, startOfDay, startOfMonth, subDays, subMonths } from "date-fns";
-import { CalendarDays, CheckCircle2, ChevronDown, Clock3, EllipsisVertical, Pencil, Play, RotateCcw, Search, Trash2, XCircle } from "lucide-react";
+import { CalendarDays, CheckCircle2, Clock3, EllipsisVertical, Pencil, Play, RotateCcw, Search, Trash2, XCircle } from "lucide-react";
 
 import { ServiceOrderFormDialog } from "./service-order-form-dialog";
 import {
@@ -17,15 +17,17 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import {
+  AdminFiltersDialog,
+  AdminFiltersSection,
   AdminListPaginationFooter,
   AdminListTableCard,
   AdminListToolbar,
 } from "@/components/admin-list-layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
+import { DatePickerInput } from "@/components/date-picker-input";
 import { StatusHistoryDialog } from "@/components/status-history-dialog";
 import { StatusTransitionDialog } from "@/components/status-transition-dialog";
 import {
@@ -38,15 +40,12 @@ import {
 } from "@/components/ui/dialog";
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { usePersistentColumnVisibility } from "@/hooks/use-persistent-column-visibility";
 import {
   Select,
   SelectContent,
@@ -69,7 +68,6 @@ import type {
 import type { ManagedServiceType } from "@/lib/service-types-admin";
 import { getSemanticStatusBadgeClass } from "@/lib/status-badge";
 import { useI18n, useLocale } from "@/i18n/provider";
-import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 type DataTableProps = {
@@ -115,15 +113,6 @@ type DateFilterControlProps = {
   onPresetChange: (preset: DateFilterPreset) => void;
   onRangeChange: (nextRange: Pick<DateFilterValue, "from" | "to">) => void;
   t: ReturnType<typeof useI18n>["t"];
-};
-
-type DatePickerFieldProps = {
-  id: string;
-  label: string;
-  locale: string;
-  value?: Date;
-  onSelect: (value?: Date) => void;
-  placeholder: string;
 };
 
 function parseDateOnly(value: string) {
@@ -255,51 +244,6 @@ function matchesServiceDateFilter(serviceOrder: ManagedServiceOrder, range: Reso
   return serviceOrder.items.some((item) => isDateInRange(parseDateOnly(item.serviceDate), range));
 }
 
-function DatePickerField({
-  id,
-  label,
-  locale,
-  value,
-  onSelect,
-  placeholder,
-}: DatePickerFieldProps) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <div className="space-y-2">
-      <Label htmlFor={id} className="text-xs font-medium text-muted-foreground">
-        {label}
-      </Label>
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            id={id}
-            variant="outline"
-            className={cn(
-              "h-10 w-full justify-start rounded-lg text-left font-normal",
-              !value && "text-muted-foreground",
-            )}
-          >
-            <CalendarDays className="mr-2 size-4" />
-            {value ? formatCompactCalendarDate(value, locale) : placeholder}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
-          <Calendar
-            mode="single"
-            selected={value}
-            onSelect={(nextDate) => {
-              onSelect(nextDate);
-              setOpen(false);
-            }}
-            initialFocus
-          />
-        </PopoverContent>
-      </Popover>
-    </div>
-  );
-}
-
 function DateFilterControl({
   idPrefix,
   label,
@@ -386,22 +330,28 @@ function DateFilterControl({
           </DialogHeader>
 
           <div className="grid gap-3 md:grid-cols-2">
-            <DatePickerField
-              id={`${idPrefix}-from`}
-              label={t("serviceOrders.fromDate")}
-              locale={locale}
-              value={draftRange.from}
-              onSelect={(from) => setDraftRange((current) => ({ ...current, from }))}
-              placeholder={t("serviceOrders.selectDate")}
-            />
-            <DatePickerField
-              id={`${idPrefix}-to`}
-              label={t("serviceOrders.toDate")}
-              locale={locale}
-              value={draftRange.to}
-              onSelect={(to) => setDraftRange((current) => ({ ...current, to }))}
-              placeholder={t("serviceOrders.selectDate")}
-            />
+            <div className="space-y-2">
+              <Label htmlFor={`${idPrefix}-from`} className="text-xs font-medium text-muted-foreground">
+                {t("serviceOrders.fromDate")}
+              </Label>
+              <DatePickerInput
+                id={`${idPrefix}-from`}
+                value={draftRange.from}
+                onChange={(from) => setDraftRange((current) => ({ ...current, from }))}
+                placeholder={t("serviceOrders.selectDate")}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`${idPrefix}-to`} className="text-xs font-medium text-muted-foreground">
+                {t("serviceOrders.toDate")}
+              </Label>
+              <DatePickerInput
+                id={`${idPrefix}-to`}
+                value={draftRange.to}
+                onChange={(to) => setDraftRange((current) => ({ ...current, to }))}
+                placeholder={t("serviceOrders.selectDate")}
+              />
+            </div>
           </div>
 
           <DialogFooter className="sm:justify-between">
@@ -488,15 +438,15 @@ export function DataTable({
   const locale = useLocale();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const { columnVisibility, setColumnVisibility } = usePersistentColumnVisibility("table:service-orders:columns:v2", {
-    createdAt: false,
-    originType: false,
-  });
   const [rowSelection, setRowSelection] = useState({});
   const [globalFilter, setGlobalFilter] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
   const [createdDateFilter, setCreatedDateFilter] = useState<DateFilterValue>({ preset: "all" });
   const [serviceDateFilter, setServiceDateFilter] = useState<DateFilterValue>({ preset: "all" });
+  const [draftStatusFilter, setDraftStatusFilter] = useState("all");
+  const [draftCreatedDateFilter, setDraftCreatedDateFilter] = useState<DateFilterValue>({ preset: "all" });
+  const [draftServiceDateFilter, setDraftServiceDateFilter] = useState<DateFilterValue>({ preset: "all" });
   const [createOpen, setCreateOpen] = useState(openCreateDialogFromQuery);
   const [editingServiceOrder, setEditingServiceOrder] = useState<ManagedServiceOrder | null>(null);
   const [pendingStatusAction, setPendingStatusAction] = useState<PendingStatusAction>(null);
@@ -727,24 +677,12 @@ export function DataTable({
     },
   ], [isMutating, locale, t]);
 
-  const columnVisibilityLabels = useMemo<Record<string, string>>(
-    () => ({
-      clientName: t("serviceOrders.client"),
-      originType: t("serviceOrders.originType"),
-      schedule: t("serviceOrders.schedule"),
-      status: t("serviceOrders.status"),
-      createdAt: t("serviceOrders.createdAt"),
-    }),
-    [t],
-  );
-
   const table = useReactTable({
     data: filteredServiceOrders,
     columns,
     getRowId: (row) => row.id,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
-    onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
     onGlobalFilterChange: setGlobalFilter,
     getCoreRowModel: getCoreRowModel(),
@@ -766,7 +704,6 @@ export function DataTable({
     state: {
       sorting,
       columnFilters,
-      columnVisibility,
       rowSelection,
       globalFilter,
     },
@@ -778,19 +715,41 @@ export function DataTable({
   });
 
   const selectedCount = table.getFilteredSelectedRowModel().rows.length;
-  const hasActiveFilters = Boolean(globalFilter.trim())
-    || columnFilters.length > 0
-    || statusFilter !== "all"
-    || createdDateFilter.preset !== "all"
-    || serviceDateFilter.preset !== "all";
+  const activeFilterCount = [
+    statusFilter !== "all",
+    createdDateFilter.preset !== "all",
+    serviceDateFilter.preset !== "all",
+  ].filter(Boolean).length;
+
+  const handleOpenFilters = (nextOpen: boolean) => {
+    if (nextOpen) {
+      setDraftStatusFilter(statusFilter);
+      setDraftCreatedDateFilter(createdDateFilter);
+      setDraftServiceDateFilter(serviceDateFilter);
+    }
+
+    setFiltersOpen(nextOpen);
+  };
+
+  const handleApplyFilters = () => {
+    setStatusFilter(draftStatusFilter);
+    table.getColumn("status")?.setFilterValue(draftStatusFilter === "all" ? undefined : draftStatusFilter);
+    setCreatedDateFilter(draftCreatedDateFilter);
+    setServiceDateFilter(draftServiceDateFilter);
+    table.setPageIndex(0);
+    setFiltersOpen(false);
+  };
 
   const handleClearFilters = () => {
-    setGlobalFilter("");
     setColumnFilters([]);
     setStatusFilter("all");
     setCreatedDateFilter({ preset: "all" });
     setServiceDateFilter({ preset: "all" });
+    setDraftStatusFilter("all");
+    setDraftCreatedDateFilter({ preset: "all" });
+    setDraftServiceDateFilter({ preset: "all" });
     table.setPageIndex(0);
+    setFiltersOpen(false);
   };
 
   return (
@@ -806,115 +765,80 @@ export function DataTable({
           />
         </div>
 
-        <div className="min-w-[180px] space-y-2">
-          <Label htmlFor="service-order-status-filter" className="text-sm font-medium">
-            {t("serviceOrders.status")}
-          </Label>
-          <Select
-            value={statusFilter}
-            onValueChange={(value) => {
-              setStatusFilter(value);
-              table.getColumn("status")?.setFilterValue(value === "all" ? undefined : value);
-            }}
-          >
-            <SelectTrigger id="service-order-status-filter" className="h-10 cursor-pointer rounded-lg">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t("serviceOrders.allStatuses")}</SelectItem>
-              <SelectItem value="pending">{t("serviceOrders.statusOptions.pending")}</SelectItem>
-              <SelectItem value="scheduled">{t("serviceOrders.statusOptions.scheduled")}</SelectItem>
-              <SelectItem value="in_progress">{t("serviceOrders.statusOptions.inProgress")}</SelectItem>
-              <SelectItem value="completed">{t("serviceOrders.statusOptions.completed")}</SelectItem>
-              <SelectItem value="cancelled">{t("serviceOrders.statusOptions.cancelled")}</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <AdminFiltersDialog
+          open={filtersOpen}
+          onOpenChange={handleOpenFilters}
+          title={t("common.filters")}
+          description={t("common.activeFilters", { count: activeFilterCount })}
+          activeCount={activeFilterCount}
+          triggerLabel={t("common.filters")}
+          clearLabel={t("common.clearFilters")}
+          cancelLabel={t("common.cancel")}
+          applyLabel={t("common.apply")}
+          onClear={handleClearFilters}
+          onApply={handleApplyFilters}
+        >
+          <AdminFiltersSection title={t("common.filters")}>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="service-order-status-filter">{t("serviceOrders.status")}</Label>
+                <Select value={draftStatusFilter} onValueChange={setDraftStatusFilter}>
+                  <SelectTrigger id="service-order-status-filter" className="h-10 cursor-pointer rounded-lg">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("serviceOrders.allStatuses")}</SelectItem>
+                    <SelectItem value="pending">{t("serviceOrders.statusOptions.pending")}</SelectItem>
+                    <SelectItem value="scheduled">{t("serviceOrders.statusOptions.scheduled")}</SelectItem>
+                    <SelectItem value="in_progress">{t("serviceOrders.statusOptions.inProgress")}</SelectItem>
+                    <SelectItem value="completed">{t("serviceOrders.statusOptions.completed")}</SelectItem>
+                    <SelectItem value="cancelled">{t("serviceOrders.statusOptions.cancelled")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </AdminFiltersSection>
 
-        <DateFilterControl
-          idPrefix="service-order-created-date"
-          label={t("serviceOrders.createdDateFilter")}
-          locale={locale}
-          value={createdDateFilter}
-          onPresetChange={(preset) => setCreatedDateFilter({ preset })}
-          onRangeChange={({ from, to }) =>
-            setCreatedDateFilter((current) => ({
-              ...current,
-              preset: "custom",
-              from,
-              to,
-            }))
-          }
-          t={t}
-        />
+          <AdminFiltersSection title={t("serviceOrders.schedule")}>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <DateFilterControl
+                idPrefix="service-order-created-date"
+                label={t("serviceOrders.createdDateFilter")}
+                locale={locale}
+                value={draftCreatedDateFilter}
+                onPresetChange={(preset) => setDraftCreatedDateFilter({ preset })}
+                onRangeChange={({ from, to }) =>
+                  setDraftCreatedDateFilter((current) => ({
+                    ...current,
+                    preset: "custom",
+                    from,
+                    to,
+                  }))
+                }
+                t={t}
+              />
 
-        <DateFilterControl
-          idPrefix="service-order-service-date"
-          label={t("serviceOrders.serviceDateFilter")}
-          locale={locale}
-          value={serviceDateFilter}
-          onPresetChange={(preset) => setServiceDateFilter({ preset })}
-          onRangeChange={({ from, to }) =>
-            setServiceDateFilter((current) => ({
-              ...current,
-              preset: "custom",
-              from,
-              to,
-            }))
-          }
-          t={t}
-        />
+              <DateFilterControl
+                idPrefix="service-order-service-date"
+                label={t("serviceOrders.serviceDateFilter")}
+                locale={locale}
+                value={draftServiceDateFilter}
+                onPresetChange={(preset) => setDraftServiceDateFilter({ preset })}
+                onRangeChange={({ from, to }) =>
+                  setDraftServiceDateFilter((current) => ({
+                    ...current,
+                    preset: "custom",
+                    from,
+                    to,
+                  }))
+                }
+                t={t}
+              />
+            </div>
+          </AdminFiltersSection>
+        </AdminFiltersDialog>
 
         <div className="ml-auto">
-          <div className="min-w-[180px] space-y-2">
-            <Label htmlFor="service-orders-column-visibility" className="text-sm font-medium">
-              {t("common.columnVisibility")}
-            </Label>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  id="service-orders-column-visibility"
-                  variant="outline"
-                  size="lg"
-                  className="h-10 w-full cursor-pointer justify-between rounded-lg px-3"
-                >
-                  {t("common.columns")} <ChevronDown className="size-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {table
-                  .getAllColumns()
-                  .filter((column) => column.getCanHide())
-                  .map((column) => (
-                    <DropdownMenuCheckboxItem
-                      key={column.id}
-                      checked={column.getIsVisible()}
-                      onCheckedChange={(value) => column.toggleVisibility(!!value)}
-                    >
-                      {columnVisibilityLabels[column.id] ?? column.id}
-                    </DropdownMenuCheckboxItem>
-                  ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-
-        <div className="w-full min-w-[160px] space-y-2 sm:w-auto">
-          <Label className="text-sm font-medium text-transparent">
-            {t("common.clearFilters")}
-          </Label>
-          <Button
-            type="button"
-            variant="outline"
-            className="h-10 w-full cursor-pointer rounded-lg sm:w-auto"
-            onClick={handleClearFilters}
-            disabled={!hasActiveFilters}
-          >
-            {t("common.clearFilters")}
-          </Button>
-        </div>
-
-        <div>
           <ServiceOrderFormDialog
             mode="create"
             open={createOpen}

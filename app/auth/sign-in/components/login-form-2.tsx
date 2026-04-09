@@ -1,11 +1,16 @@
 "use client"
 
 import * as React from "react"
+import { zodResolver } from "@hookform/resolvers/zod"
 import { useRouter } from "next/navigation"
+import { useForm } from "react-hook-form"
+import { toast } from "sonner"
+import { z } from "zod"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { useFormValidationToast } from "@/hooks/use-form-validation-toast"
 import { signIn } from "@/lib/auth-client"
 import { useI18n, useLocale } from "@/i18n/provider"
 import { getAppUrl } from "@/lib/utils"
@@ -16,12 +21,27 @@ export function LoginForm2({
   ...props
 }: React.ComponentProps<"form">) {
   const router = useRouter()
-  const [email, setEmail] = React.useState("")
-  const [password, setPassword] = React.useState("")
   const [loading, setLoading] = React.useState(false)
-  const [error, setError] = React.useState<string | null>(null)
   const { t } = useI18n()
   const locale = useLocale()
+  const loginSchema = React.useMemo(() => z.object({
+    email: z.string().trim().email(locale === "pt-BR" ? "Informe um e-mail válido." : "Enter a valid email address."),
+    password: z.string().min(1, locale === "pt-BR" ? "Informe sua senha." : "Enter your password."),
+  }), [locale])
+  const form = useForm<z.infer<typeof loginSchema>>({
+    resolver: zodResolver(loginSchema),
+    mode: "onBlur",
+    reValidateMode: "onBlur",
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  })
+  const { formClassName, handleInvalidSubmit } = useFormValidationToast({
+    form,
+    title: t("common.validationToastTitle"),
+    fallback: t("common.validationToastFallback"),
+  })
 
   React.useEffect(() => {
     resetLockscreenStorage()
@@ -52,14 +72,12 @@ export function LoginForm2({
     return rawMessage || t("auth.failedSignIn")
   }, [t])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = async (values: z.infer<typeof loginSchema>) => {
     setLoading(true)
-    setError(null)
     
     const { error } = await signIn.email({
-      email,
-      password,
+      email: values.email,
+      password: values.password,
       callbackURL: getAppUrl("/dashboard", locale)
     }, {
       onSuccess: () => {
@@ -68,7 +86,7 @@ export function LoginForm2({
         router.push(getAppUrl("/dashboard", locale))
       },
       onError: (ctx) => {
-        setError(
+        toast.error(
           getLoginErrorMessage(
             ctx.error.message,
             typeof ctx.error.status === "number" ? ctx.error.status : undefined,
@@ -79,7 +97,7 @@ export function LoginForm2({
     })
     
     if (error) {
-       setError(
+       toast.error(
         getLoginErrorMessage(
           error.message,
           typeof error.status === "number" ? error.status : undefined,
@@ -89,8 +107,17 @@ export function LoginForm2({
     }
   }
 
+  const {
+    register,
+    formState: { errors },
+  } = form
+
   return (
-    <form className={cn("flex flex-col gap-6", className)} onSubmit={handleSubmit} {...props}>
+    <form
+      className={cn("flex flex-col gap-6", formClassName, className)}
+      onSubmit={form.handleSubmit(handleSubmit, handleInvalidSubmit)}
+      {...props}
+    >
       <div className="flex flex-col items-center gap-2 text-center">
         <h1 className="text-2xl font-bold">{t("auth.loginTitle")}</h1>
         <p className="text-muted-foreground text-sm text-balance">
@@ -98,20 +125,14 @@ export function LoginForm2({
         </p>
       </div>
       <div className="grid gap-6">
-        {error && (
-          <div className="bg-destructive/15 text-destructive text-sm p-3 rounded-md">
-            {error}
-          </div>
-        )}
         <div className="grid gap-3">
           <Label htmlFor="email">{t("auth.email")}</Label>
           <Input 
             id="email" 
             type="email" 
             placeholder={t("auth.emailPlaceholder")} 
-            required 
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            aria-invalid={!!errors.email}
+            {...register("email")}
           />
         </div>
         <div className="grid gap-3">
@@ -121,9 +142,8 @@ export function LoginForm2({
           <Input 
             id="password" 
             type="password" 
-            required 
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            aria-invalid={!!errors.password}
+            {...register("password")}
           />
         </div>
         <Button type="submit" className="w-full cursor-pointer" disabled={loading}>

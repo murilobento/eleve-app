@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import { FuelFormDialog } from "./components/fuel-form-dialog";
 import { MaintenanceFormDialog } from "./components/maintenance-form-dialog";
 import {
+  AdminFiltersDialog,
+  AdminFiltersSection,
   AdminListTableCard,
   AdminListToolbar,
 } from "@/components/admin-list-layout";
@@ -14,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
+import { DatePickerInput, formatDateString, parseDateString } from "@/components/date-picker-input";
 import {
   Dialog,
   DialogContent,
@@ -253,6 +256,25 @@ export default function EquipmentCostsPage() {
 
   const [overviewFrom, setOverviewFrom] = useState("");
   const [overviewTo, setOverviewTo] = useState("");
+  const [overviewFiltersOpen, setOverviewFiltersOpen] = useState(false);
+  const [draftOverviewFrom, setDraftOverviewFrom] = useState("");
+  const [draftOverviewTo, setDraftOverviewTo] = useState("");
+
+  const [maintenanceFiltersOpen, setMaintenanceFiltersOpen] = useState(false);
+  const [draftMaintenanceFrom, setDraftMaintenanceFrom] = useState("");
+  const [draftMaintenanceTo, setDraftMaintenanceTo] = useState("");
+  const [draftMaintenanceEquipment, setDraftMaintenanceEquipment] = useState("all");
+  const [draftMaintenanceType, setDraftMaintenanceType] = useState("all");
+  const [draftMaintenanceStatus, setDraftMaintenanceStatus] = useState("all");
+  const [draftMaintenanceFinancialStatus, setDraftMaintenanceFinancialStatus] = useState("all");
+  const [draftMaintenanceOverdue, setDraftMaintenanceOverdue] = useState("all");
+
+  const [fuelFiltersOpen, setFuelFiltersOpen] = useState(false);
+  const [draftFuelFrom, setDraftFuelFrom] = useState("");
+  const [draftFuelTo, setDraftFuelTo] = useState("");
+  const [draftFuelEquipment, setDraftFuelEquipment] = useState("all");
+  const [draftFuelType, setDraftFuelType] = useState("all");
+  const [draftFuelFinancialStatus, setDraftFuelFinancialStatus] = useState("all");
 
   const [createMaintenanceOpen, setCreateMaintenanceOpen] = useState(false);
   const [editMaintenance, setEditMaintenance] = useState<ManagedMaintenanceRecord | null>(null);
@@ -527,6 +549,125 @@ export default function EquipmentCostsPage() {
     setPaidAt(paymentDialog.paidAt ?? "");
   }, [paymentDialog]);
 
+  const overviewActiveFilterCount = [overviewFrom, overviewTo].filter(Boolean).length;
+  const maintenanceActiveFilterCount = [
+    maintenanceFrom,
+    maintenanceTo,
+    maintenanceEquipment !== "all",
+    maintenanceType !== "all",
+    maintenanceStatus !== "all",
+    maintenanceFinancialStatus !== "all",
+    maintenanceOverdue !== "all",
+  ].filter(Boolean).length;
+  const fuelActiveFilterCount = [
+    fuelFrom,
+    fuelTo,
+    fuelEquipment !== "all",
+    fuelType !== "all",
+    fuelFinancialStatus !== "all",
+  ].filter(Boolean).length;
+
+  const handleOpenOverviewFilters = (nextOpen: boolean) => {
+    if (nextOpen) {
+      setDraftOverviewFrom(overviewFrom);
+      setDraftOverviewTo(overviewTo);
+    }
+
+    setOverviewFiltersOpen(nextOpen);
+  };
+
+  const handleApplyOverviewFilters = () => {
+    setOverviewFrom(draftOverviewFrom);
+    setOverviewTo(draftOverviewTo);
+    setOverviewFiltersOpen(false);
+  };
+
+  const handleClearOverviewFilters = () => {
+    setOverviewFrom("");
+    setOverviewTo("");
+    setDraftOverviewFrom("");
+    setDraftOverviewTo("");
+    setOverviewFiltersOpen(false);
+  };
+
+  const handleOpenMaintenanceFilters = (nextOpen: boolean) => {
+    if (nextOpen) {
+      setDraftMaintenanceFrom(maintenanceFrom);
+      setDraftMaintenanceTo(maintenanceTo);
+      setDraftMaintenanceEquipment(maintenanceEquipment);
+      setDraftMaintenanceType(maintenanceType);
+      setDraftMaintenanceStatus(maintenanceStatus);
+      setDraftMaintenanceFinancialStatus(maintenanceFinancialStatus);
+      setDraftMaintenanceOverdue(maintenanceOverdue);
+    }
+
+    setMaintenanceFiltersOpen(nextOpen);
+  };
+
+  const handleApplyMaintenanceFilters = () => {
+    setMaintenanceFrom(draftMaintenanceFrom);
+    setMaintenanceTo(draftMaintenanceTo);
+    setMaintenanceEquipment(draftMaintenanceEquipment);
+    setMaintenanceType(draftMaintenanceType);
+    setMaintenanceStatus(draftMaintenanceStatus);
+    setMaintenanceFinancialStatus(draftMaintenanceFinancialStatus);
+    setMaintenanceOverdue(draftMaintenanceOverdue);
+    setMaintenanceFiltersOpen(false);
+  };
+
+  const handleClearMaintenanceFilters = () => {
+    setMaintenanceFrom("");
+    setMaintenanceTo("");
+    setMaintenanceEquipment("all");
+    setMaintenanceType("all");
+    setMaintenanceStatus("all");
+    setMaintenanceFinancialStatus("all");
+    setMaintenanceOverdue("all");
+    setDraftMaintenanceFrom("");
+    setDraftMaintenanceTo("");
+    setDraftMaintenanceEquipment("all");
+    setDraftMaintenanceType("all");
+    setDraftMaintenanceStatus("all");
+    setDraftMaintenanceFinancialStatus("all");
+    setDraftMaintenanceOverdue("all");
+    setMaintenanceFiltersOpen(false);
+  };
+
+  const handleOpenFuelFilters = (nextOpen: boolean) => {
+    if (nextOpen) {
+      setDraftFuelFrom(fuelFrom);
+      setDraftFuelTo(fuelTo);
+      setDraftFuelEquipment(fuelEquipment);
+      setDraftFuelType(fuelType);
+      setDraftFuelFinancialStatus(fuelFinancialStatus);
+    }
+
+    setFuelFiltersOpen(nextOpen);
+  };
+
+  const handleApplyFuelFilters = () => {
+    setFuelFrom(draftFuelFrom);
+    setFuelTo(draftFuelTo);
+    setFuelEquipment(draftFuelEquipment);
+    setFuelType(draftFuelType);
+    setFuelFinancialStatus(draftFuelFinancialStatus);
+    setFuelFiltersOpen(false);
+  };
+
+  const handleClearFuelFilters = () => {
+    setFuelFrom("");
+    setFuelTo("");
+    setFuelEquipment("all");
+    setFuelType("all");
+    setFuelFinancialStatus("all");
+    setDraftFuelFrom("");
+    setDraftFuelTo("");
+    setDraftFuelEquipment("all");
+    setDraftFuelType("all");
+    setDraftFuelFinancialStatus("all");
+    setFuelFiltersOpen(false);
+  };
+
   return (
     <>
       <div className="px-4 lg:px-6">
@@ -551,20 +692,42 @@ export default function EquipmentCostsPage() {
 
             <TabsContent value="overview" className="space-y-4">
               <AdminListToolbar>
-                <div className="grid min-w-0 gap-2">
-                  <Label htmlFor="overview-from">{t("equipmentCosts.periodFrom")}</Label>
-                  <Input id="overview-from" type="date" value={overviewFrom} onChange={(event) => setOverviewFrom(event.target.value)} />
-                </div>
-                <div className="grid min-w-0 gap-2">
-                  <Label htmlFor="overview-to">{t("equipmentCosts.periodTo")}</Label>
-                  <Input id="overview-to" type="date" value={overviewTo} onChange={(event) => setOverviewTo(event.target.value)} />
-                </div>
-                <Button type="button" variant="outline" className="cursor-pointer" onClick={() => {
-                  setOverviewFrom("");
-                  setOverviewTo("");
-                }}>
-                  {t("common.clearFilters")}
-                </Button>
+                <AdminFiltersDialog
+                  open={overviewFiltersOpen}
+                  onOpenChange={handleOpenOverviewFilters}
+                  title={t("common.filters")}
+                  description={t("common.activeFilters", { count: overviewActiveFilterCount })}
+                  activeCount={overviewActiveFilterCount}
+                  triggerLabel={t("common.filters")}
+                  clearLabel={t("common.clearFilters")}
+                  cancelLabel={t("common.cancel")}
+                  applyLabel={t("common.apply")}
+                  onClear={handleClearOverviewFilters}
+                  onApply={handleApplyOverviewFilters}
+                >
+                  <AdminFiltersSection title={t("common.filters")}>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="grid min-w-0 gap-2">
+                        <Label htmlFor="overview-from">{t("equipmentCosts.periodFrom")}</Label>
+                        <DatePickerInput
+                          id="overview-from"
+                          value={parseDateString(draftOverviewFrom)}
+                          onChange={(date) => setDraftOverviewFrom(formatDateString(date))}
+                          placeholder={t("equipmentCosts.periodFrom")}
+                        />
+                      </div>
+                      <div className="grid min-w-0 gap-2">
+                        <Label htmlFor="overview-to">{t("equipmentCosts.periodTo")}</Label>
+                        <DatePickerInput
+                          id="overview-to"
+                          value={parseDateString(draftOverviewTo)}
+                          onChange={(date) => setDraftOverviewTo(formatDateString(date))}
+                          placeholder={t("equipmentCosts.periodTo")}
+                        />
+                      </div>
+                    </div>
+                  </AdminFiltersSection>
+                </AdminFiltersDialog>
               </AdminListToolbar>
 
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -590,83 +753,99 @@ export default function EquipmentCostsPage() {
                     />
                   </div>
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="maintenance-from">{t("equipmentCosts.periodFrom")}</Label>
-                  <Input id="maintenance-from" type="date" value={maintenanceFrom} onChange={(event) => setMaintenanceFrom(event.target.value)} />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="maintenance-to">{t("equipmentCosts.periodTo")}</Label>
-                  <Input id="maintenance-to" type="date" value={maintenanceTo} onChange={(event) => setMaintenanceTo(event.target.value)} />
-                </div>
-                <div className="grid gap-2">
-                  <Label>{t("equipmentCosts.equipment")}</Label>
-                  <Select value={maintenanceEquipment} onValueChange={setMaintenanceEquipment}>
-                    <SelectTrigger className="min-w-[180px] cursor-pointer"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">{t("equipmentCosts.allEquipment")}</SelectItem>
-                      {activeEquipment.map((item) => (
-                        <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label>{t("equipmentCosts.maintenanceType")}</Label>
-                  <Select value={maintenanceType} onValueChange={setMaintenanceType}>
-                    <SelectTrigger className="min-w-[180px] cursor-pointer"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">{t("equipmentCosts.allTypes")}</SelectItem>
-                      <SelectItem value="preventive">{t("equipmentCosts.maintenanceTypes.preventive")}</SelectItem>
-                      <SelectItem value="corrective">{t("equipmentCosts.maintenanceTypes.corrective")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label>{t("equipmentCosts.status")}</Label>
-                  <Select value={maintenanceStatus} onValueChange={setMaintenanceStatus}>
-                    <SelectTrigger className="min-w-[180px] cursor-pointer"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">{t("equipmentCosts.allStatuses")}</SelectItem>
-                      <SelectItem value="planned">{t("equipmentCosts.maintenanceStatuses.planned")}</SelectItem>
-                      <SelectItem value="completed">{t("equipmentCosts.maintenanceStatuses.completed")}</SelectItem>
-                      <SelectItem value="cancelled">{t("equipmentCosts.maintenanceStatuses.cancelled")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label>{t("equipmentCosts.financialStatus")}</Label>
-                  <Select value={maintenanceFinancialStatus} onValueChange={setMaintenanceFinancialStatus}>
-                    <SelectTrigger className="min-w-[180px] cursor-pointer"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">{t("equipmentCosts.allFinancialStatuses")}</SelectItem>
-                      <SelectItem value="pending">{t("equipmentCosts.financialStatuses.pending")}</SelectItem>
-                      <SelectItem value="paid">{t("equipmentCosts.financialStatuses.paid")}</SelectItem>
-                      <SelectItem value="cancelled">{t("equipmentCosts.financialStatuses.cancelled")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label>{t("equipmentCosts.overdueOnly")}</Label>
-                  <Select value={maintenanceOverdue} onValueChange={setMaintenanceOverdue}>
-                    <SelectTrigger className="min-w-[180px] cursor-pointer"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">{t("equipmentCosts.allRecords")}</SelectItem>
-                      <SelectItem value="yes">{t("equipmentCosts.onlyOverdue")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button type="button" variant="outline" className="cursor-pointer" onClick={() => {
-                  setMaintenanceSearch("");
-                  setMaintenanceFrom("");
-                  setMaintenanceTo("");
-                  setMaintenanceEquipment("all");
-                  setMaintenanceType("all");
-                  setMaintenanceStatus("all");
-                  setMaintenanceFinancialStatus("all");
-                  setMaintenanceOverdue("all");
-                }}>
-                  {t("common.clearFilters")}
-                </Button>
+                <AdminFiltersDialog
+                  open={maintenanceFiltersOpen}
+                  onOpenChange={handleOpenMaintenanceFilters}
+                  title={t("common.filters")}
+                  description={t("common.activeFilters", { count: maintenanceActiveFilterCount })}
+                  activeCount={maintenanceActiveFilterCount}
+                  triggerLabel={t("common.filters")}
+                  clearLabel={t("common.clearFilters")}
+                  cancelLabel={t("common.cancel")}
+                  applyLabel={t("common.apply")}
+                  onClear={handleClearMaintenanceFilters}
+                  onApply={handleApplyMaintenanceFilters}
+                >
+                  <AdminFiltersSection title={t("common.filters")}>
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                      <div className="grid gap-2">
+                        <Label htmlFor="maintenance-from">{t("equipmentCosts.periodFrom")}</Label>
+                        <DatePickerInput
+                          id="maintenance-from"
+                          value={parseDateString(draftMaintenanceFrom)}
+                          onChange={(date) => setDraftMaintenanceFrom(formatDateString(date))}
+                          placeholder={t("equipmentCosts.periodFrom")}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="maintenance-to">{t("equipmentCosts.periodTo")}</Label>
+                        <DatePickerInput
+                          id="maintenance-to"
+                          value={parseDateString(draftMaintenanceTo)}
+                          onChange={(date) => setDraftMaintenanceTo(formatDateString(date))}
+                          placeholder={t("equipmentCosts.periodTo")}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label>{t("equipmentCosts.equipment")}</Label>
+                        <Select value={draftMaintenanceEquipment} onValueChange={setDraftMaintenanceEquipment}>
+                          <SelectTrigger className="min-w-[180px] cursor-pointer"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">{t("equipmentCosts.allEquipment")}</SelectItem>
+                            {activeEquipment.map((item) => (
+                              <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label>{t("equipmentCosts.maintenanceType")}</Label>
+                        <Select value={draftMaintenanceType} onValueChange={setDraftMaintenanceType}>
+                          <SelectTrigger className="min-w-[180px] cursor-pointer"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">{t("equipmentCosts.allTypes")}</SelectItem>
+                            <SelectItem value="preventive">{t("equipmentCosts.maintenanceTypes.preventive")}</SelectItem>
+                            <SelectItem value="corrective">{t("equipmentCosts.maintenanceTypes.corrective")}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label>{t("equipmentCosts.status")}</Label>
+                        <Select value={draftMaintenanceStatus} onValueChange={setDraftMaintenanceStatus}>
+                          <SelectTrigger className="min-w-[180px] cursor-pointer"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">{t("equipmentCosts.allStatuses")}</SelectItem>
+                            <SelectItem value="planned">{t("equipmentCosts.maintenanceStatuses.planned")}</SelectItem>
+                            <SelectItem value="completed">{t("equipmentCosts.maintenanceStatuses.completed")}</SelectItem>
+                            <SelectItem value="cancelled">{t("equipmentCosts.maintenanceStatuses.cancelled")}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label>{t("equipmentCosts.financialStatus")}</Label>
+                        <Select value={draftMaintenanceFinancialStatus} onValueChange={setDraftMaintenanceFinancialStatus}>
+                          <SelectTrigger className="min-w-[180px] cursor-pointer"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">{t("equipmentCosts.allFinancialStatuses")}</SelectItem>
+                            <SelectItem value="pending">{t("equipmentCosts.financialStatuses.pending")}</SelectItem>
+                            <SelectItem value="paid">{t("equipmentCosts.financialStatuses.paid")}</SelectItem>
+                            <SelectItem value="cancelled">{t("equipmentCosts.financialStatuses.cancelled")}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label>{t("equipmentCosts.overdueOnly")}</Label>
+                        <Select value={draftMaintenanceOverdue} onValueChange={setDraftMaintenanceOverdue}>
+                          <SelectTrigger className="min-w-[180px] cursor-pointer"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">{t("equipmentCosts.allRecords")}</SelectItem>
+                            <SelectItem value="yes">{t("equipmentCosts.onlyOverdue")}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </AdminFiltersSection>
+                </AdminFiltersDialog>
                 {canCreate ? (
                   <MaintenanceFormDialog
                     mode="create"
@@ -807,64 +986,82 @@ export default function EquipmentCostsPage() {
                     />
                   </div>
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="fuel-from">{t("equipmentCosts.periodFrom")}</Label>
-                  <Input id="fuel-from" type="date" value={fuelFrom} onChange={(event) => setFuelFrom(event.target.value)} />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="fuel-to">{t("equipmentCosts.periodTo")}</Label>
-                  <Input id="fuel-to" type="date" value={fuelTo} onChange={(event) => setFuelTo(event.target.value)} />
-                </div>
-                <div className="grid gap-2">
-                  <Label>{t("equipmentCosts.equipment")}</Label>
-                  <Select value={fuelEquipment} onValueChange={setFuelEquipment}>
-                    <SelectTrigger className="min-w-[180px] cursor-pointer"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">{t("equipmentCosts.allFuelLinks")}</SelectItem>
-                      <SelectItem value="linked">{t("equipmentCosts.onlyLinkedEquipment")}</SelectItem>
-                      <SelectItem value="no-equipment">{t("equipmentCosts.noEquipmentLink")}</SelectItem>
-                      {activeEquipment.map((item) => (
-                        <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label>{t("equipmentCosts.fuelType")}</Label>
-                  <Select value={fuelType} onValueChange={setFuelType}>
-                    <SelectTrigger className="min-w-[180px] cursor-pointer"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">{t("equipmentCosts.allFuelTypes")}</SelectItem>
-                      <SelectItem value="diesel">{t("equipmentCosts.fuelTypes.diesel")}</SelectItem>
-                      <SelectItem value="gasoline">{t("equipmentCosts.fuelTypes.gasoline")}</SelectItem>
-                      <SelectItem value="ethanol">{t("equipmentCosts.fuelTypes.ethanol")}</SelectItem>
-                      <SelectItem value="gnv">{t("equipmentCosts.fuelTypes.gnv")}</SelectItem>
-                      <SelectItem value="other">{t("equipmentCosts.fuelTypes.other")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label>{t("equipmentCosts.financialStatus")}</Label>
-                  <Select value={fuelFinancialStatus} onValueChange={setFuelFinancialStatus}>
-                    <SelectTrigger className="min-w-[180px] cursor-pointer"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">{t("equipmentCosts.allFinancialStatuses")}</SelectItem>
-                      <SelectItem value="pending">{t("equipmentCosts.financialStatuses.pending")}</SelectItem>
-                      <SelectItem value="paid">{t("equipmentCosts.financialStatuses.paid")}</SelectItem>
-                      <SelectItem value="cancelled">{t("equipmentCosts.financialStatuses.cancelled")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button type="button" variant="outline" className="cursor-pointer" onClick={() => {
-                  setFuelSearch("");
-                  setFuelFrom("");
-                  setFuelTo("");
-                  setFuelEquipment("all");
-                  setFuelType("all");
-                  setFuelFinancialStatus("all");
-                }}>
-                  {t("common.clearFilters")}
-                </Button>
+                <AdminFiltersDialog
+                  open={fuelFiltersOpen}
+                  onOpenChange={handleOpenFuelFilters}
+                  title={t("common.filters")}
+                  description={t("common.activeFilters", { count: fuelActiveFilterCount })}
+                  activeCount={fuelActiveFilterCount}
+                  triggerLabel={t("common.filters")}
+                  clearLabel={t("common.clearFilters")}
+                  cancelLabel={t("common.cancel")}
+                  applyLabel={t("common.apply")}
+                  onClear={handleClearFuelFilters}
+                  onApply={handleApplyFuelFilters}
+                >
+                  <AdminFiltersSection title={t("common.filters")}>
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                      <div className="grid gap-2">
+                        <Label htmlFor="fuel-from">{t("equipmentCosts.periodFrom")}</Label>
+                        <DatePickerInput
+                          id="fuel-from"
+                          value={parseDateString(draftFuelFrom)}
+                          onChange={(date) => setDraftFuelFrom(formatDateString(date))}
+                          placeholder={t("equipmentCosts.periodFrom")}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="fuel-to">{t("equipmentCosts.periodTo")}</Label>
+                        <DatePickerInput
+                          id="fuel-to"
+                          value={parseDateString(draftFuelTo)}
+                          onChange={(date) => setDraftFuelTo(formatDateString(date))}
+                          placeholder={t("equipmentCosts.periodTo")}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label>{t("equipmentCosts.equipment")}</Label>
+                        <Select value={draftFuelEquipment} onValueChange={setDraftFuelEquipment}>
+                          <SelectTrigger className="min-w-[180px] cursor-pointer"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">{t("equipmentCosts.allFuelLinks")}</SelectItem>
+                            <SelectItem value="linked">{t("equipmentCosts.onlyLinkedEquipment")}</SelectItem>
+                            <SelectItem value="no-equipment">{t("equipmentCosts.noEquipmentLink")}</SelectItem>
+                            {activeEquipment.map((item) => (
+                              <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label>{t("equipmentCosts.fuelType")}</Label>
+                        <Select value={draftFuelType} onValueChange={setDraftFuelType}>
+                          <SelectTrigger className="min-w-[180px] cursor-pointer"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">{t("equipmentCosts.allFuelTypes")}</SelectItem>
+                            <SelectItem value="diesel">{t("equipmentCosts.fuelTypes.diesel")}</SelectItem>
+                            <SelectItem value="gasoline">{t("equipmentCosts.fuelTypes.gasoline")}</SelectItem>
+                            <SelectItem value="ethanol">{t("equipmentCosts.fuelTypes.ethanol")}</SelectItem>
+                            <SelectItem value="gnv">{t("equipmentCosts.fuelTypes.gnv")}</SelectItem>
+                            <SelectItem value="other">{t("equipmentCosts.fuelTypes.other")}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label>{t("equipmentCosts.financialStatus")}</Label>
+                        <Select value={draftFuelFinancialStatus} onValueChange={setDraftFuelFinancialStatus}>
+                          <SelectTrigger className="min-w-[180px] cursor-pointer"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">{t("equipmentCosts.allFinancialStatuses")}</SelectItem>
+                            <SelectItem value="pending">{t("equipmentCosts.financialStatuses.pending")}</SelectItem>
+                            <SelectItem value="paid">{t("equipmentCosts.financialStatuses.paid")}</SelectItem>
+                            <SelectItem value="cancelled">{t("equipmentCosts.financialStatuses.cancelled")}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </AdminFiltersSection>
+                </AdminFiltersDialog>
                 {canCreate ? (
                   <FuelFormDialog
                     mode="create"
@@ -1087,11 +1284,11 @@ export default function EquipmentCostsPage() {
           <div className="grid gap-4">
             <div className="grid gap-2">
               <Label htmlFor="status-performed-date">{t("equipmentCosts.performedDate")}</Label>
-              <Input
+              <DatePickerInput
                 id="status-performed-date"
-                type="date"
-                value={statusPerformedDate}
-                onChange={(event) => setStatusPerformedDate(event.target.value)}
+                value={parseDateString(statusPerformedDate)}
+                onChange={(date) => setStatusPerformedDate(formatDateString(date))}
+                placeholder={t("equipmentCosts.performedDate")}
               />
             </div>
             <div className="grid gap-2">
@@ -1170,11 +1367,21 @@ export default function EquipmentCostsPage() {
           </div>
           <div className="grid gap-2">
             <Label htmlFor="payment-due-date">{t("equipmentCosts.paymentDueDate")}</Label>
-            <Input id="payment-due-date" type="date" value={paymentDueDate} onChange={(event) => setPaymentDueDate(event.target.value)} />
+            <DatePickerInput
+              id="payment-due-date"
+              value={parseDateString(paymentDueDate)}
+              onChange={(date) => setPaymentDueDate(formatDateString(date))}
+              placeholder={t("equipmentCosts.paymentDueDate")}
+            />
           </div>
           <div className="grid gap-2">
             <Label htmlFor="payment-paid-at">{t("equipmentCosts.paidAt")}</Label>
-            <Input id="payment-paid-at" type="date" value={paidAt} onChange={(event) => setPaidAt(event.target.value)} />
+            <DatePickerInput
+              id="payment-paid-at"
+              value={parseDateString(paidAt)}
+              onChange={(date) => setPaidAt(formatDateString(date))}
+              placeholder={t("equipmentCosts.paidAt")}
+            />
           </div>
         </div>
       </ActionDialog>

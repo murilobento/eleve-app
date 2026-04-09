@@ -1,9 +1,14 @@
 "use client";
 
 import * as React from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { toast } from "sonner";
+import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useFormValidationToast } from "@/hooks/use-form-validation-toast";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useI18n } from "@/i18n/provider";
@@ -26,14 +31,33 @@ export function IdleLockScreen({
   onSignOut,
 }: IdleLockScreenProps) {
   const { t } = useI18n();
-  const [password, setPassword] = React.useState("");
-  const [error, setError] = React.useState<string | null>(null);
   const passwordInputRef = React.useRef<HTMLInputElement | null>(null);
+  const lockScreenSchema = React.useMemo(
+    () =>
+      z.object({
+        password: z.string().trim().min(1, t("auth.lockScreen.invalidPassword")),
+      }),
+    [t],
+  );
+  const form = useForm<z.infer<typeof lockScreenSchema>>({
+    resolver: zodResolver(lockScreenSchema),
+    mode: "onBlur",
+    reValidateMode: "onBlur",
+    defaultValues: {
+      password: "",
+    },
+  });
+  const watchedPassword = form.watch("password");
+  const { formClassName, handleInvalidSubmit } = useFormValidationToast({
+    form,
+    title: t("common.validationToastTitle"),
+    fallback: t("auth.lockScreen.invalidPassword"),
+  });
+  const passwordField = form.register("password");
 
   React.useEffect(() => {
     if (!open) {
-      setPassword("");
-      setError(null);
+      form.reset({ password: "" });
       if (passwordInputRef.current) {
         passwordInputRef.current.value = "";
       }
@@ -43,7 +67,7 @@ export function IdleLockScreen({
     // Some browsers/password managers try to restore password fields on reload.
     // Clear the DOM value again after mount/open so the lockscreen always starts blank.
     const clearRestoredPassword = () => {
-      setPassword("");
+      form.reset({ password: "" });
       if (passwordInputRef.current) {
         passwordInputRef.current.value = "";
       }
@@ -55,7 +79,7 @@ export function IdleLockScreen({
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [open]);
+  }, [form, open]);
 
   if (!open) {
     return null;
@@ -63,20 +87,16 @@ export function IdleLockScreen({
 
   const remainingAttempts = Math.max(0, 3 - failedAttempts);
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setError(null);
-
+  const handleSubmit = async (values: z.infer<typeof lockScreenSchema>) => {
     try {
-      await onUnlock(password);
-      setPassword("");
+      await onUnlock(values.password);
+      form.reset({ password: "" });
     } catch (unlockError) {
       const fallback = t("auth.lockScreen.invalidPassword");
-      if (unlockError instanceof Error && unlockError.message) {
-        setError(unlockError.message);
-        return;
-      }
-      setError(fallback);
+      const message = unlockError instanceof Error && unlockError.message ? unlockError.message : fallback;
+      form.setError("password", { message });
+      toast.error(message);
+      return;
     }
   };
 
@@ -93,20 +113,21 @@ export function IdleLockScreen({
             ) : null}
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
-              {error ? (
-                <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">{error}</div>
-              ) : null}
+            <form
+              onSubmit={form.handleSubmit(handleSubmit, handleInvalidSubmit)}
+              className={`space-y-4 ${formClassName}`}
+              autoComplete="off"
+            >
               <div className="space-y-2">
                 <Label htmlFor="lockscreen-password">{t("auth.password")}</Label>
                 <Input
                   id="lockscreen-password"
-                  ref={passwordInputRef}
-                  name="lockscreen-passcode"
                   type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  required
+                  {...passwordField}
+                  ref={(element) => {
+                    passwordField.ref(element);
+                    passwordInputRef.current = element;
+                  }}
                   autoFocus
                   autoComplete="new-password"
                   data-1p-ignore="true"
@@ -122,7 +143,7 @@ export function IdleLockScreen({
                 <Button type="button" variant="outline" onClick={onSignOut} className="cursor-pointer">
                   {t("auth.lockScreen.signOut")}
                 </Button>
-                <Button type="submit" disabled={isSubmitting || !password.trim()} className="cursor-pointer">
+                <Button type="submit" disabled={isSubmitting || !watchedPassword?.trim()} className="cursor-pointer">
                   {isSubmitting ? t("auth.loginLoading") : t("auth.lockScreen.unlock")}
                 </Button>
               </div>

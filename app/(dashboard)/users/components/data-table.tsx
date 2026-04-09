@@ -12,12 +12,14 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { ChevronDown, EllipsisVertical, Pencil, Search, Trash2 } from "lucide-react";
+import { EllipsisVertical, Pencil, Search, Trash2 } from "lucide-react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  AdminFiltersDialog,
+  AdminFiltersSection,
   AdminListPaginationFooter,
   AdminListTableCard,
   AdminListToolbar,
@@ -26,7 +28,6 @@ import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
@@ -54,7 +55,6 @@ import {
   type ManagedUser,
   type UpdateManagedUserInput,
 } from "@/lib/users-admin";
-import { usePersistentColumnVisibility } from "@/hooks/use-persistent-column-visibility";
 import type { RoleRecord } from "@/lib/rbac-shared";
 import { getSemanticStatusBadgeClass } from "@/lib/status-badge";
 import { useI18n, useLocale } from "@/i18n/provider";
@@ -91,15 +91,14 @@ export function DataTable({
   const locale = useLocale();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const { columnVisibility, setColumnVisibility } = usePersistentColumnVisibility("table:users:columns:v2", {
-    joinedDate: false,
-    updatedDate: false,
-  });
   const [rowSelection, setRowSelection] = useState({});
   const [globalFilter, setGlobalFilter] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<ManagedUser | null>(null);
   const [deletingUser, setDeletingUser] = useState<ManagedUser | null>(null);
+  const [draftRoleFilter, setDraftRoleFilter] = useState("all");
+  const [draftStatusFilter, setDraftStatusFilter] = useState("all");
 
   const columns = useMemo<ColumnDef<ManagedUser>[]>(
     () => [
@@ -233,22 +232,11 @@ export function DataTable({
     ],
     [isMutating, locale, onDeleteUser, t],
   );
-  const columnVisibilityLabels = useMemo<Record<string, string>>(
-    () => ({
-      roles: t("users.roles"),
-      status: t("users.status"),
-      joinedDate: t("users.joined"),
-      updatedDate: t("users.updated"),
-    }),
-    [t],
-  );
-
   const table = useReactTable({
     data: users,
     columns,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
-    onColumnVisibilityChange: setColumnVisibility,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -262,7 +250,6 @@ export function DataTable({
     state: {
       sorting,
       columnFilters,
-      columnVisibility,
       rowSelection,
       globalFilter,
     },
@@ -276,130 +263,104 @@ export function DataTable({
   const roleFilter = (table.getColumn("roles")?.getFilterValue() as string) || "all";
   const statusFilter = (table.getColumn("status")?.getFilterValue() as string) || "all";
   const selectedCount = table.getFilteredSelectedRowModel().rows.length;
-  const hasActiveFilters = Boolean(globalFilter.trim()) || columnFilters.length > 0;
+  const activeFilterCount = [roleFilter, statusFilter].filter((value) => value !== "all").length;
+
+  const handleOpenFilters = (nextOpen: boolean) => {
+    if (nextOpen) {
+      setDraftRoleFilter(roleFilter);
+      setDraftStatusFilter(statusFilter);
+    }
+
+    setFiltersOpen(nextOpen);
+  };
+
+  const handleApplyFilters = () => {
+    table.getColumn("roles")?.setFilterValue(draftRoleFilter === "all" ? undefined : draftRoleFilter);
+    table.getColumn("status")?.setFilterValue(draftStatusFilter === "all" ? undefined : draftStatusFilter);
+    table.setPageIndex(0);
+    setFiltersOpen(false);
+  };
 
   const handleClearFilters = () => {
-    setGlobalFilter("");
     setColumnFilters([]);
+    setDraftRoleFilter("all");
+    setDraftStatusFilter("all");
     table.setPageIndex(0);
+    setFiltersOpen(false);
   };
 
   return (
     <div className="w-full space-y-4">
       <AdminListToolbar>
-          <div className="relative min-w-[240px] flex-1">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder={t("users.searchPlaceholder")}
-              value={globalFilter}
-              onChange={(event) => setGlobalFilter(event.target.value)}
-              className="h-10 rounded-lg border-muted-foreground/20 bg-background pl-9"
-            />
-          </div>
-          <div className="min-w-[180px] space-y-2">
-            <Label htmlFor="role-filter" className="text-sm font-medium">
-              {t("users.role")}
-            </Label>
-            <Select
-              value={roleFilter}
-              onValueChange={(value) =>
-                table.getColumn("roles")?.setFilterValue(value === "all" ? undefined : value)
-              }
-            >
-              <SelectTrigger className="h-10 w-full cursor-pointer rounded-lg" id="role-filter">
-                <SelectValue placeholder={t("users.selectRole")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("users.allRoles")}</SelectItem>
-                {roles.map((role) => (
-                  <SelectItem key={role.id} value={role.slug}>
-                    {role.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="relative min-w-[240px] flex-1">
+          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder={t("users.searchPlaceholder")}
+            value={globalFilter}
+            onChange={(event) => setGlobalFilter(event.target.value)}
+            className="h-10 rounded-lg border-muted-foreground/20 bg-background pl-9"
+          />
+        </div>
 
-          <div className="min-w-[180px] space-y-2">
-            <Label htmlFor="status-filter" className="text-sm font-medium">
-              {t("users.status")}
-            </Label>
-            <Select
-              value={statusFilter}
-              onValueChange={(value) =>
-                table.getColumn("status")?.setFilterValue(value === "all" ? undefined : value)
-              }
-            >
-              <SelectTrigger className="h-10 w-full cursor-pointer rounded-lg" id="status-filter">
-                <SelectValue placeholder={t("users.selectStatus")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("users.allStatuses")}</SelectItem>
-                <SelectItem value="active">{t("users.active")}</SelectItem>
-                <SelectItem value="inactive">{t("users.inactive")}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="ml-auto">
-            <div className="min-w-[180px] space-y-2">
-              <Label htmlFor="users-column-visibility" className="text-sm font-medium">
-                {t("common.columnVisibility")}
-              </Label>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    id="users-column-visibility"
-                    variant="outline"
-                    size="lg"
-                    className="h-10 w-full cursor-pointer justify-between rounded-lg px-3"
-                  >
-                    {t("common.columns")} <ChevronDown className="size-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {table
-                    .getAllColumns()
-                    .filter((column) => column.getCanHide())
-                    .map((column) => (
-                      <DropdownMenuCheckboxItem
-                        key={column.id}
-                        checked={column.getIsVisible()}
-                        onCheckedChange={(value) => column.toggleVisibility(!!value)}
-                      >
-                        {columnVisibilityLabels[column.id] ?? column.id}
-                      </DropdownMenuCheckboxItem>
+        <AdminFiltersDialog
+          open={filtersOpen}
+          onOpenChange={handleOpenFilters}
+          title={t("common.filters")}
+          description={t("common.activeFilters", { count: activeFilterCount })}
+          activeCount={activeFilterCount}
+          triggerLabel={t("common.filters")}
+          clearLabel={t("common.clearFilters")}
+          cancelLabel={t("common.cancel")}
+          applyLabel={t("common.apply")}
+          onClear={handleClearFilters}
+          onApply={handleApplyFilters}
+        >
+          <AdminFiltersSection title={t("common.filters")}>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="role-filter">{t("users.role")}</Label>
+                <Select value={draftRoleFilter} onValueChange={setDraftRoleFilter}>
+                  <SelectTrigger className="h-10 w-full cursor-pointer rounded-lg" id="role-filter">
+                    <SelectValue placeholder={t("users.selectRole")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("users.allRoles")}</SelectItem>
+                    {roles.map((role) => (
+                      <SelectItem key={role.id} value={role.slug}>
+                        {role.name}
+                      </SelectItem>
                     ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="status-filter">{t("users.status")}</Label>
+                <Select value={draftStatusFilter} onValueChange={setDraftStatusFilter}>
+                  <SelectTrigger className="h-10 w-full cursor-pointer rounded-lg" id="status-filter">
+                    <SelectValue placeholder={t("users.selectStatus")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("users.allStatuses")}</SelectItem>
+                    <SelectItem value="active">{t("users.active")}</SelectItem>
+                    <SelectItem value="inactive">{t("users.inactive")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          </div>
+          </AdminFiltersSection>
+        </AdminFiltersDialog>
 
-          <div className="w-full min-w-[160px] space-y-2 sm:w-auto">
-            <Label className="text-sm font-medium text-transparent">
-              {t("common.clearFilters")}
-            </Label>
-            <Button
-              type="button"
-              variant="outline"
-              className="h-10 w-full cursor-pointer rounded-lg sm:w-auto"
-              onClick={handleClearFilters}
-              disabled={!hasActiveFilters}
-            >
-              {t("common.clearFilters")}
-            </Button>
-          </div>
-
-          <div>
-            <UserFormDialog
-              mode="create"
-              open={createOpen}
-              onOpenChange={setCreateOpen}
-              onSubmit={onCreateUser}
-              isSubmitting={isMutating}
-              availableRoles={roles}
-            />
-          </div>
+        <div className="ml-auto">
+          <UserFormDialog
+            mode="create"
+            open={createOpen}
+            onOpenChange={setCreateOpen}
+            onSubmit={onCreateUser}
+            isSubmitting={isMutating}
+            availableRoles={roles}
+          />
+        </div>
       </AdminListToolbar>
 
       {selectedCount > 0 ? (

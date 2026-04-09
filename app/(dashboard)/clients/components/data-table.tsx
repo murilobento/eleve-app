@@ -12,11 +12,13 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { ChevronDown, EllipsisVertical, Eye, Pencil, Search, Trash2 } from "lucide-react";
+import { EllipsisVertical, Eye, Pencil, Search, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  AdminFiltersDialog,
+  AdminFiltersSection,
   AdminListPaginationFooter,
   AdminListTableCard,
   AdminListToolbar,
@@ -26,7 +28,6 @@ import { EntityDetailsDialog } from "@/components/entity-details-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
@@ -48,7 +49,6 @@ import type {
   UpdateClientInput,
 } from "@/lib/clients-admin";
 import { getSemanticStatusBadgeClass } from "@/lib/status-badge";
-import { usePersistentColumnVisibility } from "@/hooks/use-persistent-column-visibility";
 import { useI18n, useLocale } from "@/i18n/provider";
 
 import { ClientFormDialog } from "./client-form-dialog";
@@ -93,18 +93,15 @@ export function DataTable({
   const locale = useLocale();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const { columnVisibility, setColumnVisibility } = usePersistentColumnVisibility("table:clients:columns:v4", {
-    updatedAt: false,
-    personType: false,
-    document: false,
-    email: false,
-  });
   const [rowSelection, setRowSelection] = useState({});
   const [globalFilter, setGlobalFilter] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [viewingClient, setViewingClient] = useState<ManagedClient | null>(null);
   const [editingClient, setEditingClient] = useState<ManagedClient | null>(null);
   const [deletingClient, setDeletingClient] = useState<ManagedClient | null>(null);
+  const [draftPersonTypeFilter, setDraftPersonTypeFilter] = useState("all");
+  const [draftStatusFilter, setDraftStatusFilter] = useState("all");
 
   const getDisplayValue = (value?: string | null) => {
     if (!value?.trim()) {
@@ -314,25 +311,11 @@ export function DataTable({
     },
   ], [isMutating, locale, t]);
 
-  const columnVisibilityLabels = useMemo<Record<string, string>>(
-    () => ({
-      personType: t("clients.personType"),
-      status: t("clients.status"),
-      document: t("clients.document"),
-      contactName: t("clients.contactName"),
-      email: t("clients.email"),
-      location: t("clients.location"),
-      updatedAt: t("clients.updated"),
-    }),
-    [t]
-  );
-
   const table = useReactTable({
     data: clients,
     columns,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
-    onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
     onGlobalFilterChange: setGlobalFilter,
     getCoreRowModel: getCoreRowModel(),
@@ -356,7 +339,6 @@ export function DataTable({
     state: {
       sorting,
       columnFilters,
-      columnVisibility,
       rowSelection,
       globalFilter,
     },
@@ -370,12 +352,30 @@ export function DataTable({
   const personTypeFilter = (table.getColumn("personType")?.getFilterValue() as string) || "all";
   const statusFilter = (table.getColumn("status")?.getFilterValue() as string) || "all";
   const selectedCount = table.getFilteredSelectedRowModel().rows.length;
-  const hasActiveFilters = Boolean(globalFilter.trim()) || columnFilters.length > 0;
+  const activeFilterCount = [personTypeFilter, statusFilter].filter((value) => value !== "all").length;
+
+  const handleOpenFilters = (nextOpen: boolean) => {
+    if (nextOpen) {
+      setDraftPersonTypeFilter(personTypeFilter);
+      setDraftStatusFilter(statusFilter);
+    }
+
+    setFiltersOpen(nextOpen);
+  };
+
+  const handleApplyFilters = () => {
+    table.getColumn("personType")?.setFilterValue(draftPersonTypeFilter === "all" ? undefined : draftPersonTypeFilter);
+    table.getColumn("status")?.setFilterValue(draftStatusFilter === "all" ? undefined : draftStatusFilter);
+    table.setPageIndex(0);
+    setFiltersOpen(false);
+  };
 
   const handleClearFilters = () => {
-    setGlobalFilter("");
     setColumnFilters([]);
+    setDraftPersonTypeFilter("all");
+    setDraftStatusFilter("all");
     table.setPageIndex(0);
+    setFiltersOpen(false);
   };
 
   const shouldIgnoreRowClick = (target: EventTarget | null) => {
@@ -393,116 +393,71 @@ export function DataTable({
   return (
     <div className="w-full space-y-4">
       <AdminListToolbar>
-          <div className="relative min-w-[240px] flex-1">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder={t("clients.searchPlaceholder")}
-              value={globalFilter}
-              onChange={(event) => setGlobalFilter(event.target.value)}
-              className="h-10 rounded-lg border-muted-foreground/20 bg-background pl-9"
-            />
-          </div>
+        <div className="relative min-w-[240px] flex-1">
+          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder={t("clients.searchPlaceholder")}
+            value={globalFilter}
+            onChange={(event) => setGlobalFilter(event.target.value)}
+            className="h-10 rounded-lg border-muted-foreground/20 bg-background pl-9"
+          />
+        </div>
 
-          <div className="min-w-[180px] space-y-2">
-            <Label htmlFor="client-person-type-filter" className="text-sm font-medium">
-              {t("clients.personType")}
-            </Label>
-            <Select
-              value={personTypeFilter}
-              onValueChange={(value) =>
-                table.getColumn("personType")?.setFilterValue(value === "all" ? undefined : value)
-              }
-            >
-              <SelectTrigger className="h-10 w-full cursor-pointer rounded-lg" id="client-person-type-filter">
-                <SelectValue placeholder={t("clients.selectPersonType")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("clients.allPersonTypes")}</SelectItem>
-                <SelectItem value="PF">{t("clients.individual")}</SelectItem>
-                <SelectItem value="PJ">{t("clients.legalEntity")}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        <AdminFiltersDialog
+          open={filtersOpen}
+          onOpenChange={handleOpenFilters}
+          title={t("common.filters")}
+          description={t("common.activeFilters", { count: activeFilterCount })}
+          activeCount={activeFilterCount}
+          triggerLabel={t("common.filters")}
+          clearLabel={t("common.clearFilters")}
+          cancelLabel={t("common.cancel")}
+          applyLabel={t("common.apply")}
+          onClear={handleClearFilters}
+          onApply={handleApplyFilters}
+        >
+          <AdminFiltersSection title={t("common.filters")}>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="client-person-type-filter">{t("clients.personType")}</Label>
+                <Select value={draftPersonTypeFilter} onValueChange={setDraftPersonTypeFilter}>
+                  <SelectTrigger className="h-10 w-full cursor-pointer rounded-lg" id="client-person-type-filter">
+                    <SelectValue placeholder={t("clients.selectPersonType")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("clients.allPersonTypes")}</SelectItem>
+                    <SelectItem value="PF">{t("clients.individual")}</SelectItem>
+                    <SelectItem value="PJ">{t("clients.legalEntity")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-          <div className="min-w-[180px] space-y-2">
-            <Label htmlFor="client-status-filter" className="text-sm font-medium">
-              {t("clients.status")}
-            </Label>
-            <Select
-              value={statusFilter}
-              onValueChange={(value) =>
-                table.getColumn("status")?.setFilterValue(value === "all" ? undefined : value)
-              }
-            >
-              <SelectTrigger className="h-10 w-full cursor-pointer rounded-lg" id="client-status-filter">
-                <SelectValue placeholder={t("clients.selectStatus")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("clients.allStatuses")}</SelectItem>
-                <SelectItem value="active">{t("clients.active")}</SelectItem>
-                <SelectItem value="inactive">{t("clients.inactive")}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="ml-auto">
-            <div className="min-w-[180px] space-y-2">
-              <Label htmlFor="clients-column-visibility" className="text-sm font-medium">
-                {t("common.columnVisibility")}
-              </Label>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    id="clients-column-visibility"
-                    variant="outline"
-                    size="lg"
-                    className="h-10 w-full cursor-pointer justify-between rounded-lg px-3"
-                  >
-                    {t("common.columns")} <ChevronDown className="size-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {table
-                    .getAllColumns()
-                    .filter((column) => column.getCanHide())
-                    .map((column) => (
-                      <DropdownMenuCheckboxItem
-                        key={column.id}
-                        checked={column.getIsVisible()}
-                        onCheckedChange={(value) => column.toggleVisibility(!!value)}
-                      >
-                        {columnVisibilityLabels[column.id] ?? column.id}
-                      </DropdownMenuCheckboxItem>
-                    ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <div className="space-y-2">
+                <Label htmlFor="client-status-filter">{t("clients.status")}</Label>
+                <Select value={draftStatusFilter} onValueChange={setDraftStatusFilter}>
+                  <SelectTrigger className="h-10 w-full cursor-pointer rounded-lg" id="client-status-filter">
+                    <SelectValue placeholder={t("clients.selectStatus")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("clients.allStatuses")}</SelectItem>
+                    <SelectItem value="active">{t("clients.active")}</SelectItem>
+                    <SelectItem value="inactive">{t("clients.inactive")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          </div>
+          </AdminFiltersSection>
+        </AdminFiltersDialog>
 
-          <div className="w-full min-w-[160px] space-y-2 sm:w-auto">
-            <Label className="text-sm font-medium text-transparent">
-              {t("common.clearFilters")}
-            </Label>
-            <Button
-              type="button"
-              variant="outline"
-              className="h-10 w-full cursor-pointer rounded-lg sm:w-auto"
-              onClick={handleClearFilters}
-              disabled={!hasActiveFilters}
-            >
-              {t("common.clearFilters")}
-            </Button>
-          </div>
-
-          <div>
-            <ClientFormDialog
-              mode="create"
-              open={createOpen}
-              onOpenChange={setCreateOpen}
-              onSubmit={onCreateClient}
-              isSubmitting={isMutating}
-            />
-          </div>
+        <div className="ml-auto">
+          <ClientFormDialog
+            mode="create"
+            open={createOpen}
+            onOpenChange={setCreateOpen}
+            onSubmit={onCreateClient}
+            isSubmitting={isMutating}
+          />
+        </div>
       </AdminListToolbar>
 
       {selectedCount > 0 ? (

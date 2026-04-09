@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
-import { useFieldArray, useForm, type FieldErrors } from "react-hook-form";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { SearchableCombobox } from "@/components/searchable-combobox";
+import { DatePickerInput, formatDateString, parseDateString } from "@/components/date-picker-input";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -35,7 +36,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type { ManagedBudget } from "@/lib/budgets-admin";
-import type { ManagedClient } from "@/lib/clients-admin";
+import type { ManagedClient, PostalCodeLookupResult } from "@/lib/clients-admin";
 import type { EquipmentOption } from "@/lib/equipment-admin";
 import type { ManagedOperator } from "@/lib/operators-admin";
 import {
@@ -47,6 +48,8 @@ import {
   updateServiceOrderSchema,
 } from "@/lib/service-orders-admin";
 import type { ManagedServiceType } from "@/lib/service-types-admin";
+import { useFormValidationToast } from "@/hooks/use-form-validation-toast";
+import { formatPostalCode } from "@/lib/utils";
 import { useI18n } from "@/i18n/provider";
 
 type ServiceOrderFormDialogProps = {
@@ -62,6 +65,12 @@ type ServiceOrderFormDialogProps = {
   operators: ManagedOperator[];
   approvedBudgets: ManagedBudget[];
 };
+
+type PostalCodeLookupResponse = {
+  postalCode: PostalCodeLookupResult;
+};
+
+type ServiceAddressMode = "inherit" | "manual";
 
 function createEmptyItem(): ServiceOrderItemInput {
   return {
@@ -80,29 +89,49 @@ function createEmptyItem(): ServiceOrderItemInput {
   };
 }
 
-function collectErrorMessages(errors: unknown): string[] {
-  const messages: string[] = [];
+function normalizePostalCode(value: string | null | undefined) {
+  return (value ?? "").replace(/\D/g, "");
+}
 
-  const visit = (value: unknown) => {
-    if (!value || typeof value !== "object") {
-      return;
-    }
+function normalizeAddressValue(value: string | null | undefined) {
+  return (value ?? "").trim().toLowerCase();
+}
 
-    if ("message" in value && typeof value.message === "string" && value.message.trim()) {
-      messages.push(value.message.trim());
-    }
+function isSameAddressAsClient(
+  client: ManagedClient | null,
+  address: {
+    postalCode?: string | null;
+    street?: string | null;
+    number?: string | null;
+    complement?: string | null;
+    district?: string | null;
+    city?: string | null;
+    state?: string | null;
+    country?: string | null;
+  },
+) {
+  if (!client) {
+    return false;
+  }
 
-    if (Array.isArray(value)) {
-      value.forEach(visit);
-      return;
-    }
+  return normalizePostalCode(address.postalCode) === normalizePostalCode(client.postalCode)
+    && normalizeAddressValue(address.street) === normalizeAddressValue(client.street)
+    && normalizeAddressValue(address.number) === normalizeAddressValue(client.number)
+    && normalizeAddressValue(address.complement) === normalizeAddressValue(client.complement)
+    && normalizeAddressValue(address.district) === normalizeAddressValue(client.district)
+    && normalizeAddressValue(address.city) === normalizeAddressValue(client.city)
+    && normalizeAddressValue(address.state) === normalizeAddressValue(client.state)
+    && normalizeAddressValue(address.country ?? "Brasil") === normalizeAddressValue(client.country);
+}
 
-    Object.values(value).forEach(visit);
-  };
+async function parseResponse<T>(response: Response): Promise<T> {
+  const payload = await response.json().catch(() => null);
 
-  visit(errors);
+  if (!response.ok) {
+    throw new Error(payload?.error || "Request failed.");
+  }
 
-  return Array.from(new Set(messages));
+  return payload as T;
 }
 
 export function ServiceOrderFormDialog({
@@ -122,10 +151,15 @@ export function ServiceOrderFormDialog({
   const isEdit = mode === "edit";
   const schema = isEdit ? updateServiceOrderSchema : createServiceOrderSchema;
   const lastHydratedBudgetIdRef = useRef<string | null>(null);
+  const lastLookedUpServicePostalCodeRef = useRef<string | null>(null);
+  const [pendingAddressClient, setPendingAddressClient] = useState<ManagedClient | null>(null);
+  const [serviceAddressMode, setServiceAddressMode] = useState<ServiceAddressMode>("inherit");
 
   const form = useForm<CreateServiceOrderInput | UpdateServiceOrderInput>({
     resolver: zodResolver(schema),
     shouldFocusError: false,
+    mode: "onBlur",
+    reValidateMode: "onBlur",
     defaultValues: {
       originType: "manual",
       sourceBudgetId: undefined,
@@ -142,6 +176,11 @@ export function ServiceOrderFormDialog({
       items: [createEmptyItem()],
     },
   });
+  const { formClassName, handleInvalidSubmit } = useFormValidationToast({
+    form,
+    title: t("serviceOrders.validationToastTitle"),
+    fallback: t("serviceOrders.validationToastFallback"),
+  });
 
   const { fields, append, remove, replace } = useFieldArray({
     control: form.control,
@@ -150,7 +189,13 @@ export function ServiceOrderFormDialog({
 
   const watchedOriginType = form.watch("originType");
   const watchedSourceBudgetId = form.watch("sourceBudgetId");
+  const watchedClientId = form.watch("clientId");
+  const watchedServicePostalCode = form.watch("servicePostalCode");
 
+  const clientsById = useMemo(
+    () => new Map(clients.map((client) => [client.id, client])),
+    [clients],
+  );
   const clientOptions = useMemo(
     () =>
       clients.map((client) => ({
@@ -177,10 +222,54 @@ export function ServiceOrderFormDialog({
     () => new Map(approvedBudgets.map((budget) => [budget.id, budget])),
     [approvedBudgets],
   );
+  const selectedClient = useMemo(
+    () => clientsById.get(watchedClientId ?? "") ?? null,
+    [clientsById, watchedClientId],
+  );
+
+  const copyAddressFromClient = (client: ManagedClient) => {
+    form.setValue("servicePostalCode", formatPostalCode(client.postalCode), { shouldDirty: true, shouldValidate: true });
+    form.setValue("serviceStreet", client.street, { shouldDirty: true, shouldValidate: true });
+    form.setValue("serviceNumber", client.number, { shouldDirty: true, shouldValidate: true });
+    form.setValue("serviceComplement", client.complement ?? "", { shouldDirty: true });
+    form.setValue("serviceDistrict", client.district, { shouldDirty: true, shouldValidate: true });
+    form.setValue("serviceCity", client.city, { shouldDirty: true, shouldValidate: true });
+    form.setValue("serviceState", client.state, { shouldDirty: true, shouldValidate: true });
+    form.setValue("serviceCountry", client.country, { shouldDirty: true, shouldValidate: true });
+  };
+
+  const clearServiceAddress = () => {
+    form.setValue("servicePostalCode", "", { shouldDirty: true, shouldValidate: true });
+    form.setValue("serviceStreet", "", { shouldDirty: true, shouldValidate: true });
+    form.setValue("serviceNumber", "", { shouldDirty: true, shouldValidate: true });
+    form.setValue("serviceComplement", "", { shouldDirty: true });
+    form.setValue("serviceDistrict", "", { shouldDirty: true, shouldValidate: true });
+    form.setValue("serviceCity", "", { shouldDirty: true, shouldValidate: true });
+    form.setValue("serviceState", "", { shouldDirty: true, shouldValidate: true });
+    form.setValue("serviceCountry", "Brasil", { shouldDirty: true, shouldValidate: true });
+  };
+
+  const handleClientAddressDecision = (shouldUseClientAddress: boolean) => {
+    if (!pendingAddressClient) {
+      return;
+    }
+
+    if (shouldUseClientAddress) {
+      copyAddressFromClient(pendingAddressClient);
+      setServiceAddressMode("inherit");
+      lastLookedUpServicePostalCodeRef.current = normalizePostalCode(pendingAddressClient.postalCode);
+    } else {
+      clearServiceAddress();
+      setServiceAddressMode("manual");
+      lastLookedUpServicePostalCodeRef.current = null;
+    }
+
+    setPendingAddressClient(null);
+  };
 
   const applyBudgetToForm = (budget: ManagedBudget) => {
     form.setValue("clientId", budget.clientId, { shouldDirty: true });
-    form.setValue("servicePostalCode", budget.servicePostalCode, { shouldDirty: true });
+    form.setValue("servicePostalCode", formatPostalCode(budget.servicePostalCode), { shouldDirty: true });
     form.setValue("serviceStreet", budget.serviceStreet, { shouldDirty: true });
     form.setValue("serviceNumber", budget.serviceNumber, { shouldDirty: true });
     form.setValue("serviceComplement", budget.serviceComplement ?? "", { shouldDirty: true });
@@ -208,6 +297,16 @@ export function ServiceOrderFormDialog({
   };
 
   useEffect(() => {
+    if (open) {
+      return;
+    }
+
+    setPendingAddressClient(null);
+    setServiceAddressMode("inherit");
+    lastLookedUpServicePostalCodeRef.current = null;
+  }, [open]);
+
+  useEffect(() => {
     if (!open) {
       return;
     }
@@ -215,11 +314,23 @@ export function ServiceOrderFormDialog({
     lastHydratedBudgetIdRef.current = null;
 
     if (serviceOrder) {
+      const selectedServiceOrderClient = clientsById.get(serviceOrder.clientId) ?? null;
+      const sameAddressAsClient = isSameAddressAsClient(selectedServiceOrderClient, {
+        postalCode: serviceOrder.servicePostalCode,
+        street: serviceOrder.serviceStreet,
+        number: serviceOrder.serviceNumber,
+        complement: serviceOrder.serviceComplement,
+        district: serviceOrder.serviceDistrict,
+        city: serviceOrder.serviceCity,
+        state: serviceOrder.serviceState,
+        country: serviceOrder.serviceCountry,
+      });
+
       form.reset({
         originType: serviceOrder.originType,
         sourceBudgetId: serviceOrder.sourceBudgetId ?? undefined,
         clientId: serviceOrder.clientId,
-        servicePostalCode: serviceOrder.servicePostalCode,
+        servicePostalCode: formatPostalCode(serviceOrder.servicePostalCode),
         serviceStreet: serviceOrder.serviceStreet,
         serviceNumber: serviceOrder.serviceNumber,
         serviceComplement: serviceOrder.serviceComplement ?? "",
@@ -243,6 +354,10 @@ export function ServiceOrderFormDialog({
           notes: item.notes ?? "",
         })),
       });
+      setPendingAddressClient(null);
+      setServiceAddressMode(sameAddressAsClient ? "inherit" : "manual");
+      lastLookedUpServicePostalCodeRef.current =
+        sameAddressAsClient ? normalizePostalCode(serviceOrder.servicePostalCode) : null;
       lastHydratedBudgetIdRef.current = serviceOrder.sourceBudgetId;
       return;
     }
@@ -262,7 +377,10 @@ export function ServiceOrderFormDialog({
       notes: "",
       items: [createEmptyItem()],
     });
-  }, [form, open, serviceOrder]);
+    setPendingAddressClient(null);
+    setServiceAddressMode("inherit");
+    lastLookedUpServicePostalCodeRef.current = null;
+  }, [clientsById, form, open, serviceOrder]);
 
   useEffect(() => {
     if (!open || watchedOriginType !== "budget" || !watchedSourceBudgetId) {
@@ -280,22 +398,100 @@ export function ServiceOrderFormDialog({
     }
 
     applyBudgetToForm(budget);
+    setPendingAddressClient(null);
+    setServiceAddressMode("inherit");
+    lastLookedUpServicePostalCodeRef.current = normalizePostalCode(budget.servicePostalCode);
     lastHydratedBudgetIdRef.current = watchedSourceBudgetId;
   }, [approvedBudgetsById, form, open, replace, watchedOriginType, watchedSourceBudgetId]);
+
+  useEffect(() => {
+    if (!open || isEdit || watchedOriginType !== "manual" || serviceOrder) {
+      return;
+    }
+
+    const postalCode = normalizePostalCode(watchedServicePostalCode);
+
+    if (serviceAddressMode !== "manual" || postalCode.length !== 8 || postalCode === lastLookedUpServicePostalCodeRef.current) {
+      return;
+    }
+
+    let cancelled = false;
+    let lookupCompleted = false;
+    let timedOut = false;
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, 8000);
+    const toastId = toast.loading(t("serviceOrders.postalCodeLookupLoading"));
+
+    lastLookedUpServicePostalCodeRef.current = postalCode;
+    form.clearErrors("servicePostalCode");
+
+    void (async () => {
+      try {
+        const payload = await parseResponse<PostalCodeLookupResponse>(
+          await fetch(`/api/service-orders/postal-code?postalCode=${postalCode}`, {
+            cache: "no-store",
+            signal: controller.signal,
+          }),
+        );
+
+        if (cancelled) {
+          return;
+        }
+
+        form.setValue("servicePostalCode", formatPostalCode(payload.postalCode.postalCode), {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
+        form.setValue("serviceStreet", payload.postalCode.street, { shouldDirty: true, shouldValidate: true });
+        form.setValue("serviceDistrict", payload.postalCode.district, { shouldDirty: true, shouldValidate: true });
+        form.setValue("serviceCity", payload.postalCode.city, { shouldDirty: true, shouldValidate: true });
+        form.setValue("serviceState", payload.postalCode.state, { shouldDirty: true, shouldValidate: true });
+        form.setValue("serviceCountry", "Brasil", { shouldDirty: true, shouldValidate: true });
+        lookupCompleted = true;
+        toast.success(t("serviceOrders.postalCodeLookupSuccess"), { id: toastId });
+      } catch (lookupError) {
+        if (cancelled) {
+          return;
+        }
+
+        if (lookupError instanceof Error && lookupError.name === "AbortError" && !timedOut) {
+          return;
+        }
+
+        lastLookedUpServicePostalCodeRef.current = null;
+        const message = timedOut
+          ? t("serviceOrders.postalCodeLookupError")
+          : lookupError instanceof Error ? lookupError.message : t("serviceOrders.postalCodeLookupError");
+        form.setError("servicePostalCode", { message });
+        lookupCompleted = true;
+        toast.error(message, { id: toastId });
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+      controller.abort();
+
+      if (!lookupCompleted) {
+        toast.dismiss(toastId);
+      }
+    };
+  }, [form, isEdit, open, serviceAddressMode, serviceOrder, t, watchedOriginType, watchedServicePostalCode]);
 
   async function handleSubmit(values: CreateServiceOrderInput | UpdateServiceOrderInput) {
     await onSubmit(values);
     form.reset();
+    setPendingAddressClient(null);
+    setServiceAddressMode("inherit");
+    lastLookedUpServicePostalCodeRef.current = null;
     onOpenChange(false);
   }
-
-  const handleInvalidSubmit = (errors: FieldErrors<CreateServiceOrderInput | UpdateServiceOrderInput>) => {
-    const messages = collectErrorMessages(errors);
-
-    toast.error(t("serviceOrders.validationToastTitle"), {
-      description: messages[0] ?? t("serviceOrders.validationToastFallback"),
-    });
-  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -313,7 +509,7 @@ export function ServiceOrderFormDialog({
           <DialogDescription>{t("serviceOrders.createDescription")}</DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit, handleInvalidSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(handleSubmit, handleInvalidSubmit)} className={`space-y-6 ${formClassName}`}>
             <div className="grid gap-4 md:grid-cols-2">
               <FormField
                 control={form.control}
@@ -380,7 +576,21 @@ export function ServiceOrderFormDialog({
                     <FormControl>
                       <SearchableCombobox
                         value={field.value}
-                        onChange={field.onChange}
+                        onChange={(value) => {
+                          if (value === field.value) {
+                            return;
+                          }
+
+                          field.onChange(value);
+
+                          if (!isEdit && watchedOriginType === "manual") {
+                            const client = clientsById.get(value);
+
+                            if (client) {
+                              setPendingAddressClient(client);
+                            }
+                          }
+                        }}
                         options={clientOptions}
                         placeholder={t("serviceOrders.selectClient")}
                         searchPlaceholder={t("serviceOrders.searchClientPlaceholder")}
@@ -400,7 +610,27 @@ export function ServiceOrderFormDialog({
                   <FormItem>
                     <FormLabel>{t("serviceOrders.servicePostalCode")}</FormLabel>
                     <FormControl>
-                      <Input {...field} disabled={isSubmitting} />
+                      <Input
+                        {...field}
+                        value={field.value ?? ""}
+                        placeholder="00000-000"
+                        disabled={isSubmitting}
+                        onChange={(event) => {
+                          const nextValue = formatPostalCode(event.target.value);
+                          const nextPostalCode = normalizePostalCode(nextValue);
+
+                          field.onChange(nextValue);
+                          form.clearErrors("servicePostalCode");
+                          lastLookedUpServicePostalCodeRef.current = null;
+
+                          if (
+                            serviceAddressMode === "inherit"
+                            && (!selectedClient || nextPostalCode !== normalizePostalCode(selectedClient.postalCode))
+                          ) {
+                            setServiceAddressMode("manual");
+                          }
+                        }}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -623,7 +853,12 @@ export function ServiceOrderFormDialog({
                         <FormItem>
                           <FormLabel>{t("serviceOrders.serviceDate")}</FormLabel>
                           <FormControl>
-                            <Input {...itemField} type="date" disabled={isSubmitting} />
+                            <DatePickerInput
+                              value={parseDateString(itemField.value)}
+                              onChange={(date) => itemField.onChange(formatDateString(date))}
+                              placeholder={t("serviceOrders.selectDate")}
+                              disabled={isSubmitting}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -747,6 +982,43 @@ export function ServiceOrderFormDialog({
           </form>
         </Form>
       </DialogContent>
+
+      <Dialog
+        open={Boolean(pendingAddressClient)}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            setPendingAddressClient(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("serviceOrders.clientAddressConfirmTitle")}</DialogTitle>
+            <DialogDescription>
+              {t("serviceOrders.clientAddressConfirmDescription", {
+                client: pendingAddressClient?.tradeName || pendingAddressClient?.legalName || "",
+              })}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              className="cursor-pointer"
+              onClick={() => handleClientAddressDecision(false)}
+            >
+              {t("serviceOrders.clientAddressConfirmNo")}
+            </Button>
+            <Button
+              type="button"
+              className="cursor-pointer"
+              onClick={() => handleClientAddressDecision(true)}
+            >
+              {t("serviceOrders.clientAddressConfirmYes")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }

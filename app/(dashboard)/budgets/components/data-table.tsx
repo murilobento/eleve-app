@@ -13,14 +13,17 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { CalendarDays, Check, ChevronDown, Clock3, EllipsisVertical, FileDown, Pencil, RotateCcw, Search, X, Trash2 } from "lucide-react";
+import { Check, Clock3, EllipsisVertical, FileDown, Pencil, RotateCcw, Search, X, Trash2 } from "lucide-react";
 
 import { BudgetFormDialog } from "./budget-form-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
+import { DatePickerInput } from "@/components/date-picker-input";
 import {
+  AdminFiltersDialog,
+  AdminFiltersSection,
   AdminListPaginationFooter,
   AdminListTableCard,
   AdminListToolbar,
@@ -35,14 +38,12 @@ import {
 } from "@/components/ui/dialog";
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -54,7 +55,6 @@ import { SortableHeader } from "@/components/sortable-header";
 import { StatusHistoryDialog } from "@/components/status-history-dialog";
 import { StatusTransitionDialog } from "@/components/status-transition-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Calendar } from "@/components/ui/calendar";
 import type {
   CreateBudgetInput,
   ManagedBudget,
@@ -63,12 +63,10 @@ import type {
 } from "@/lib/budgets-admin";
 import type { ManagedClient } from "@/lib/clients-admin";
 import type { EquipmentOption } from "@/lib/equipment-admin";
-import { usePersistentColumnVisibility } from "@/hooks/use-persistent-column-visibility";
 import { useI18n, useLocale } from "@/i18n/provider";
 import type { ManagedOperator } from "@/lib/operators-admin";
 import type { ManagedServiceType } from "@/lib/service-types-admin";
 import { getSemanticStatusBadgeClass } from "@/lib/status-badge";
-import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 type DataTableProps = {
@@ -113,15 +111,6 @@ type DateFilterControlProps = {
   onPresetChange: (preset: DateFilterPreset) => void;
   onRangeChange: (nextRange: Pick<DateFilterValue, "from" | "to">) => void;
   t: ReturnType<typeof useI18n>["t"];
-};
-
-type DatePickerFieldProps = {
-  id: string;
-  label: string;
-  locale: string;
-  value?: Date;
-  onSelect: (value?: Date) => void;
-  placeholder: string;
 };
 
 function parseDateOnly(value: string) {
@@ -260,51 +249,6 @@ function matchesServiceDateFilter(budget: ManagedBudget, range: ResolvedDateRang
   return budget.items.some((item) => isDateInRange(parseDateOnly(item.serviceDate), range));
 }
 
-function DatePickerField({
-  id,
-  label,
-  locale,
-  value,
-  onSelect,
-  placeholder,
-}: DatePickerFieldProps) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <div className="space-y-2">
-      <Label htmlFor={id} className="text-xs font-medium text-muted-foreground">
-        {label}
-      </Label>
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            id={id}
-            variant="outline"
-            className={cn(
-              "h-10 w-full justify-start rounded-lg text-left font-normal",
-              !value && "text-muted-foreground",
-            )}
-          >
-            <CalendarDays className="mr-2 size-4" />
-            {value ? formatCompactCalendarDate(value, locale) : placeholder}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
-          <Calendar
-            mode="single"
-            selected={value}
-            onSelect={(nextDate) => {
-              onSelect(nextDate);
-              setOpen(false);
-            }}
-            initialFocus
-          />
-        </PopoverContent>
-      </Popover>
-    </div>
-  );
-}
-
 function DateFilterControl({
   idPrefix,
   label,
@@ -391,22 +335,28 @@ function DateFilterControl({
           </DialogHeader>
 
           <div className="grid gap-3 md:grid-cols-2">
-            <DatePickerField
-              id={`${idPrefix}-from`}
-              label={t("budgets.fromDate")}
-              locale={locale}
-              value={draftRange.from}
-              onSelect={(from) => setDraftRange((current) => ({ ...current, from }))}
-              placeholder={t("budgets.selectDate")}
-            />
-            <DatePickerField
-              id={`${idPrefix}-to`}
-              label={t("budgets.toDate")}
-              locale={locale}
-              value={draftRange.to}
-              onSelect={(to) => setDraftRange((current) => ({ ...current, to }))}
-              placeholder={t("budgets.selectDate")}
-            />
+            <div className="space-y-2">
+              <Label htmlFor={`${idPrefix}-from`} className="text-xs font-medium text-muted-foreground">
+                {t("budgets.fromDate")}
+              </Label>
+              <DatePickerInput
+                id={`${idPrefix}-from`}
+                value={draftRange.from}
+                onChange={(from) => setDraftRange((current) => ({ ...current, from }))}
+                placeholder={t("budgets.selectDate")}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`${idPrefix}-to`} className="text-xs font-medium text-muted-foreground">
+                {t("budgets.toDate")}
+              </Label>
+              <DatePickerInput
+                id={`${idPrefix}-to`}
+                value={draftRange.to}
+                onChange={(to) => setDraftRange((current) => ({ ...current, to }))}
+                placeholder={t("budgets.selectDate")}
+              />
+            </div>
           </div>
 
           <DialogFooter className="sm:justify-between">
@@ -503,11 +453,9 @@ export function DataTable({
   const locale = useLocale();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const { columnVisibility, setColumnVisibility } = usePersistentColumnVisibility("table:budgets:columns:v2", {
-    updatedAt: false,
-  });
   const [rowSelection, setRowSelection] = useState({});
   const [globalFilter, setGlobalFilter] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [editingBudget, setEditingBudget] = useState<ManagedBudget | null>(null);
   const [pendingStatusAction, setPendingStatusAction] = useState<PendingStatusAction>(null);
@@ -516,6 +464,9 @@ export function DataTable({
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [createdDateFilter, setCreatedDateFilter] = useState<DateFilterValue>({ preset: "all" });
   const [serviceDateFilter, setServiceDateFilter] = useState<DateFilterValue>({ preset: "all" });
+  const [draftStatusFilter, setDraftStatusFilter] = useState("all");
+  const [draftCreatedDateFilter, setDraftCreatedDateFilter] = useState<DateFilterValue>({ preset: "all" });
+  const [draftServiceDateFilter, setDraftServiceDateFilter] = useState<DateFilterValue>({ preset: "all" });
   const createdDateRange = useMemo(() => resolveDateFilterRange(createdDateFilter), [createdDateFilter]);
   const serviceDateRange = useMemo(() => resolveDateFilterRange(serviceDateFilter), [serviceDateFilter]);
   const filteredBudgets = useMemo(
@@ -713,24 +664,12 @@ export function DataTable({
     },
   ], [isMutating, locale, t]);
 
-  const columnVisibilityLabels = useMemo<Record<string, string>>(
-    () => ({
-      services: t("budgets.services"),
-      schedule: t("budgets.schedule"),
-      totalValue: t("budgets.totalValue"),
-      status: t("budgets.status"),
-      updatedAt: t("budgets.updatedAt"),
-    }),
-    [t],
-  );
-
   const table = useReactTable({
     data: filteredBudgets,
     columns,
     getRowId: (row) => row.id,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
-    onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
     onGlobalFilterChange: setGlobalFilter,
     getCoreRowModel: getCoreRowModel(),
@@ -759,7 +698,6 @@ export function DataTable({
     state: {
       sorting,
       columnFilters,
-      columnVisibility,
       rowSelection,
       globalFilter,
     },
@@ -772,17 +710,39 @@ export function DataTable({
 
   const statusFilter = (table.getColumn("status")?.getFilterValue() as string | undefined) ?? "all";
   const selectedCount = table.getFilteredSelectedRowModel().rows.length;
-  const hasActiveFilters = Boolean(globalFilter.trim())
-    || columnFilters.length > 0
-    || createdDateFilter.preset !== "all"
-    || serviceDateFilter.preset !== "all";
+  const activeFilterCount = [
+    statusFilter !== "all",
+    createdDateFilter.preset !== "all",
+    serviceDateFilter.preset !== "all",
+  ].filter(Boolean).length;
+
+  const handleOpenFilters = (nextOpen: boolean) => {
+    if (nextOpen) {
+      setDraftStatusFilter(statusFilter);
+      setDraftCreatedDateFilter(createdDateFilter);
+      setDraftServiceDateFilter(serviceDateFilter);
+    }
+
+    setFiltersOpen(nextOpen);
+  };
+
+  const handleApplyFilters = () => {
+    table.getColumn("status")?.setFilterValue(draftStatusFilter === "all" ? undefined : draftStatusFilter);
+    setCreatedDateFilter(draftCreatedDateFilter);
+    setServiceDateFilter(draftServiceDateFilter);
+    table.setPageIndex(0);
+    setFiltersOpen(false);
+  };
 
   const handleClearFilters = () => {
-    setGlobalFilter("");
     setColumnFilters([]);
     setCreatedDateFilter({ preset: "all" });
     setServiceDateFilter({ preset: "all" });
+    setDraftStatusFilter("all");
+    setDraftCreatedDateFilter({ preset: "all" });
+    setDraftServiceDateFilter({ preset: "all" });
     table.setPageIndex(0);
+    setFiltersOpen(false);
   };
 
   const [bulkCancelDialog, setBulkCancelDialog] = useState(false);
@@ -790,134 +750,100 @@ export function DataTable({
   return (
     <div className="w-full space-y-4">
       <AdminListToolbar>
-          <div className="relative min-w-[240px] flex-1">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder={t("budgets.searchPlaceholder")}
-              value={globalFilter}
-              onChange={(event) => setGlobalFilter(event.target.value)}
-              className="h-10 rounded-lg border-muted-foreground/20 bg-background pl-9"
-            />
-          </div>
-
-          <div className="w-full min-w-[180px] space-y-2 sm:w-auto">
-            <Label htmlFor="budget-status-filter" className="text-sm font-medium">
-              {t("budgets.status")}
-            </Label>
-            <Select
-              value={statusFilter}
-              onValueChange={(value) =>
-                table.getColumn("status")?.setFilterValue(value === "all" ? undefined : value)
-              }
-            >
-              <SelectTrigger className="h-10 w-full cursor-pointer rounded-lg" id="budget-status-filter">
-                <SelectValue placeholder={t("budgets.selectStatus")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("budgets.allStatuses")}</SelectItem>
-                <SelectItem value="pending">{t("budgets.statusOptions.pending")}</SelectItem>
-                <SelectItem value="approved">{t("budgets.statusOptions.approved")}</SelectItem>
-                <SelectItem value="cancelled">{t("budgets.statusOptions.cancelled")}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <DateFilterControl
-            idPrefix="budget-created-date-filter"
-            label={t("budgets.createdDateFilter")}
-            locale={locale}
-            value={createdDateFilter}
-            onPresetChange={(preset) => setCreatedDateFilter({ preset })}
-            onRangeChange={({ from, to }) =>
-              setCreatedDateFilter((current) => ({
-                ...current,
-                preset: "custom",
-                from,
-                to,
-              }))
-            }
-            t={t}
+        <div className="relative min-w-[240px] flex-1">
+          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder={t("budgets.searchPlaceholder")}
+            value={globalFilter}
+            onChange={(event) => setGlobalFilter(event.target.value)}
+            className="h-10 rounded-lg border-muted-foreground/20 bg-background pl-9"
           />
+        </div>
 
-          <DateFilterControl
-            idPrefix="budget-service-date-filter"
-            label={t("budgets.serviceDateFilter")}
-            locale={locale}
-            value={serviceDateFilter}
-            onPresetChange={(preset) => setServiceDateFilter({ preset })}
-            onRangeChange={({ from, to }) =>
-              setServiceDateFilter((current) => ({
-                ...current,
-                preset: "custom",
-                from,
-                to,
-              }))
-            }
-            t={t}
-          />
-
-          <div className="w-full min-w-[180px] space-y-2 sm:ml-auto sm:w-auto">
-            <div className="min-w-[180px] space-y-2">
-              <Label htmlFor="budgets-column-visibility" className="text-sm font-medium">
-                {t("common.columnVisibility")}
-              </Label>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    id="budgets-column-visibility"
-                    variant="outline"
-                    size="lg"
-                    className="h-10 w-full cursor-pointer justify-between rounded-lg px-3"
-                  >
-                    {t("common.columns")} <ChevronDown className="size-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {table
-                    .getAllColumns()
-                    .filter((column) => column.getCanHide())
-                    .map((column) => (
-                      <DropdownMenuCheckboxItem
-                        key={column.id}
-                        checked={column.getIsVisible()}
-                        onCheckedChange={(value) => column.toggleVisibility(!!value)}
-                      >
-                        {columnVisibilityLabels[column.id] ?? column.id}
-                      </DropdownMenuCheckboxItem>
-                    ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+        <AdminFiltersDialog
+          open={filtersOpen}
+          onOpenChange={handleOpenFilters}
+          title={t("common.filters")}
+          description={t("common.activeFilters", { count: activeFilterCount })}
+          activeCount={activeFilterCount}
+          triggerLabel={t("common.filters")}
+          clearLabel={t("common.clearFilters")}
+          cancelLabel={t("common.cancel")}
+          applyLabel={t("common.apply")}
+          onClear={handleClearFilters}
+          onApply={handleApplyFilters}
+        >
+          <AdminFiltersSection title={t("common.filters")}>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="budget-status-filter">{t("budgets.status")}</Label>
+                <Select value={draftStatusFilter} onValueChange={setDraftStatusFilter}>
+                  <SelectTrigger className="h-10 w-full cursor-pointer rounded-lg" id="budget-status-filter">
+                    <SelectValue placeholder={t("budgets.selectStatus")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("budgets.allStatuses")}</SelectItem>
+                    <SelectItem value="pending">{t("budgets.statusOptions.pending")}</SelectItem>
+                    <SelectItem value="approved">{t("budgets.statusOptions.approved")}</SelectItem>
+                    <SelectItem value="cancelled">{t("budgets.statusOptions.cancelled")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          </div>
+          </AdminFiltersSection>
 
-          <div className="w-full min-w-[160px] space-y-2 sm:w-auto">
-            <Label className="text-sm font-medium text-transparent">
-              {t("common.clearFilters")}
-            </Label>
-            <Button
-              type="button"
-              variant="outline"
-              className="h-10 w-full cursor-pointer rounded-lg sm:w-auto"
-              onClick={handleClearFilters}
-              disabled={!hasActiveFilters}
-            >
-              {t("common.clearFilters")}
-            </Button>
-          </div>
+          <AdminFiltersSection title={t("budgets.schedule")}>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <DateFilterControl
+                idPrefix="budget-created-date-filter"
+                label={t("budgets.createdDateFilter")}
+                locale={locale}
+                value={draftCreatedDateFilter}
+                onPresetChange={(preset) => setDraftCreatedDateFilter({ preset })}
+                onRangeChange={({ from, to }) =>
+                  setDraftCreatedDateFilter((current) => ({
+                    ...current,
+                    preset: "custom",
+                    from,
+                    to,
+                  }))
+                }
+                t={t}
+              />
 
-          <div>
-            <BudgetFormDialog
-              mode="create"
-              open={createOpen}
-              onOpenChange={setCreateOpen}
-              onSubmit={onCreateBudget}
-              isSubmitting={isMutating}
-              clients={clients}
-              equipment={equipment}
-              serviceTypes={serviceTypes}
-              operators={operators}
-            />
-          </div>
+              <DateFilterControl
+                idPrefix="budget-service-date-filter"
+                label={t("budgets.serviceDateFilter")}
+                locale={locale}
+                value={draftServiceDateFilter}
+                onPresetChange={(preset) => setDraftServiceDateFilter({ preset })}
+                onRangeChange={({ from, to }) =>
+                  setDraftServiceDateFilter((current) => ({
+                    ...current,
+                    preset: "custom",
+                    from,
+                    to,
+                  }))
+                }
+                t={t}
+              />
+            </div>
+          </AdminFiltersSection>
+        </AdminFiltersDialog>
+
+        <div className="ml-auto">
+          <BudgetFormDialog
+            mode="create"
+            open={createOpen}
+            onOpenChange={setCreateOpen}
+            onSubmit={onCreateBudget}
+            isSubmitting={isMutating}
+            clients={clients}
+            equipment={equipment}
+            serviceTypes={serviceTypes}
+            operators={operators}
+          />
+        </div>
       </AdminListToolbar>
 
       {selectedCount > 0 ? (

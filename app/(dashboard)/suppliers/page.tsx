@@ -14,10 +14,12 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { ChevronDown, EllipsisVertical, Eye, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { EllipsisVertical, Eye, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import {
+  AdminFiltersDialog,
+  AdminFiltersSection,
   AdminListPaginationFooter,
   AdminListTableCard,
   AdminListToolbar,
@@ -37,7 +39,6 @@ import {
 } from "@/components/ui/dialog";
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
@@ -61,7 +62,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { usePersistentColumnVisibility } from "@/hooks/use-persistent-column-visibility";
+import { useFormValidationToast } from "@/hooks/use-form-validation-toast";
 import { useI18n, useLocale } from "@/i18n/provider";
 import type {
   CnpjLookupResult,
@@ -104,25 +105,6 @@ function formatSupplierDocument(value: string) {
   return digits.length > 11 ? formatCnpj(digits) : formatCpf(digits);
 }
 
-function findFirstErrorMessage(value: unknown): string | null {
-  if (!value || typeof value !== "object") {
-    return null;
-  }
-
-  if ("message" in value && typeof value.message === "string" && value.message.length > 0) {
-    return value.message;
-  }
-
-  for (const entry of Object.values(value)) {
-    const message = findFirstErrorMessage(entry);
-    if (message) {
-      return message;
-    }
-  }
-
-  return null;
-}
-
 function formatDate(value: string, locale: string) {
   return new Intl.DateTimeFormat(locale, {
     dateStyle: "medium",
@@ -138,19 +120,17 @@ export default function SuppliersPage() {
   const [isMutating, setIsMutating] = useState(false);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const { columnVisibility, setColumnVisibility } = usePersistentColumnVisibility("table:suppliers:columns:v2", {
-    updatedAt: false,
-    document: false,
-    email: false,
-  });
   const [rowSelection, setRowSelection] = useState({});
   const [globalFilter, setGlobalFilter] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [viewing, setViewing] = useState<ManagedSupplier | null>(null);
   const [editing, setEditing] = useState<ManagedSupplier | null>(null);
   const [deleting, setDeleting] = useState<ManagedSupplier | null>(null);
   const [isLookingUpDocument, setIsLookingUpDocument] = useState(false);
   const [isLookingUpPostalCode, setIsLookingUpPostalCode] = useState(false);
+  const [draftTypeFilter, setDraftTypeFilter] = useState("all");
+  const [draftStatusFilter, setDraftStatusFilter] = useState("all");
 
   const isEdit = Boolean(editing);
   const schema = isEdit ? updateSupplierSchema : createSupplierSchema;
@@ -223,6 +203,8 @@ export default function SuppliersPage() {
 
   const form = useForm<CreateSupplierInput | UpdateSupplierInput>({
     resolver: zodResolver(schema),
+    mode: "onBlur",
+    reValidateMode: "onBlur",
     defaultValues: {
       supplierType: "workshop",
       status: "active",
@@ -243,6 +225,11 @@ export default function SuppliersPage() {
       state: "",
       country: "Brasil",
     },
+  });
+  const { formClassName, handleInvalidSubmit: handleInvalidFormSubmit } = useFormValidationToast({
+    form,
+    title: t("common.validationToastTitle"),
+    fallback: t("common.validationToastFallback"),
   });
 
   async function loadSuppliers() {
@@ -430,8 +417,7 @@ export default function SuppliersPage() {
   }
 
   function handleInvalidSubmit(errors: FieldErrors<CreateSupplierInput | UpdateSupplierInput>) {
-    const message = findFirstErrorMessage(errors) ?? t("suppliers.updateError");
-    toast.error(message);
+    handleInvalidFormSubmit(errors);
   }
 
   const columns = useMemo<ColumnDef<ManagedSupplier>[]>(() => [
@@ -566,25 +552,11 @@ export default function SuppliersPage() {
     },
   ], [isMutating, locale, t]);
 
-  const columnVisibilityLabels = useMemo<Record<string, string>>(
-    () => ({
-      supplierType: t("suppliers.type"),
-      status: t("suppliers.status"),
-      document: t("suppliers.document"),
-      contactName: t("suppliers.contactName"),
-      email: t("suppliers.email"),
-      location: t("suppliers.location"),
-      updatedAt: t("suppliers.updated"),
-    }),
-    [t],
-  );
-
   const table = useReactTable({
     data: suppliers,
     columns,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
-    onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
     onGlobalFilterChange: setGlobalFilter,
     getCoreRowModel: getCoreRowModel(),
@@ -608,7 +580,6 @@ export default function SuppliersPage() {
     state: {
       sorting,
       columnFilters,
-      columnVisibility,
       rowSelection,
       globalFilter,
     },
@@ -622,12 +593,30 @@ export default function SuppliersPage() {
   const typeFilter = (table.getColumn("supplierType")?.getFilterValue() as string) || "all";
   const statusFilter = (table.getColumn("status")?.getFilterValue() as string) || "all";
   const selectedCount = table.getFilteredSelectedRowModel().rows.length;
-  const hasActiveFilters = Boolean(globalFilter.trim()) || columnFilters.length > 0;
+  const activeFilterCount = [typeFilter, statusFilter].filter((value) => value !== "all").length;
+
+  const handleOpenFilters = (nextOpen: boolean) => {
+    if (nextOpen) {
+      setDraftTypeFilter(typeFilter);
+      setDraftStatusFilter(statusFilter);
+    }
+
+    setFiltersOpen(nextOpen);
+  };
+
+  const handleApplyFilters = () => {
+    table.getColumn("supplierType")?.setFilterValue(draftTypeFilter === "all" ? undefined : draftTypeFilter);
+    table.getColumn("status")?.setFilterValue(draftStatusFilter === "all" ? undefined : draftStatusFilter);
+    table.setPageIndex(0);
+    setFiltersOpen(false);
+  };
 
   const handleClearFilters = () => {
-    setGlobalFilter("");
     setColumnFilters([]);
+    setDraftTypeFilter("all");
+    setDraftStatusFilter("all");
     table.setPageIndex(0);
+    setFiltersOpen(false);
   };
 
   const shouldIgnoreRowClick = (target: EventTarget | null) => {
@@ -663,100 +652,55 @@ export default function SuppliersPage() {
             />
           </div>
 
-          <div className="min-w-[180px] space-y-2">
-            <Label htmlFor="supplier-type-filter" className="text-sm font-medium">
-              {t("suppliers.type")}
-            </Label>
-            <Select
-              value={typeFilter}
-              onValueChange={(value) =>
-                table.getColumn("supplierType")?.setFilterValue(value === "all" ? undefined : value)
-              }
-            >
-              <SelectTrigger className="h-10 w-full cursor-pointer rounded-lg" id="supplier-type-filter">
-                <SelectValue placeholder={t("suppliers.selectType")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("suppliers.allTypes")}</SelectItem>
-                <SelectItem value="fuel_station">{t("suppliers.types.fuel_station")}</SelectItem>
-                <SelectItem value="workshop">{t("suppliers.types.workshop")}</SelectItem>
-                <SelectItem value="other">{t("suppliers.types.other")}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <AdminFiltersDialog
+            open={filtersOpen}
+            onOpenChange={handleOpenFilters}
+            title={t("common.filters")}
+            description={t("common.activeFilters", { count: activeFilterCount })}
+            activeCount={activeFilterCount}
+            triggerLabel={t("common.filters")}
+            clearLabel={t("common.clearFilters")}
+            cancelLabel={t("common.cancel")}
+            applyLabel={t("common.apply")}
+            onClear={handleClearFilters}
+            onApply={handleApplyFilters}
+          >
+            <AdminFiltersSection title={t("common.filters")}>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="supplier-type-filter">{t("suppliers.type")}</Label>
+                  <Select value={draftTypeFilter} onValueChange={setDraftTypeFilter}>
+                    <SelectTrigger className="h-10 w-full cursor-pointer rounded-lg" id="supplier-type-filter">
+                      <SelectValue placeholder={t("suppliers.selectType")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t("suppliers.allTypes")}</SelectItem>
+                      <SelectItem value="fuel_station">{t("suppliers.types.fuel_station")}</SelectItem>
+                      <SelectItem value="workshop">{t("suppliers.types.workshop")}</SelectItem>
+                      <SelectItem value="other">{t("suppliers.types.other")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-          <div className="min-w-[180px] space-y-2">
-            <Label htmlFor="supplier-status-filter" className="text-sm font-medium">
-              {t("suppliers.status")}
-            </Label>
-            <Select
-              value={statusFilter}
-              onValueChange={(value) =>
-                table.getColumn("status")?.setFilterValue(value === "all" ? undefined : value)
-              }
-            >
-              <SelectTrigger className="h-10 w-full cursor-pointer rounded-lg" id="supplier-status-filter">
-                <SelectValue placeholder={t("suppliers.selectStatus")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("suppliers.allStatuses")}</SelectItem>
-                <SelectItem value="active">{t("suppliers.active")}</SelectItem>
-                <SelectItem value="inactive">{t("suppliers.inactive")}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="ml-auto">
-            <div className="min-w-[180px] space-y-2">
-              <Label htmlFor="suppliers-column-visibility" className="text-sm font-medium">
-                {t("common.columnVisibility")}
-              </Label>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    id="suppliers-column-visibility"
-                    variant="outline"
-                    size="lg"
-                    className="h-10 w-full cursor-pointer justify-between rounded-lg px-3"
-                  >
-                    {t("common.columns")} <ChevronDown className="size-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {table
-                    .getAllColumns()
-                    .filter((column) => column.getCanHide())
-                    .map((column) => (
-                      <DropdownMenuCheckboxItem
-                        key={column.id}
-                        checked={column.getIsVisible()}
-                        onCheckedChange={(value) => column.toggleVisibility(!!value)}
-                      >
-                        {columnVisibilityLabels[column.id] ?? column.id}
-                      </DropdownMenuCheckboxItem>
-                    ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-
-          <div className="w-full min-w-[160px] space-y-2 sm:w-auto">
-            <Label className="text-sm font-medium text-transparent">
-              {t("common.clearFilters")}
-            </Label>
-            <Button
-              type="button"
-              variant="outline"
-              className="h-10 w-full cursor-pointer rounded-lg sm:w-auto"
-              onClick={handleClearFilters}
-              disabled={!hasActiveFilters}
-            >
-              {t("common.clearFilters")}
-            </Button>
-          </div>
+                <div className="space-y-2">
+                  <Label htmlFor="supplier-status-filter">{t("suppliers.status")}</Label>
+                  <Select value={draftStatusFilter} onValueChange={setDraftStatusFilter}>
+                    <SelectTrigger className="h-10 w-full cursor-pointer rounded-lg" id="supplier-status-filter">
+                      <SelectValue placeholder={t("suppliers.selectStatus")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t("suppliers.allStatuses")}</SelectItem>
+                      <SelectItem value="active">{t("suppliers.active")}</SelectItem>
+                      <SelectItem value="inactive">{t("suppliers.inactive")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </AdminFiltersSection>
+          </AdminFiltersDialog>
 
           <Button
-            className="cursor-pointer"
+            className="ml-auto cursor-pointer"
             onClick={() => {
               setEditing(null);
               setCreateOpen(true);
@@ -878,7 +822,7 @@ export default function SuppliersPage() {
       >
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-5xl">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleSubmit, handleInvalidSubmit)} className="space-y-3">
+            <form onSubmit={form.handleSubmit(handleSubmit, handleInvalidSubmit)} className={`space-y-3 ${formClassName}`}>
               <DialogHeader>
                 <div className="flex flex-wrap items-center gap-3 pr-8">
                   <DialogTitle>{editing ? t("suppliers.edit") : t("suppliers.add")}</DialogTitle>

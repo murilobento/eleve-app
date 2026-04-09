@@ -39,6 +39,7 @@ import {
   type UpdateOperatorInput,
   updateOperatorSchema,
 } from "@/lib/operators-admin";
+import { useFormValidationToast } from "@/hooks/use-form-validation-toast";
 import { useI18n } from "@/i18n/provider";
 import { formatPhone } from "@/lib/utils";
 
@@ -65,12 +66,19 @@ export function OperatorFormDialog({
 
   const form = useForm<CreateOperatorInput | UpdateOperatorInput>({
     resolver: zodResolver(schema),
+    mode: "onBlur",
+    reValidateMode: "onBlur",
     defaultValues: {
       name: "",
       phone: "",
       license: "B",
       status: "active",
     },
+  });
+  const { formClassName, handleInvalidSubmit } = useFormValidationToast({
+    form,
+    title: t("common.validationToastTitle"),
+    fallback: t("common.validationToastFallback"),
   });
 
   useEffect(() => {
@@ -104,7 +112,7 @@ export function OperatorFormDialog({
       ) : null}
       <DialogContent className="sm:max-w-xl">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(handleSubmit, handleInvalidSubmit)} className={`space-y-4 ${formClassName}`}>
             <DialogHeader className="gap-3">
               <div className="flex flex-wrap items-center gap-3 pr-8">
                 <DialogTitle>{isEdit ? t("operators.editOperator") : t("operators.createOperator")}</DialogTitle>

@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { zodResolver } from "@hookform/resolvers/zod"
 import {
   closestCenter,
   DndContext,
@@ -49,12 +50,14 @@ import {
   useReactTable,
   type VisibilityState,
 } from "@tanstack/react-table"
+import { useForm } from "react-hook-form"
 import { getSemanticStatusBadgeClass } from "@/lib/status-badge"
 import { toast } from "sonner"
 import { z } from "zod"
 
 import { schema } from "../schemas/task-schema"
 import { useIsMobile } from "@/hooks/use-mobile"
+import { useFormValidationToast } from "@/hooks/use-form-validation-toast"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -76,6 +79,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -104,6 +108,38 @@ import {
 const TableCellChart = React.lazy(() =>
   import("./table-cell-chart").then((module) => ({ default: module.TableCellChart }))
 )
+
+const tableCellViewerSchema = z.object({
+  header: z.string().trim().min(1, "Header is required."),
+  type: z.string().trim().min(1, "Type is required."),
+  status: z.string().trim().min(1, "Status is required."),
+  target: z.string().trim().min(1, "Target is required."),
+  limit: z.string().trim().min(1, "Limit is required."),
+  reviewer: z.string().trim().min(1, "Reviewer is required."),
+})
+
+const typeOptions = [
+  "Table of Contents",
+  "Executive Summary",
+  "Technical Approach",
+  "Design",
+  "Capabilities",
+  "Focus Documents",
+  "Narrative",
+  "Cover Page",
+] as const
+
+const statusOptions = [
+  "Done",
+  "In Progress",
+  "Not Started",
+] as const
+
+const reviewerOptions = [
+  "Eddie Lake",
+  "Jamik Tashpulatov",
+  "Emily Whalen",
+] as const
 
 // Create a separate component for the drag handle
 function DragHandle({ id }: { id: number }) {
@@ -908,6 +944,44 @@ export function DataTable({
 
 function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
   const isMobile = useIsMobile()
+  const formId = React.useId()
+  const form = useForm<z.infer<typeof tableCellViewerSchema>>({
+    resolver: zodResolver(tableCellViewerSchema),
+    mode: "onBlur",
+    reValidateMode: "onBlur",
+    defaultValues: {
+      header: item.header,
+      type: item.type,
+      status: item.status,
+      target: item.target,
+      limit: item.limit,
+      reviewer: item.reviewer === "Assign reviewer" ? "" : item.reviewer,
+    },
+  })
+  const { formClassName, handleInvalidSubmit } = useFormValidationToast({
+    form,
+    title: "Review the required fields",
+    fallback: "There are invalid fields in the form.",
+  })
+
+  React.useEffect(() => {
+    form.reset({
+      header: item.header,
+      type: item.type,
+      status: item.status,
+      target: item.target,
+      limit: item.limit,
+      reviewer: item.reviewer === "Assign reviewer" ? "" : item.reviewer,
+    })
+  }, [form, item])
+
+  const handleSubmit = async (values: z.infer<typeof tableCellViewerSchema>) => {
+    await toast.promise(new Promise((resolve) => setTimeout(resolve, 1000)), {
+      loading: `Saving ${values.header}`,
+      success: "Done",
+      error: "Error",
+    })
+  }
 
   return (
     <Drawer direction={isMobile ? "bottom" : "right"}>
@@ -944,81 +1018,132 @@ function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
               <Separator />
             </>
           )}
-          <form className="flex flex-col gap-4">
-            <div className="flex flex-col gap-3">
-              <Label htmlFor="header">Header</Label>
-              <Input id="header" defaultValue={item.header} />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="type">Type</Label>
-                <Select defaultValue={item.type}>
-                  <SelectTrigger id="type" className="w-full cursor-pointer">
-                    <SelectValue placeholder="Select a type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Table of Contents">
-                      Table of Contents
-                    </SelectItem>
-                    <SelectItem value="Executive Summary">
-                      Executive Summary
-                    </SelectItem>
-                    <SelectItem value="Technical Approach">
-                      Technical Approach
-                    </SelectItem>
-                    <SelectItem value="Design">Design</SelectItem>
-                    <SelectItem value="Capabilities">Capabilities</SelectItem>
-                    <SelectItem value="Focus Documents">
-                      Focus Documents
-                    </SelectItem>
-                    <SelectItem value="Narrative">Narrative</SelectItem>
-                    <SelectItem value="Cover Page">Cover Page</SelectItem>
-                  </SelectContent>
-                </Select>
+          <Form {...form}>
+            <form
+              id={formId}
+              className={`flex flex-col gap-4 ${formClassName}`}
+              onSubmit={form.handleSubmit(handleSubmit, handleInvalidSubmit)}
+            >
+              <FormField
+                control={form.control}
+                name="header"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col gap-3">
+                    <Label htmlFor={`${formId}-header`}>Header</Label>
+                    <FormControl>
+                      <Input id={`${formId}-header`} {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="type"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col gap-3">
+                      <Label htmlFor={`${formId}-type`}>Type</Label>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger id={`${formId}-type`} className="w-full cursor-pointer">
+                            <SelectValue placeholder="Select a type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {typeOptions.map((option) => (
+                            <SelectItem key={option} value={option}>
+                              {option}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col gap-3">
+                      <Label htmlFor={`${formId}-status`}>Status</Label>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger id={`${formId}-status`} className="w-full cursor-pointer">
+                            <SelectValue placeholder="Select a status" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {statusOptions.map((option) => (
+                            <SelectItem key={option} value={option}>
+                              {option}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="status">Status</Label>
-                <Select defaultValue={item.status}>
-                  <SelectTrigger id="status" className="w-full cursor-pointer">
-                    <SelectValue placeholder="Select a status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Done">Done</SelectItem>
-                    <SelectItem value="In Progress">In Progress</SelectItem>
-                    <SelectItem value="Not Started">Not Started</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="target"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col gap-3">
+                      <Label htmlFor={`${formId}-target`}>Target</Label>
+                      <FormControl>
+                        <Input id={`${formId}-target`} {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="limit"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col gap-3">
+                      <Label htmlFor={`${formId}-limit`}>Limit</Label>
+                      <FormControl>
+                        <Input id={`${formId}-limit`} {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="target">Target</Label>
-                <Input id="target" defaultValue={item.target} />
-              </div>
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="limit">Limit</Label>
-                <Input id="limit" defaultValue={item.limit} />
-              </div>
-            </div>
-            <div className="flex flex-col gap-3">
-              <Label htmlFor="reviewer">Reviewer</Label>
-              <Select defaultValue={item.reviewer}>
-                <SelectTrigger id="reviewer" className="w-full cursor-pointer">
-                  <SelectValue placeholder="Select a reviewer" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Eddie Lake">Eddie Lake</SelectItem>
-                  <SelectItem value="Jamik Tashpulatov">
-                    Jamik Tashpulatov
-                  </SelectItem>
-                  <SelectItem value="Emily Whalen">Emily Whalen</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </form>
+              <FormField
+                control={form.control}
+                name="reviewer"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col gap-3">
+                    <Label htmlFor={`${formId}-reviewer`}>Reviewer</Label>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger id={`${formId}-reviewer`} className="w-full cursor-pointer">
+                          <SelectValue placeholder="Select a reviewer" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {reviewerOptions.map((option) => (
+                          <SelectItem key={option} value={option}>
+                            {option}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </form>
+          </Form>
         </div>
         <DrawerFooter>
-          <Button className="cursor-pointer">Submit</Button>
+          <Button className="cursor-pointer" type="submit" form={formId}>Submit</Button>
           <DrawerClose asChild>
             <Button variant="outline" className="cursor-pointer">Done</Button>
           </DrawerClose>

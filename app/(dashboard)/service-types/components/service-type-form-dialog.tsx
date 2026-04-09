@@ -43,6 +43,7 @@ import {
   type UpdateServiceTypeInput,
   updateServiceTypeSchema,
 } from "@/lib/service-types-admin";
+import { useFormValidationToast } from "@/hooks/use-form-validation-toast";
 import { useI18n } from "@/i18n/provider";
 
 type ServiceTypeFormDialogProps = {
@@ -81,6 +82,8 @@ export function ServiceTypeFormDialog({
 
   const form = useForm<CreateServiceTypeInput | UpdateServiceTypeInput>({
     resolver: zodResolver(schema),
+    mode: "onBlur",
+    reValidateMode: "onBlur",
     defaultValues: {
       name: "",
       description: "",
@@ -91,6 +94,11 @@ export function ServiceTypeFormDialog({
       minimumKm: undefined,
       equipmentIds: [],
     },
+  });
+  const { formClassName, handleInvalidSubmit } = useFormValidationToast({
+    form,
+    title: t("common.validationToastTitle"),
+    fallback: t("common.validationToastFallback"),
   });
 
   useEffect(() => {
@@ -128,7 +136,7 @@ export function ServiceTypeFormDialog({
       ) : null}
       <DialogContent className="sm:max-w-2xl">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(handleSubmit, handleInvalidSubmit)} className={`space-y-4 ${formClassName}`}>
             <DialogHeader>
               <div className="flex flex-wrap items-center gap-3 pr-8">
                 <DialogTitle>{isEdit ? t("serviceTypes.editType") : t("serviceTypes.createType")}</DialogTitle>

@@ -34,6 +34,7 @@ import {
   type UpdateRoleInput,
   updateRoleSchema,
 } from "@/lib/roles-admin";
+import { useFormValidationToast } from "@/hooks/use-form-validation-toast";
 import { useI18n } from "@/i18n/provider";
 
 type RoleFormDialogProps = {
@@ -116,10 +117,17 @@ export function RoleFormDialog({
 
   const form = useForm<CreateRoleInput | UpdateRoleInput>({
     resolver: zodResolver(schema),
+    mode: "onBlur",
+    reValidateMode: "onBlur",
     defaultValues: {
       name: "",
       permissionKeys: [],
     },
+  });
+  const { formClassName, handleInvalidSubmit } = useFormValidationToast({
+    form,
+    title: t("common.validationToastTitle"),
+    fallback: t("common.validationToastFallback"),
   });
 
   useEffect(() => {
@@ -161,7 +169,7 @@ export function RoleFormDialog({
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(handleSubmit, handleInvalidSubmit)} className={`space-y-4 ${formClassName}`}>
             <FormField
               control={form.control}
               name="name"

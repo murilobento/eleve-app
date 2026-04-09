@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus } from "lucide-react";
 
+import { DatePickerInput, formatDateString, parseDateString } from "@/components/date-picker-input";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -40,6 +41,7 @@ import {
   type UpdateFuelInput,
   updateFuelSchema,
 } from "@/lib/fuel-admin";
+import { useFormValidationToast } from "@/hooks/use-form-validation-toast";
 import { useI18n } from "@/i18n/provider";
 
 type FuelFormDialogProps = {
@@ -66,6 +68,8 @@ export function FuelFormDialog({
 
   const form = useForm<CreateFuelInput | UpdateFuelInput>({
     resolver: zodResolver(isEdit ? updateFuelSchema : createFuelSchema),
+    mode: "onBlur",
+    reValidateMode: "onBlur",
     defaultValues: {
       equipmentId: undefined,
       fuelDate: "",
@@ -81,6 +85,11 @@ export function FuelFormDialog({
       paymentDueDate: "",
       paidAt: "",
     },
+  });
+  const { formClassName, handleInvalidSubmit } = useFormValidationToast({
+    form,
+    title: t("common.validationToastTitle"),
+    fallback: t("common.validationToastFallback"),
   });
 
   useEffect(() => {
@@ -123,7 +132,7 @@ export function FuelFormDialog({
       ) : null}
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(handleSubmit, handleInvalidSubmit)} className={`space-y-4 ${formClassName}`}>
             <DialogHeader>
               <DialogTitle>{isEdit ? t("equipmentCosts.editFuel") : t("equipmentCosts.createFuel")}</DialogTitle>
               <DialogDescription>{t("equipmentCosts.fuelFormDescription")}</DialogDescription>
@@ -137,7 +146,11 @@ export function FuelFormDialog({
                   <FormItem>
                     <FormLabel>{t("equipmentCosts.fuelDate")}</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <DatePickerInput
+                        value={parseDateString(field.value)}
+                        onChange={(date) => field.onChange(formatDateString(date))}
+                        placeholder={t("equipmentCosts.fuelDate")}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -172,7 +185,11 @@ export function FuelFormDialog({
                   <FormItem>
                     <FormLabel>{t("equipmentCosts.paymentDueDate")}</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} value={field.value ?? ""} />
+                      <DatePickerInput
+                        value={parseDateString(field.value)}
+                        onChange={(date) => field.onChange(formatDateString(date))}
+                        placeholder={t("equipmentCosts.paymentDueDate")}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -185,7 +202,11 @@ export function FuelFormDialog({
                   <FormItem>
                     <FormLabel>{t("equipmentCosts.paidAt")}</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} value={field.value ?? ""} />
+                      <DatePickerInput
+                        value={parseDateString(field.value)}
+                        onChange={(date) => field.onChange(formatDateString(date))}
+                        placeholder={t("equipmentCosts.paidAt")}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

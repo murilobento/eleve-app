@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useFieldArray, useForm, useWatch, type FieldErrors } from "react-hook-form";
+import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { SearchableCombobox } from "@/components/searchable-combobox";
+import { DatePickerInput, formatDateString, parseDateString } from "@/components/date-picker-input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -55,6 +56,7 @@ import type { EquipmentOption } from "@/lib/equipment-admin";
 import type { ManagedOperator } from "@/lib/operators-admin";
 import type { ManagedServiceType } from "@/lib/service-types-admin";
 import { getSemanticStatusBadgeClass } from "@/lib/status-badge";
+import { useFormValidationToast } from "@/hooks/use-form-validation-toast";
 import { useI18n, useLocale } from "@/i18n/provider";
 import { cn, formatPostalCode } from "@/lib/utils";
 
@@ -161,31 +163,6 @@ function buildServiceTypeCaption(
   });
 }
 
-function collectErrorMessages(errors: unknown): string[] {
-  const messages: string[] = [];
-
-  const visit = (value: unknown) => {
-    if (!value || typeof value !== "object") {
-      return;
-    }
-
-    if ("message" in value && typeof value.message === "string" && value.message.trim()) {
-      messages.push(value.message.trim());
-    }
-
-    if (Array.isArray(value)) {
-      value.forEach(visit);
-      return;
-    }
-
-    Object.values(value).forEach(visit);
-  };
-
-  visit(errors);
-
-  return Array.from(new Set(messages));
-}
-
 function normalizePostalCode(value: string | null | undefined) {
   return (value ?? "").replace(/\D/g, "");
 }
@@ -246,6 +223,8 @@ export function BudgetFormDialog({
   const form = useForm<CreateBudgetInput | UpdateBudgetInput>({
     resolver: zodResolver(schema),
     shouldFocusError: false,
+    mode: "onBlur",
+    reValidateMode: "onBlur",
     defaultValues: {
       clientId: "",
       servicePostalCode: "",
@@ -260,6 +239,11 @@ export function BudgetFormDialog({
       notes: "",
       items: [createEmptyItem()],
     },
+  });
+  const { formClassName, handleInvalidSubmit } = useFormValidationToast({
+    form,
+    title: t("budgets.validationToastTitle"),
+    fallback: t("budgets.validationToastFallback"),
   });
 
   const { fields, append, move, remove } = useFieldArray({
@@ -642,18 +626,6 @@ export function BudgetFormDialog({
     onOpenChange(false);
   }
 
-  function handleInvalidSubmit(errors: FieldErrors<CreateBudgetInput | UpdateBudgetInput>) {
-    const messages = collectErrorMessages(errors);
-    const visibleMessages = messages.slice(0, 4);
-    const remainingCount = messages.length - visibleMessages.length;
-
-    toast.error(t("budgets.validationToastTitle"), {
-      description: visibleMessages.length
-        ? `${visibleMessages.join(" • ")}${remainingCount > 0 ? ` • +${remainingCount}` : ""}`
-        : t("budgets.validationToastFallback"),
-    });
-  }
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {!isEdit ? (
@@ -668,7 +640,7 @@ export function BudgetFormDialog({
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit(handleSubmit, handleInvalidSubmit)}
-            className="flex max-h-[calc(100vh-2rem)] flex-col [&_[aria-invalid=true]]:border-input [&_[aria-invalid=true]]:ring-0 [&_[data-slot=form-label][data-error=true]]:text-foreground [&_[data-slot=form-message]]:hidden"
+            className={`flex max-h-[calc(100vh-2rem)] flex-col [&_[aria-invalid=true]]:border-input [&_[aria-invalid=true]]:ring-0 ${formClassName}`}
           >
             <div className="shrink-0 border-b px-6 py-5">
               <DialogHeader className="gap-3">
@@ -1110,7 +1082,11 @@ export function BudgetFormDialog({
                                 <FormItem>
                                   <FormLabel>{t("budgets.serviceDate")}</FormLabel>
                                   <FormControl>
-                                    <Input type="date" {...itemField} />
+                                    <DatePickerInput
+                                      value={parseDateString(itemField.value)}
+                                      onChange={(date) => itemField.onChange(formatDateString(date))}
+                                      placeholder={t("budgets.selectDate")}
+                                    />
                                   </FormControl>
                                   <FormMessage />
                                 </FormItem>

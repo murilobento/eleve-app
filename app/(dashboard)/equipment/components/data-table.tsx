@@ -13,11 +13,13 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { ChevronDown, EllipsisVertical, Pencil, Search, Trash2 } from "lucide-react";
+import { EllipsisVertical, Pencil, Search, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  AdminFiltersDialog,
+  AdminFiltersSection,
   AdminListPaginationFooter,
   AdminListTableCard,
   AdminListToolbar,
@@ -26,7 +28,6 @@ import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
@@ -50,7 +51,6 @@ import type {
 import type { ManagedEquipmentType } from "@/lib/equipment-types-admin";
 import { getSemanticStatusBadgeClass } from "@/lib/status-badge";
 import { useRbac } from "@/hooks/use-rbac";
-import { usePersistentColumnVisibility } from "@/hooks/use-persistent-column-visibility";
 import { useI18n, useLocale } from "@/i18n/provider";
 import { getAppUrl } from "@/lib/utils";
 
@@ -87,15 +87,15 @@ export function DataTable({
   const { hasPermission } = useRbac();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const { columnVisibility, setColumnVisibility } = usePersistentColumnVisibility("table:equipment:columns:v3", {
-    updatedAt: false,
-    plate: false,
-  });
   const [rowSelection, setRowSelection] = useState({});
   const [globalFilter, setGlobalFilter] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [editingEquipment, setEditingEquipment] = useState<ManagedEquipment | null>(null);
   const [deletingEquipment, setDeletingEquipment] = useState<ManagedEquipment | null>(null);
+  const [draftTypeFilter, setDraftTypeFilter] = useState("all");
+  const [draftLicenseFilter, setDraftLicenseFilter] = useState("all");
+  const [draftStatusFilter, setDraftStatusFilter] = useState("all");
 
   const columns = useMemo<ColumnDef<ManagedEquipment>[]>(() => [
     {
@@ -244,27 +244,11 @@ export function DataTable({
       },
     },
   ], [isMutating, locale, t]);
-  const columnVisibilityLabels = useMemo<Record<string, string>>(
-    () => ({
-      typeName: t("equipment.type"),
-      licenseRequired: t("equipment.licenseRequired"),
-      status: t("equipment.status"),
-      brand: t("equipment.brand"),
-      model: t("equipment.model"),
-      year: t("equipment.year"),
-      liftingCapacityTons: t("equipment.liftingCapacityTons"),
-      plate: t("equipment.plate"),
-      updatedAt: t("equipment.updated"),
-    }),
-    [t],
-  );
-
   const table = useReactTable({
     data: equipment,
     columns,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
-    onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
     onGlobalFilterChange: setGlobalFilter,
     getCoreRowModel: getCoreRowModel(),
@@ -286,7 +270,6 @@ export function DataTable({
     state: {
       sorting,
       columnFilters,
-      columnVisibility,
       rowSelection,
       globalFilter,
     },
@@ -301,166 +284,133 @@ export function DataTable({
   const licenseFilter = (table.getColumn("licenseRequired")?.getFilterValue() as string) || "all";
   const statusFilter = (table.getColumn("status")?.getFilterValue() as string) || "all";
   const selectedCount = table.getFilteredSelectedRowModel().rows.length;
-  const hasActiveFilters = Boolean(globalFilter.trim()) || columnFilters.length > 0;
+  const activeFilterCount = [typeFilter, licenseFilter, statusFilter].filter((value) => value !== "all").length;
+
+  const handleOpenFilters = (nextOpen: boolean) => {
+    if (nextOpen) {
+      setDraftTypeFilter(typeFilter);
+      setDraftLicenseFilter(licenseFilter);
+      setDraftStatusFilter(statusFilter);
+    }
+
+    setFiltersOpen(nextOpen);
+  };
+
+  const handleApplyFilters = () => {
+    table.getColumn("typeName")?.setFilterValue(draftTypeFilter === "all" ? undefined : draftTypeFilter);
+    table.getColumn("licenseRequired")?.setFilterValue(draftLicenseFilter === "all" ? undefined : draftLicenseFilter);
+    table.getColumn("status")?.setFilterValue(draftStatusFilter === "all" ? undefined : draftStatusFilter);
+    table.setPageIndex(0);
+    setFiltersOpen(false);
+  };
 
   const handleClearFilters = () => {
-    setGlobalFilter("");
     setColumnFilters([]);
+    setDraftTypeFilter("all");
+    setDraftLicenseFilter("all");
+    setDraftStatusFilter("all");
     table.setPageIndex(0);
+    setFiltersOpen(false);
   };
 
   return (
     <div className="w-full space-y-4">
       <AdminListToolbar>
-          <div className="relative min-w-[240px] flex-1">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder={t("equipment.searchPlaceholder")}
-              value={globalFilter}
-              onChange={(event) => setGlobalFilter(event.target.value)}
-              className="h-10 rounded-lg border-muted-foreground/20 bg-background pl-9"
-            />
-          </div>
+        <div className="relative min-w-[240px] flex-1">
+          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder={t("equipment.searchPlaceholder")}
+            value={globalFilter}
+            onChange={(event) => setGlobalFilter(event.target.value)}
+            className="h-10 rounded-lg border-muted-foreground/20 bg-background pl-9"
+          />
+        </div>
 
-          <div className="min-w-[180px] space-y-2">
-            <Label htmlFor="equipment-type-filter" className="text-sm font-medium">
-              {t("equipment.type")}
-            </Label>
-            <Select
-              value={typeFilter}
-              onValueChange={(value) =>
-                table.getColumn("typeName")?.setFilterValue(value === "all" ? undefined : value)
-              }
-            >
-              <SelectTrigger className="h-10 w-full cursor-pointer rounded-lg" id="equipment-type-filter">
-                <SelectValue placeholder={t("equipment.selectType")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("equipment.allTypes")}</SelectItem>
-                {equipmentTypes.map((equipmentType) => (
-                  <SelectItem key={equipmentType.id} value={equipmentType.name}>
-                    {equipmentType.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="min-w-[180px] space-y-2">
-            <Label htmlFor="equipment-license-filter" className="text-sm font-medium">
-              {t("equipment.licenseRequired")}
-            </Label>
-            <Select
-              value={licenseFilter}
-              onValueChange={(value) =>
-                table.getColumn("licenseRequired")?.setFilterValue(value === "all" ? undefined : value)
-              }
-            >
-              <SelectTrigger className="h-10 w-full cursor-pointer rounded-lg" id="equipment-license-filter">
-                <SelectValue placeholder={t("equipment.selectLicense")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("equipment.allLicenses")}</SelectItem>
-                {["A", "B", "C", "D", "E"].map((license) => (
-                  <SelectItem key={license} value={license}>
-                    {license}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="min-w-[180px] space-y-2">
-            <Label htmlFor="equipment-status-filter" className="text-sm font-medium">
-              {t("equipment.status")}
-            </Label>
-            <Select
-              value={statusFilter}
-              onValueChange={(value) =>
-                table.getColumn("status")?.setFilterValue(value === "all" ? undefined : value)
-              }
-            >
-              <SelectTrigger className="h-10 w-full cursor-pointer rounded-lg" id="equipment-status-filter">
-                <SelectValue placeholder={t("equipment.selectStatus")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("equipment.allStatuses")}</SelectItem>
-                <SelectItem value="active">{t("equipment.active")}</SelectItem>
-                <SelectItem value="inactive">{t("equipment.inactive")}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="ml-auto">
-            <div className="min-w-[180px] space-y-2">
-              <Label htmlFor="equipment-column-visibility" className="text-sm font-medium">
-                {t("common.columnVisibility")}
-              </Label>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    id="equipment-column-visibility"
-                    variant="outline"
-                    size="lg"
-                    className="h-10 w-full cursor-pointer justify-between rounded-lg px-3"
-                  >
-                    {t("common.columns")} <ChevronDown className="size-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {table
-                    .getAllColumns()
-                    .filter((column) => column.getCanHide())
-                    .map((column) => (
-                      <DropdownMenuCheckboxItem
-                        key={column.id}
-                        checked={column.getIsVisible()}
-                        onCheckedChange={(value) => column.toggleVisibility(!!value)}
-                      >
-                        {columnVisibilityLabels[column.id] ?? column.id}
-                      </DropdownMenuCheckboxItem>
+        <AdminFiltersDialog
+          open={filtersOpen}
+          onOpenChange={handleOpenFilters}
+          title={t("common.filters")}
+          description={t("common.activeFilters", { count: activeFilterCount })}
+          activeCount={activeFilterCount}
+          triggerLabel={t("common.filters")}
+          clearLabel={t("common.clearFilters")}
+          cancelLabel={t("common.cancel")}
+          applyLabel={t("common.apply")}
+          onClear={handleClearFilters}
+          onApply={handleApplyFilters}
+        >
+          <AdminFiltersSection title={t("common.filters")}>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="equipment-type-filter">{t("equipment.type")}</Label>
+                <Select value={draftTypeFilter} onValueChange={setDraftTypeFilter}>
+                  <SelectTrigger className="h-10 w-full cursor-pointer rounded-lg" id="equipment-type-filter">
+                    <SelectValue placeholder={t("equipment.selectType")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("equipment.allTypes")}</SelectItem>
+                    {equipmentTypes.map((equipmentType) => (
+                      <SelectItem key={equipmentType.id} value={equipmentType.name}>
+                        {equipmentType.name}
+                      </SelectItem>
                     ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
+                  </SelectContent>
+                </Select>
+              </div>
 
-          <div className="w-full min-w-[160px] space-y-2 sm:w-auto">
-            <Label className="text-sm font-medium text-transparent">
-              {t("common.clearFilters")}
-            </Label>
-            <Button
-              type="button"
-              variant="outline"
-              className="h-10 w-full cursor-pointer rounded-lg sm:w-auto"
-              onClick={handleClearFilters}
-              disabled={!hasActiveFilters}
-            >
-              {t("common.clearFilters")}
+              <div className="space-y-2">
+                <Label htmlFor="equipment-license-filter">{t("equipment.licenseRequired")}</Label>
+                <Select value={draftLicenseFilter} onValueChange={setDraftLicenseFilter}>
+                  <SelectTrigger className="h-10 w-full cursor-pointer rounded-lg" id="equipment-license-filter">
+                    <SelectValue placeholder={t("equipment.selectLicense")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("equipment.allLicenses")}</SelectItem>
+                    {["A", "B", "C", "D", "E"].map((license) => (
+                      <SelectItem key={license} value={license}>
+                        {license}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="equipment-status-filter">{t("equipment.status")}</Label>
+                <Select value={draftStatusFilter} onValueChange={setDraftStatusFilter}>
+                  <SelectTrigger className="h-10 w-full cursor-pointer rounded-lg" id="equipment-status-filter">
+                    <SelectValue placeholder={t("equipment.selectStatus")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("equipment.allStatuses")}</SelectItem>
+                    <SelectItem value="active">{t("equipment.active")}</SelectItem>
+                    <SelectItem value="inactive">{t("equipment.inactive")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </AdminFiltersSection>
+        </AdminFiltersDialog>
+
+        <div className="ml-auto flex items-center gap-2">
+          {hasPermission("equipment-types.read") ? (
+            <Button asChild variant="outline" className="cursor-pointer">
+              <Link href={getAppUrl("/equipment-types", locale)}>
+                {t("navigation.equipmentTypes")}
+              </Link>
             </Button>
-          </div>
+          ) : null}
 
-          <div>
-            <div className="flex items-center gap-2">
-              {hasPermission("equipment-types.read") ? (
-                <Button asChild variant="outline" className="cursor-pointer">
-                  <Link href={getAppUrl("/equipment-types", locale)}>
-                    {t("navigation.equipmentTypes")}
-                  </Link>
-                </Button>
-              ) : null}
-
-              <EquipmentFormDialog
-                mode="create"
-                open={createOpen}
-                onOpenChange={setCreateOpen}
-                onSubmit={onCreateEquipment}
-                isSubmitting={isMutating}
-                equipmentTypes={equipmentTypes}
-                canCreate={equipmentTypes.length > 0}
-              />
-            </div>
-          </div>
+          <EquipmentFormDialog
+            mode="create"
+            open={createOpen}
+            onOpenChange={setCreateOpen}
+            onSubmit={onCreateEquipment}
+            isSubmitting={isMutating}
+            equipmentTypes={equipmentTypes}
+            canCreate={equipmentTypes.length > 0}
+          />
+        </div>
       </AdminListToolbar>
 
       {selectedCount > 0 ? (

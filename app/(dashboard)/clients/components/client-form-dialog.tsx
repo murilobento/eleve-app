@@ -44,6 +44,7 @@ import {
   createClientSchema,
   updateClientSchema,
 } from "@/lib/clients-admin";
+import { useFormValidationToast } from "@/hooks/use-form-validation-toast";
 import { useI18n } from "@/i18n/provider";
 import { formatCnpj, formatCpf, formatPhone, formatPostalCode } from "@/lib/utils";
 
@@ -97,6 +98,8 @@ export function ClientFormDialog({
 
   const form = useForm<CreateClientInput | UpdateClientInput>({
     resolver: zodResolver(schema),
+    mode: "onBlur",
+    reValidateMode: "onBlur",
     defaultValues: {
       personType: "PF",
       status: "active",
@@ -117,6 +120,11 @@ export function ClientFormDialog({
       state: "",
       country: "Brasil",
     },
+  });
+  const { formClassName, handleInvalidSubmit } = useFormValidationToast({
+    form,
+    title: t("common.validationToastTitle"),
+    fallback: t("common.validationToastFallback"),
   });
 
   const personType = form.watch("personType");
@@ -246,7 +254,7 @@ export function ClientFormDialog({
       ) : null}
       <DialogContent className="sm:max-w-5xl">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-3">
+          <form onSubmit={form.handleSubmit(handleSubmit, handleInvalidSubmit)} className={`space-y-3 ${formClassName}`}>
             <DialogHeader>
               <div className="flex flex-wrap items-center gap-3 pr-8">
                 <DialogTitle>{isEdit ? t("clients.editClient") : t("clients.createClient")}</DialogTitle>

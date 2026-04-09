@@ -34,6 +34,7 @@ import {
   updateManagedUserSchema,
 } from "@/lib/users-admin";
 import type { RoleRecord } from "@/lib/rbac-shared";
+import { useFormValidationToast } from "@/hooks/use-form-validation-toast";
 import { useI18n } from "@/i18n/provider";
 
 type UserFormDialogProps = {
@@ -61,6 +62,8 @@ export function UserFormDialog({
 
   const form = useForm<CreateManagedUserInput | UpdateManagedUserInput>({
     resolver: zodResolver(schema),
+    mode: "onBlur",
+    reValidateMode: "onBlur",
     defaultValues: {
       name: "",
       email: "",
@@ -68,6 +71,11 @@ export function UserFormDialog({
       roleIds: [],
       status: "active",
     },
+  });
+  const { formClassName, handleInvalidSubmit } = useFormValidationToast({
+    form,
+    title: t("common.validationToastTitle"),
+    fallback: t("common.validationToastFallback"),
   });
 
   useEffect(() => {
@@ -109,7 +117,7 @@ export function UserFormDialog({
       ) : null}
       <DialogContent className="sm:max-w-xl">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(handleSubmit, handleInvalidSubmit)} className={`space-y-4 ${formClassName}`}>
             <DialogHeader className="gap-3">
               <div className="flex flex-wrap items-center gap-3 pr-8">
                 <DialogTitle>{isEdit ? t("users.editUser") : t("users.createUser")}</DialogTitle>

@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus } from "lucide-react";
 
+import { DatePickerInput, formatDateString, parseDateString } from "@/components/date-picker-input";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -40,6 +41,7 @@ import {
   type UpdateMaintenanceInput,
   updateMaintenanceSchema,
 } from "@/lib/maintenance-admin";
+import { useFormValidationToast } from "@/hooks/use-form-validation-toast";
 import { useI18n } from "@/i18n/provider";
 
 type MaintenanceFormDialogProps = {
@@ -66,6 +68,8 @@ export function MaintenanceFormDialog({
 
   const form = useForm<CreateMaintenanceInput | UpdateMaintenanceInput>({
     resolver: zodResolver(isEdit ? updateMaintenanceSchema : createMaintenanceSchema),
+    mode: "onBlur",
+    reValidateMode: "onBlur",
     defaultValues: {
       equipmentId: "",
       maintenanceType: "preventive",
@@ -83,6 +87,11 @@ export function MaintenanceFormDialog({
       meterKind: undefined,
       meterValue: undefined,
     },
+  });
+  const { formClassName, handleInvalidSubmit } = useFormValidationToast({
+    form,
+    title: t("common.validationToastTitle"),
+    fallback: t("common.validationToastFallback"),
   });
 
   useEffect(() => {
@@ -127,7 +136,7 @@ export function MaintenanceFormDialog({
       ) : null}
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(handleSubmit, handleInvalidSubmit)} className={`space-y-4 ${formClassName}`}>
             <DialogHeader>
               <DialogTitle>{isEdit ? t("equipmentCosts.editMaintenance") : t("equipmentCosts.createMaintenance")}</DialogTitle>
               <DialogDescription>{t("equipmentCosts.maintenanceFormDescription")}</DialogDescription>
@@ -252,7 +261,11 @@ export function MaintenanceFormDialog({
                   <FormItem>
                     <FormLabel>{t("equipmentCosts.plannedDate")}</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <DatePickerInput
+                        value={parseDateString(field.value)}
+                        onChange={(date) => field.onChange(formatDateString(date))}
+                        placeholder={t("equipmentCosts.plannedDate")}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -265,7 +278,11 @@ export function MaintenanceFormDialog({
                   <FormItem>
                     <FormLabel>{t("equipmentCosts.performedDate")}</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} value={field.value ?? ""} />
+                      <DatePickerInput
+                        value={parseDateString(field.value)}
+                        onChange={(date) => field.onChange(formatDateString(date))}
+                        placeholder={t("equipmentCosts.performedDate")}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -278,7 +295,11 @@ export function MaintenanceFormDialog({
                   <FormItem>
                     <FormLabel>{t("equipmentCosts.paymentDueDate")}</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} value={field.value ?? ""} />
+                      <DatePickerInput
+                        value={parseDateString(field.value)}
+                        onChange={(date) => field.onChange(formatDateString(date))}
+                        placeholder={t("equipmentCosts.paymentDueDate")}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -291,7 +312,11 @@ export function MaintenanceFormDialog({
                   <FormItem>
                     <FormLabel>{t("equipmentCosts.paidAt")}</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} value={field.value ?? ""} />
+                      <DatePickerInput
+                        value={parseDateString(field.value)}
+                        onChange={(date) => field.onChange(formatDateString(date))}
+                        placeholder={t("equipmentCosts.paidAt")}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

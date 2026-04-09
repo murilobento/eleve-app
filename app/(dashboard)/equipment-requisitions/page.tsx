@@ -12,7 +12,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { Check, ChevronDown, EllipsisVertical, FileDown, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { Check, EllipsisVertical, FileDown, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
+import { DatePickerInput, formatDateString, parseDateString } from "@/components/date-picker-input";
 import {
   Dialog,
   DialogContent,
@@ -34,14 +35,12 @@ import {
 } from "@/components/ui/dialog";
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { usePersistentColumnVisibility } from "@/hooks/use-persistent-column-visibility";
 import {
   Select,
   SelectContent,
@@ -896,7 +895,11 @@ export default function EquipmentRequisitionsPage() {
             </div>
             <div className="grid gap-2">
               <Label>{t("equipmentRequisitions.scheduledDate")}</Label>
-              <Input type="date" value={maintenanceForm.scheduledDate} onChange={(event) => setMaintenanceForm((current) => ({ ...current, scheduledDate: event.target.value }))} />
+              <DatePickerInput
+                value={parseDateString(maintenanceForm.scheduledDate)}
+                onChange={(date) => setMaintenanceForm((current) => ({ ...current, scheduledDate: formatDateString(date) }))}
+                placeholder={t("equipmentRequisitions.scheduledDate")}
+              />
             </div>
             <div className="grid gap-2">
               <Label>{t("equipmentRequisitions.descriptionLabel")}</Label>
@@ -986,7 +989,11 @@ export default function EquipmentRequisitionsPage() {
             </div>
             <div className="grid gap-2">
               <Label>{t("equipmentRequisitions.scheduledDate")}</Label>
-              <Input type="date" value={fuelForm.scheduledDate} onChange={(event) => setFuelForm((current) => ({ ...current, scheduledDate: event.target.value }))} />
+              <DatePickerInput
+                value={parseDateString(fuelForm.scheduledDate)}
+                onChange={(date) => setFuelForm((current) => ({ ...current, scheduledDate: formatDateString(date) }))}
+                placeholder={t("equipmentRequisitions.scheduledDate")}
+              />
             </div>
             <div className="grid gap-2">
               <Label>{t("equipmentRequisitions.notes")}</Label>
@@ -1139,7 +1146,11 @@ export default function EquipmentRequisitionsPage() {
             <div className="grid gap-4">
               <div className="grid gap-2">
                 <Label>{t("equipmentRequisitions.completedAt")}</Label>
-                <Input type="date" value={completedAt} onChange={(event) => setCompletedAt(event.target.value)} />
+                <DatePickerInput
+                  value={parseDateString(completedAt)}
+                  onChange={(date) => setCompletedAt(formatDateString(date))}
+                  placeholder={t("equipmentRequisitions.completedAt")}
+                />
               </div>
               <div className="grid gap-2">
                 <Label>{t("equipmentRequisitions.completionNotes")}</Label>
