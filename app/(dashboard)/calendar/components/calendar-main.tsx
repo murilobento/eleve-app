@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Calendar as CalendarIcon,
   Clock,
+  FileDown,
   MapPin,
   Truck,
   Menu,
@@ -16,6 +17,7 @@ import { format, addDays, subDays, isToday, isSameDay } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { useResourcePermissions } from "@/hooks/use-resource-permissions"
 import {
   Dialog,
   DialogContent,
@@ -26,6 +28,7 @@ import {
 import { cn, getAppUrl } from "@/lib/utils"
 import { useI18n, useLocale } from "@/i18n/provider"
 import { getDateFnsLocale } from "@/lib/date-locale"
+import { formatAgendaDateKey } from "@/lib/service-agenda"
 import { type CalendarEvent } from "../types"
 
 const HOUR_ROW_HEIGHT = 60
@@ -108,6 +111,7 @@ interface CalendarMainProps {
 export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, onEventClick }: CalendarMainProps) {
   const { t } = useI18n()
   const locale = useLocale()
+  const { canRead, canUpdate } = useResourcePermissions("service-orders")
   const dateLocale = getDateFnsLocale(locale)
   const calendarEvents = events ?? []
 
@@ -424,6 +428,18 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
     window.location.assign(targetUrl)
   }
 
+  const handleExportDailyPdf = () => {
+    const date = formatAgendaDateKey(currentDate)
+    const targetUrl = `/api/service-orders/daily-pdf?date=${encodeURIComponent(date)}`
+    window.open(targetUrl, "_blank", "noopener,noreferrer")
+  }
+
+  const handleExportDailyPng = () => {
+    const date = formatAgendaDateKey(currentDate)
+    const targetUrl = `/api/service-orders/daily-png?date=${encodeURIComponent(date)}`
+    window.open(targetUrl, "_blank", "noopener,noreferrer")
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -456,7 +472,30 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
           </h1>
         </div>
 
-        <div />
+        <div className="flex items-center gap-2">
+          {canRead ? (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                className="cursor-pointer"
+                onClick={handleExportDailyPdf}
+              >
+                <FileDown className="w-4 h-4" />
+                {t("calendar.exportDailyPdf")}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="cursor-pointer"
+                onClick={handleExportDailyPng}
+              >
+                <FileDown className="w-4 h-4" />
+                {t("calendar.exportDailyPng")}
+              </Button>
+            </>
+          ) : null}
+        </div>
       </div>
 
       {/* Calendar Content */}
@@ -554,13 +593,15 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
               ) : null}
 
               <div className="flex justify-end gap-2 pt-2">
-                <Button
-                  className="cursor-pointer"
-                  onClick={handleOpenServiceOrderEdit}
-                  disabled={!selectedEvent.serviceOrderId}
-                >
-                  {t("serviceOrders.editServiceOrder")}
-                </Button>
+                {canUpdate ? (
+                  <Button
+                    className="cursor-pointer"
+                    onClick={handleOpenServiceOrderEdit}
+                    disabled={!selectedEvent.serviceOrderId}
+                  >
+                    {t("serviceOrders.editServiceOrder")}
+                  </Button>
+                ) : null}
                 <Button variant="outline" className="cursor-pointer" onClick={() => {
                   setShowEventDialog(false)
                 }}>

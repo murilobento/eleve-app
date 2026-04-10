@@ -32,6 +32,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { SortableHeader } from "@/components/sortable-header";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useResourcePermissions } from "@/hooks/use-resource-permissions";
 import { useI18n } from "@/i18n/provider";
 import type {
   CreateEquipmentTypeInput,
@@ -66,9 +67,14 @@ export function DataTable({
   const [createOpen, setCreateOpen] = useState(false);
   const [editingEquipmentType, setEditingEquipmentType] = useState<ManagedEquipmentType | null>(null);
   const [deletingEquipmentType, setDeletingEquipmentType] = useState<ManagedEquipmentType | null>(null);
+  const { canCreate, canUpdate, canDelete } = useResourcePermissions("equipment-types");
+  const canSelectRows = canDelete;
 
-  const columns = useMemo<ColumnDef<ManagedEquipmentType>[]>(() => [
-    {
+  const columns = useMemo<ColumnDef<ManagedEquipmentType>[]>(() => {
+    const nextColumns: ColumnDef<ManagedEquipmentType>[] = [];
+
+    if (canSelectRows) {
+      nextColumns.push({
       id: "select",
       header: ({ table }) => (
         <div className="flex items-center justify-center px-2">
@@ -91,8 +97,10 @@ export function DataTable({
       enableSorting: false,
       enableHiding: false,
       size: 50,
-    },
-    {
+      });
+    }
+
+    nextColumns.push({
       accessorKey: "name",
       header: ({ column }) => <SortableHeader column={column} title={t("equipmentTypes.name")} className="-ml-3" />,
       enableHiding: false,
@@ -104,49 +112,57 @@ export function DataTable({
           </div>
         </div>
       ),
-    },
-    {
+    });
+    nextColumns.push({
       accessorKey: "equipmentCount",
       header: ({ column }) => (
         <SortableHeader column={column} title={t("equipmentTypes.linkedEquipment")} className="-ml-3" />
       ),
       cell: ({ row }) => <Badge variant="secondary">{row.original.equipmentCount}</Badge>,
-    },
-    {
-      id: "actions",
-      header: t("equipmentTypes.actions"),
-      enableSorting: false,
-      enableHiding: false,
-      cell: ({ row }) => {
-        const equipmentType = row.original;
+    });
+    if (canUpdate || canDelete) {
+      nextColumns.push({
+        id: "actions",
+        header: t("equipmentTypes.actions"),
+        enableSorting: false,
+        enableHiding: false,
+        cell: ({ row }) => {
+          const equipmentType = row.original;
 
-        return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer" disabled={isMutating}>
-                <EllipsisVertical className="size-4" />
-                <span className="sr-only">{t("equipmentTypes.actions")}</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem className="cursor-pointer" onClick={() => setEditingEquipmentType(equipmentType)}>
-                <Pencil className="mr-2 size-4" />
-                {t("equipmentTypes.editType")}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                variant="destructive"
-                className="cursor-pointer"
-                onClick={() => setDeletingEquipmentType(equipmentType)}
-              >
-                <Trash2 className="mr-2 size-4" />
-                {t("common.delete")}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        );
-      },
-    },
-  ], [isMutating, t]);
+          return (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer" disabled={isMutating}>
+                  <EllipsisVertical className="size-4" />
+                  <span className="sr-only">{t("equipmentTypes.actions")}</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {canUpdate ? (
+                  <DropdownMenuItem className="cursor-pointer" onClick={() => setEditingEquipmentType(equipmentType)}>
+                    <Pencil className="mr-2 size-4" />
+                    {t("equipmentTypes.editType")}
+                  </DropdownMenuItem>
+                ) : null}
+                {canDelete ? (
+                  <DropdownMenuItem
+                    variant="destructive"
+                    className="cursor-pointer"
+                    onClick={() => setDeletingEquipmentType(equipmentType)}
+                  >
+                    <Trash2 className="mr-2 size-4" />
+                    {t("common.delete")}
+                  </DropdownMenuItem>
+                ) : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          );
+        },
+      });
+    }
+
+    return nextColumns;
+  }, [canDelete, canSelectRows, canUpdate, isMutating, t]);
   const table = useReactTable({
     data: equipmentTypes,
     columns,
@@ -194,17 +210,19 @@ export function DataTable({
         </div>
 
         <div className="ml-auto">
-          <EquipmentTypeFormDialog
-            mode="create"
-            open={createOpen}
-            onOpenChange={setCreateOpen}
-            onSubmit={onCreateEquipmentType}
-            isSubmitting={isMutating}
-          />
+          {canCreate ? (
+            <EquipmentTypeFormDialog
+              mode="create"
+              open={createOpen}
+              onOpenChange={setCreateOpen}
+              onSubmit={onCreateEquipmentType}
+              isSubmitting={isMutating}
+            />
+          ) : null}
         </div>
       </AdminListToolbar>
 
-      {selectedCount > 0 ? (
+      {canDelete && selectedCount > 0 ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/30 px-3 py-2">
           <span className="text-sm text-muted-foreground">
             {t("common.selectedCount", { count: selectedCount })}
@@ -284,47 +302,51 @@ export function DataTable({
         canNextPage={table.getCanNextPage()}
       />
 
-      <EquipmentTypeFormDialog
-        mode="edit"
-        open={Boolean(editingEquipmentType)}
-        onOpenChange={(open) => {
-          if (!open) {
-            setEditingEquipmentType(null);
-          }
-        }}
-        onSubmit={async (values) => {
-          if (!editingEquipmentType) {
-            return;
-          }
+      {canUpdate ? (
+        <EquipmentTypeFormDialog
+          mode="edit"
+          open={Boolean(editingEquipmentType)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setEditingEquipmentType(null);
+            }
+          }}
+          onSubmit={async (values) => {
+            if (!editingEquipmentType) {
+              return;
+            }
 
-          await onUpdateEquipmentType(editingEquipmentType.id, values as UpdateEquipmentTypeInput);
-        }}
-        isSubmitting={isMutating}
-        equipmentType={editingEquipmentType}
-      />
+            await onUpdateEquipmentType(editingEquipmentType.id, values as UpdateEquipmentTypeInput);
+          }}
+          isSubmitting={isMutating}
+          equipmentType={editingEquipmentType}
+        />
+      ) : null}
 
-      <ConfirmDeleteDialog
-        open={Boolean(deletingEquipmentType)}
-        onOpenChange={(open) => {
-          if (!open) {
+      {canDelete ? (
+        <ConfirmDeleteDialog
+          open={Boolean(deletingEquipmentType)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setDeletingEquipmentType(null);
+            }
+          }}
+          description={
+            deletingEquipmentType
+              ? t("equipmentTypes.confirmDelete", { name: deletingEquipmentType.name })
+              : ""
+          }
+          onConfirm={async () => {
+            if (!deletingEquipmentType) {
+              return;
+            }
+
+            await onDeleteEquipmentType(deletingEquipmentType.id);
             setDeletingEquipmentType(null);
-          }
-        }}
-        description={
-          deletingEquipmentType
-            ? t("equipmentTypes.confirmDelete", { name: deletingEquipmentType.name })
-            : ""
-        }
-        onConfirm={async () => {
-          if (!deletingEquipmentType) {
-            return;
-          }
-
-          await onDeleteEquipmentType(deletingEquipmentType.id);
-          setDeletingEquipmentType(null);
-        }}
-        isLoading={isMutating}
-      />
+          }}
+          isLoading={isMutating}
+        />
+      ) : null}
     </div>
   );
 }

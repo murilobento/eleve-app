@@ -4,6 +4,7 @@ import { CalendarSidebar } from "./calendar-sidebar"
 import { CalendarMain } from "./calendar-main"
 import { EventForm } from "./event-form"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { useResourcePermissions } from "@/hooks/use-resource-permissions"
 import { type CalendarEvent } from "../types"
 import { useCalendar } from "../use-calendar"
 import { useI18n } from "@/i18n/provider"
@@ -16,6 +17,7 @@ interface CalendarProps {
 export function Calendar({ events, eventDates }: CalendarProps) {
   const { t } = useI18n()
   const calendar = useCalendar(events)
+  const { canCreate } = useResourcePermissions("service-orders")
 
   return (
     <>
@@ -27,7 +29,7 @@ export function Calendar({ events, eventDates }: CalendarProps) {
               selectedDate={calendar.selectedDate}
               onDateSelect={calendar.handleDateSelect}
               onNewCalendar={calendar.handleNewCalendar}
-              onNewEvent={calendar.handleNewEvent}
+              onNewEvent={canCreate ? calendar.handleNewEvent : undefined}
               events={eventDates}
               className="h-full"
             />
@@ -57,7 +59,7 @@ export function Calendar({ events, eventDates }: CalendarProps) {
               selectedDate={calendar.selectedDate}
               onDateSelect={calendar.handleDateSelect}
               onNewCalendar={calendar.handleNewCalendar}
-              onNewEvent={calendar.handleNewEvent}
+              onNewEvent={canCreate ? calendar.handleNewEvent : undefined}
               events={eventDates}
               className="h-full"
             />

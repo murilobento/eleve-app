@@ -33,6 +33,10 @@ export function resolvePdfBrowserExecutablePath() {
             "/snap/bin/chromium",
             "/opt/google/chrome/chrome",
             "/usr/bin/microsoft-edge",
+            "/mnt/c/Program Files/Google/Chrome/Application/chrome.exe",
+            "/mnt/c/Program Files (x86)/Google/Chrome/Application/chrome.exe",
+            "/mnt/c/Program Files/Microsoft/Edge/Application/msedge.exe",
+            "/mnt/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
           ];
 
   const discovered = candidates.find((candidate) => isExecutablePath(candidate));
@@ -45,4 +49,3 @@ export function resolvePdfBrowserExecutablePath() {
     "Could not find Chrome/Chromium executable for PDF generation. Configure PUPPETEER_EXECUTABLE_PATH.",
   );
 }
-

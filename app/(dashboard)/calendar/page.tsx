@@ -6,24 +6,10 @@ import { toast } from "sonner"
 import { Calendar } from "./components/calendar"
 import { useI18n } from "@/i18n/provider"
 import type { ManagedServiceOrder } from "@/lib/service-orders-admin"
+import { getServiceAgendaStatusColor, listServiceAgendaEntries } from "@/lib/service-agenda"
 
 type ServiceOrdersResponse = {
   serviceOrders: ManagedServiceOrder[]
-}
-
-function getCalendarEventColor(status: ManagedServiceOrder["status"]) {
-  switch (status) {
-    case "completed":
-      return "bg-emerald-500"
-    case "cancelled":
-      return "bg-red-500"
-    case "in_progress":
-      return "bg-blue-500"
-    case "scheduled":
-      return "bg-amber-500"
-    default:
-      return "bg-slate-500"
-  }
 }
 
 export default function CalendarPage() {
@@ -55,51 +41,36 @@ export default function CalendarPage() {
   }, [t])
 
   const events = useMemo(() => (
-    serviceOrders
-      .filter((serviceOrder) => serviceOrder.status !== "pending")
-      .flatMap((serviceOrder, serviceOrderIndex) =>
-      serviceOrder.items.map((item, itemIndex) => ({
-        id: serviceOrderIndex * 1000 + itemIndex + 1,
-        title: item.serviceDescription || item.serviceTypeName,
-        date: new Date(`${item.serviceDate}T${item.plannedStartTime || "00:00"}:00`),
-        time: `${item.plannedStartTime} - ${item.plannedEndTime}`,
-        duration: `${item.plannedStartTime} - ${item.plannedEndTime}`,
-        startTime: item.plannedStartTime,
-        endTime: item.plannedEndTime,
-        serviceOrderId: serviceOrder.id,
-        serviceOrderNumber: serviceOrder.number,
-        clientName: serviceOrder.clientName,
-        equipmentName: item.equipmentName,
-        equipmentTypeName: item.equipmentTypeName,
-        operatorName: item.operatorName,
-        status: serviceOrder.status,
-        address: [
-          serviceOrder.serviceStreet,
-          serviceOrder.serviceNumber,
-          serviceOrder.serviceComplement,
-          serviceOrder.serviceDistrict,
-          `${serviceOrder.serviceCity} - ${serviceOrder.serviceState}`,
-        ].filter(Boolean).join(", "),
-        type: "event" as const,
-        attendees: item.operatorName ? [item.operatorName] : [],
-        location: `${serviceOrder.serviceCity} - ${serviceOrder.serviceState}`,
-        color: getCalendarEventColor(serviceOrder.status),
-        description: serviceOrder.notes || item.notes || undefined,
-      }))
-    )
+    listServiceAgendaEntries(serviceOrders).map((entry, index) => ({
+      id: index + 1,
+      title: entry.serviceDescription || entry.serviceTypeName,
+      date: new Date(`${entry.serviceDate}T${entry.plannedStartTime || "00:00"}:00`),
+      time: `${entry.plannedStartTime} - ${entry.plannedEndTime}`,
+      duration: `${entry.plannedStartTime} - ${entry.plannedEndTime}`,
+      startTime: entry.plannedStartTime,
+      endTime: entry.plannedEndTime,
+      serviceOrderId: entry.serviceOrderId,
+      serviceOrderNumber: entry.serviceOrderNumber,
+      clientName: entry.clientName,
+      equipmentName: entry.equipmentName,
+      equipmentTypeName: entry.equipmentTypeName,
+      operatorName: entry.operatorName,
+      serviceTypeName: entry.serviceTypeName,
+      status: entry.status,
+      address: entry.address,
+      type: "event" as const,
+      attendees: entry.operatorName ? [entry.operatorName] : [],
+      location: entry.location,
+      color: getServiceAgendaStatusColor(entry.status),
+      description: entry.notes || undefined,
+    }))
   ), [serviceOrders])
 
   const eventDates = useMemo(() => {
     const countByDate = new Map<string, number>()
 
-    for (const serviceOrder of serviceOrders) {
-      if (serviceOrder.status === "pending") {
-        continue
-      }
-
-      for (const item of serviceOrder.items) {
-        countByDate.set(item.serviceDate, (countByDate.get(item.serviceDate) ?? 0) + 1)
-      }
+    for (const entry of listServiceAgendaEntries(serviceOrders)) {
+      countByDate.set(entry.serviceDate, (countByDate.get(entry.serviceDate) ?? 0) + 1)
     }
 
     return Array.from(countByDate.entries()).map(([date, count]) => ({

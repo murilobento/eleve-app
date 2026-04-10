@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
 import { DatePickerInput } from "@/components/date-picker-input";
+import { useResourcePermissions } from "@/hooks/use-resource-permissions";
 import { StatusHistoryDialog } from "@/components/status-history-dialog";
 import { StatusTransitionDialog } from "@/components/status-transition-dialog";
 import {
@@ -447,12 +448,14 @@ export function DataTable({
   const [serviceOrderHistory, setServiceOrderHistory] = useState<ManagedServiceOrderStatusHistory[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [bulkCancelDialog, setBulkCancelDialog] = useState(false);
+  const { canCreate, canUpdate } = useResourcePermissions("service-orders");
+  const canSelectRows = canUpdate;
 
   useEffect(() => {
-    if (openCreateDialogFromQuery) {
+    if (openCreateDialogFromQuery && canCreate) {
       setCreateOpen(true);
     }
-  }, [openCreateDialogFromQuery]);
+  }, [canCreate, openCreateDialogFromQuery]);
 
   useEffect(() => {
     if (!editServiceOrderIdFromQuery) {
@@ -461,10 +464,10 @@ export function DataTable({
 
     const serviceOrder = serviceOrders.find((item) => item.id === editServiceOrderIdFromQuery);
 
-    if (serviceOrder) {
+    if (serviceOrder && canUpdate) {
       setEditingServiceOrder(serviceOrder);
     }
-  }, [editServiceOrderIdFromQuery, serviceOrders]);
+  }, [canUpdate, editServiceOrderIdFromQuery, serviceOrders]);
 
   const createdDateRange = useMemo(() => resolveDateFilterRange(createdDateFilter), [createdDateFilter]);
   const serviceDateRange = useMemo(() => resolveDateFilterRange(serviceDateFilter), [serviceDateFilter]);
@@ -487,8 +490,11 @@ export function DataTable({
     });
   }, [createdDateRange, serviceDateRange, serviceOrders, statusFilter]);
 
-  const columns = useMemo<ColumnDef<ManagedServiceOrder>[]>(() => [
-    {
+  const columns = useMemo<ColumnDef<ManagedServiceOrder>[]>(() => {
+    const nextColumns: ColumnDef<ManagedServiceOrder>[] = [];
+
+    if (canSelectRows) {
+      nextColumns.push({
       id: "select",
       header: ({ table }) => (
         <div className="flex items-center justify-center px-2">
@@ -511,8 +517,10 @@ export function DataTable({
       enableSorting: false,
       enableHiding: false,
       size: 50,
-    },
-    {
+      });
+    }
+
+    nextColumns.push({
       accessorKey: "number",
       header: ({ column }) => <SortableHeader column={column} title={t("serviceOrders.number")} className="-ml-3" />,
       enableHiding: false,
@@ -526,8 +534,8 @@ export function DataTable({
           ) : null}
         </div>
       ),
-    },
-    {
+    });
+    nextColumns.push({
       accessorKey: "clientName",
       header: ({ column }) => <SortableHeader column={column} title={t("serviceOrders.client")} className="-ml-3" />,
       cell: ({ row }) => (
@@ -538,14 +546,14 @@ export function DataTable({
           </div>
         </div>
       ),
-    },
-    {
+    });
+    nextColumns.push({
       id: "originType",
       accessorFn: (row) => getOriginLabel(row.originType, t),
       header: ({ column }) => <SortableHeader column={column} title={t("serviceOrders.originType")} className="-ml-3" />,
       cell: ({ row }) => <Badge variant="outline">{getOriginLabel(row.original.originType, t)}</Badge>,
-    },
-    {
+    });
+    nextColumns.push({
       id: "schedule",
       accessorFn: (row) => {
         const firstDate = row.items[0]?.serviceDate;
@@ -568,8 +576,8 @@ export function DataTable({
           </div>
         </div>
       ),
-    },
-    {
+    });
+    nextColumns.push({
       accessorKey: "status",
       header: ({ column }) => <SortableHeader column={column} title={t("serviceOrders.status")} className="-ml-3" />,
       cell: ({ row }) => (
@@ -578,8 +586,8 @@ export function DataTable({
         </Badge>
       ),
       filterFn: "equals",
-    },
-    {
+    });
+    nextColumns.push({
       id: "actions",
       header: t("serviceOrders.actions"),
       enableSorting: false,
@@ -596,7 +604,7 @@ export function DataTable({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              {serviceOrder.status !== "completed" && serviceOrder.status !== "cancelled" ? (
+              {canUpdate && serviceOrder.status !== "completed" && serviceOrder.status !== "cancelled" ? (
                 <DropdownMenuItem className="cursor-pointer" onClick={() => setEditingServiceOrder(serviceOrder)}>
                   <Pencil className="mr-2 size-4" />
                   {t("serviceOrders.editServiceOrder")}
@@ -628,31 +636,31 @@ export function DataTable({
                 <Clock3 className="mr-2 size-4" />
                 {t("serviceOrders.viewHistory")}
               </DropdownMenuItem>
-              {serviceOrder.status === "pending" ? (
+              {canUpdate && serviceOrder.status === "pending" ? (
                 <DropdownMenuItem className="cursor-pointer" onClick={() => setPendingStatusAction({ serviceOrder, status: "scheduled" })}>
                   <CheckCircle2 className="mr-2 size-4" />
                   {t("serviceOrders.scheduleServiceOrder")}
                 </DropdownMenuItem>
               ) : null}
-              {serviceOrder.status === "scheduled" ? (
+              {canUpdate && serviceOrder.status === "scheduled" ? (
                 <DropdownMenuItem className="cursor-pointer" onClick={() => setPendingStatusAction({ serviceOrder, status: "in_progress" })}>
                   <Play className="mr-2 size-4" />
                   {t("serviceOrders.startServiceOrder")}
                 </DropdownMenuItem>
               ) : null}
-              {serviceOrder.status === "in_progress" ? (
+              {canUpdate && serviceOrder.status === "in_progress" ? (
                 <DropdownMenuItem className="cursor-pointer" onClick={() => setPendingStatusAction({ serviceOrder, status: "completed" })}>
                   <CheckCircle2 className="mr-2 size-4" />
                   {t("serviceOrders.completeServiceOrder")}
                 </DropdownMenuItem>
               ) : null}
-              {(serviceOrder.status === "pending" || serviceOrder.status === "scheduled") ? (
+              {canUpdate && (serviceOrder.status === "pending" || serviceOrder.status === "scheduled") ? (
                 <DropdownMenuItem className="cursor-pointer text-destructive" onClick={() => setPendingStatusAction({ serviceOrder, status: "cancelled" })}>
                   <XCircle className="mr-2 size-4" />
                   {t("serviceOrders.cancelServiceOrder")}
                 </DropdownMenuItem>
               ) : null}
-              {(serviceOrder.status === "completed" || serviceOrder.status === "cancelled") ? (
+              {canUpdate && (serviceOrder.status === "completed" || serviceOrder.status === "cancelled") ? (
                 <DropdownMenuItem className="cursor-pointer" onClick={() => setPendingStatusAction({ serviceOrder, status: "pending" })}>
                   <RotateCcw className="mr-2 size-4" />
                   {t("serviceOrders.revertServiceOrder")}
@@ -662,8 +670,10 @@ export function DataTable({
           </DropdownMenu>
         );
       },
-    },
-  ], [isMutating, locale, t]);
+    });
+
+    return nextColumns;
+  }, [canSelectRows, canUpdate, isMutating, locale, t]);
 
   const table = useReactTable({
     data: filteredServiceOrders,
@@ -827,22 +837,24 @@ export function DataTable({
         </AdminFiltersDialog>
 
         <div className="ml-auto">
-          <ServiceOrderFormDialog
-            mode="create"
-            open={createOpen}
-            onOpenChange={setCreateOpen}
-            onSubmit={onCreateServiceOrder}
-            isSubmitting={isMutating}
-            clients={clients}
-            equipment={equipment}
-            serviceTypes={serviceTypes}
-            operators={operators}
-            approvedBudgets={approvedBudgets}
-          />
+          {canCreate ? (
+            <ServiceOrderFormDialog
+              mode="create"
+              open={createOpen}
+              onOpenChange={setCreateOpen}
+              onSubmit={onCreateServiceOrder}
+              isSubmitting={isMutating}
+              clients={clients}
+              equipment={equipment}
+              serviceTypes={serviceTypes}
+              operators={operators}
+              approvedBudgets={approvedBudgets}
+            />
+          ) : null}
         </div>
       </AdminListToolbar>
 
-      {selectedCount > 0 ? (
+      {canUpdate && selectedCount > 0 ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/30 px-3 py-2">
           <span className="text-sm text-muted-foreground">
             {t("common.selectedCount", { count: selectedCount })}
@@ -916,83 +928,87 @@ export function DataTable({
         canNextPage={table.getCanNextPage()}
       />
 
-      <ServiceOrderFormDialog
-        mode="edit"
-        open={Boolean(editingServiceOrder)}
-        onOpenChange={(open) => {
-          if (!open) {
-            setEditingServiceOrder(null);
-          }
-        }}
-        onSubmit={async (values) => {
-          if (!editingServiceOrder) {
-            return;
-          }
+      {canUpdate ? (
+        <>
+          <ServiceOrderFormDialog
+            mode="edit"
+            open={Boolean(editingServiceOrder)}
+            onOpenChange={(open) => {
+              if (!open) {
+                setEditingServiceOrder(null);
+              }
+            }}
+            onSubmit={async (values) => {
+              if (!editingServiceOrder) {
+                return;
+              }
 
-          await onUpdateServiceOrder(editingServiceOrder.id, values as UpdateServiceOrderInput);
-          setEditingServiceOrder(null);
-        }}
-        isSubmitting={isMutating}
-        serviceOrder={editingServiceOrder}
-        clients={clients}
-        equipment={equipment}
-        serviceTypes={serviceTypes}
-        operators={operators}
-        approvedBudgets={approvedBudgets}
-      />
+              await onUpdateServiceOrder(editingServiceOrder.id, values as UpdateServiceOrderInput);
+              setEditingServiceOrder(null);
+            }}
+            isSubmitting={isMutating}
+            serviceOrder={editingServiceOrder}
+            clients={clients}
+            equipment={equipment}
+            serviceTypes={serviceTypes}
+            operators={operators}
+            approvedBudgets={approvedBudgets}
+          />
 
-      <StatusTransitionDialog
-        open={Boolean(pendingStatusAction)}
-        onOpenChange={(open) => {
-          if (!open) {
-            setPendingStatusAction(null);
-          }
-        }}
-        title={
-          pendingStatusAction?.status === "scheduled"
-            ? t("serviceOrders.confirmScheduleTitle")
-            : pendingStatusAction?.status === "in_progress"
-              ? t("serviceOrders.confirmStartTitle")
-              : pendingStatusAction?.status === "completed"
-                ? t("serviceOrders.confirmCompleteTitle")
-                : pendingStatusAction?.status === "cancelled"
-                  ? t("serviceOrders.confirmCancelTitle")
-                  : t("serviceOrders.confirmRevertTitle")
-        }
-        description={
-          pendingStatusAction?.status === "scheduled"
-            ? t("serviceOrders.confirmScheduleDescription")
-            : pendingStatusAction?.status === "in_progress"
-              ? t("serviceOrders.confirmStartDescription")
-              : pendingStatusAction?.status === "completed"
-                ? t("serviceOrders.confirmCompleteDescription")
-                : pendingStatusAction?.status === "cancelled"
-                  ? t("serviceOrders.confirmCancelDescription")
-                  : t("serviceOrders.confirmRevertDescription")
-        }
-        confirmLabel={
-          pendingStatusAction?.status === "scheduled"
-            ? t("serviceOrders.scheduleServiceOrder")
-            : pendingStatusAction?.status === "in_progress"
-              ? t("serviceOrders.startServiceOrder")
-              : pendingStatusAction?.status === "completed"
-                ? t("serviceOrders.completeServiceOrder")
-                : pendingStatusAction?.status === "cancelled"
-                  ? t("serviceOrders.cancelServiceOrder")
-                  : t("serviceOrders.revertServiceOrder")
-        }
-        confirmVariant={pendingStatusAction?.status === "cancelled" ? "destructive" : "default"}
-        requireReason={pendingStatusAction?.status === "pending"}
-        onConfirm={async (reason) => {
-          if (!pendingStatusAction) {
-            return;
-          }
+          <StatusTransitionDialog
+            open={Boolean(pendingStatusAction)}
+            onOpenChange={(open) => {
+              if (!open) {
+                setPendingStatusAction(null);
+              }
+            }}
+            title={
+              pendingStatusAction?.status === "scheduled"
+                ? t("serviceOrders.confirmScheduleTitle")
+                : pendingStatusAction?.status === "in_progress"
+                  ? t("serviceOrders.confirmStartTitle")
+                  : pendingStatusAction?.status === "completed"
+                    ? t("serviceOrders.confirmCompleteTitle")
+                    : pendingStatusAction?.status === "cancelled"
+                      ? t("serviceOrders.confirmCancelTitle")
+                      : t("serviceOrders.confirmRevertTitle")
+            }
+            description={
+              pendingStatusAction?.status === "scheduled"
+                ? t("serviceOrders.confirmScheduleDescription")
+                : pendingStatusAction?.status === "in_progress"
+                  ? t("serviceOrders.confirmStartDescription")
+                  : pendingStatusAction?.status === "completed"
+                    ? t("serviceOrders.confirmCompleteDescription")
+                    : pendingStatusAction?.status === "cancelled"
+                      ? t("serviceOrders.confirmCancelDescription")
+                      : t("serviceOrders.confirmRevertDescription")
+            }
+            confirmLabel={
+              pendingStatusAction?.status === "scheduled"
+                ? t("serviceOrders.scheduleServiceOrder")
+                : pendingStatusAction?.status === "in_progress"
+                  ? t("serviceOrders.startServiceOrder")
+                  : pendingStatusAction?.status === "completed"
+                    ? t("serviceOrders.completeServiceOrder")
+                    : pendingStatusAction?.status === "cancelled"
+                      ? t("serviceOrders.cancelServiceOrder")
+                      : t("serviceOrders.revertServiceOrder")
+            }
+            confirmVariant={pendingStatusAction?.status === "cancelled" ? "destructive" : "default"}
+            requireReason={pendingStatusAction?.status === "pending"}
+            onConfirm={async (reason) => {
+              if (!pendingStatusAction) {
+                return;
+              }
 
-          await onChangeStatus(pendingStatusAction.serviceOrder.id, pendingStatusAction.status, reason);
-          setPendingStatusAction(null);
-        }}
-        isLoading={isMutating}
-      />
+              await onChangeStatus(pendingStatusAction.serviceOrder.id, pendingStatusAction.status, reason);
+              setPendingStatusAction(null);
+            }}
+            isLoading={isMutating}
+          />
+        </>
+      ) : null}
 
       <StatusHistoryDialog
         open={Boolean(historyServiceOrder)}
@@ -1014,31 +1030,33 @@ export function DataTable({
         getStatusLabel={(status) => getStatusLabel(status as ManagedServiceOrder["status"], t)}
       />
 
-      <ConfirmDeleteDialog
-        open={bulkCancelDialog}
-        onOpenChange={setBulkCancelDialog}
-        title={t("serviceOrders.bulkCancelTitle")}
-        description={t("serviceOrders.bulkCancelDescription", { count: selectedCount })}
-        onConfirm={async () => {
-          const selectedRows = table.getSelectedRowModel().rows;
-          const cancellableOrders = selectedRows.filter(
-            (row) => row.original.status === "pending" || row.original.status === "scheduled"
-          );
+      {canUpdate ? (
+        <ConfirmDeleteDialog
+          open={bulkCancelDialog}
+          onOpenChange={setBulkCancelDialog}
+          title={t("serviceOrders.bulkCancelTitle")}
+          description={t("serviceOrders.bulkCancelDescription", { count: selectedCount })}
+          onConfirm={async () => {
+            const selectedRows = table.getSelectedRowModel().rows;
+            const cancellableOrders = selectedRows.filter(
+              (row) => row.original.status === "pending" || row.original.status === "scheduled"
+            );
 
-          if (cancellableOrders.length === 0) {
-            toast.error(t("serviceOrders.noCancellableSelected"));
+            if (cancellableOrders.length === 0) {
+              toast.error(t("serviceOrders.noCancellableSelected"));
+              setBulkCancelDialog(false);
+              return;
+            }
+
+            const ids = cancellableOrders.map((row) => row.original.id);
+            await onCancelServiceOrders(ids);
+            table.resetRowSelection();
             setBulkCancelDialog(false);
-            return;
-          }
-
-          const ids = cancellableOrders.map((row) => row.original.id);
-          await onCancelServiceOrders(ids);
-          table.resetRowSelection();
-          setBulkCancelDialog(false);
-        }}
-        isLoading={isMutating}
-        confirmLabel={t("serviceOrders.cancelSelected")}
-      />
+          }}
+          isLoading={isMutating}
+          confirmLabel={t("serviceOrders.cancelSelected")}
+        />
+      ) : null}
     </div>
   );
 }

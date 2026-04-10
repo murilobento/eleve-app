@@ -50,6 +50,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useResourcePermissions } from "@/hooks/use-resource-permissions";
 import {
   type CreateManagedUserInput,
   type ManagedUser,
@@ -99,10 +100,15 @@ export function DataTable({
   const [deletingUser, setDeletingUser] = useState<ManagedUser | null>(null);
   const [draftRoleFilter, setDraftRoleFilter] = useState("all");
   const [draftStatusFilter, setDraftStatusFilter] = useState("all");
+  const { canCreate, canUpdate, canDelete } = useResourcePermissions("users");
+  const canSelectRows = canDelete;
 
   const columns = useMemo<ColumnDef<ManagedUser>[]>(
-    () => [
-      {
+    () => {
+      const nextColumns: ColumnDef<ManagedUser>[] = [];
+
+      if (canSelectRows) {
+        nextColumns.push({
         id: "select",
         header: ({ table }) => (
           <div className="flex items-center justify-center px-2">
@@ -128,8 +134,10 @@ export function DataTable({
         enableSorting: false,
         enableHiding: false,
         size: 50,
-      },
-      {
+        });
+      }
+
+      nextColumns.push({
         accessorKey: "name",
         header: ({ column }) => <SortableHeader column={column} title={t("users.title")} className="-ml-3" />,
         enableHiding: false,
@@ -145,8 +153,8 @@ export function DataTable({
             </div>
           );
         },
-      },
-      {
+      });
+      nextColumns.push({
         id: "roles",
         header: ({ column }) => <SortableHeader column={column} title={t("users.roles")} className="-ml-3" />,
         cell: ({ row }) => {
@@ -169,18 +177,18 @@ export function DataTable({
 
           return row.original.roles.some((role) => role.slug === filterValue);
         },
-      },
-      {
+      });
+      nextColumns.push({
         accessorKey: "joinedDate",
         header: ({ column }) => <SortableHeader column={column} title={t("users.joined")} className="-ml-3" />,
         cell: ({ row }) => <span className="text-sm">{formatDate(row.original.joinedDate, locale)}</span>,
-      },
-      {
+      });
+      nextColumns.push({
         accessorKey: "updatedDate",
         header: ({ column }) => <SortableHeader column={column} title={t("users.updated")} className="-ml-3" />,
         cell: ({ row }) => <span className="text-sm">{formatDate(row.original.updatedDate, locale)}</span>,
-      },
-      {
+      });
+      nextColumns.push({
         accessorKey: "status",
         header: ({ column }) => <SortableHeader column={column} title={t("users.status")} className="-ml-3" />,
         cell: ({ row }) => {
@@ -194,8 +202,10 @@ export function DataTable({
           );
         },
         filterFn: "equals",
-      },
-      {
+      });
+
+      if (canUpdate || canDelete) {
+        nextColumns.push({
         id: "actions",
         header: t("users.actions"),
         enableSorting: false,
@@ -212,25 +222,32 @@ export function DataTable({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem className="cursor-pointer" onClick={() => setEditingUser(user)}>
-                  <Pencil className="mr-2 size-4" />
-                  {t("users.editUser")}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  variant="destructive"
-                  className="cursor-pointer"
-                  onClick={() => setDeletingUser(user)}
-                >
-                  <Trash2 className="mr-2 size-4" />
-                  {t("common.delete")}
-                </DropdownMenuItem>
+                {canUpdate ? (
+                  <DropdownMenuItem className="cursor-pointer" onClick={() => setEditingUser(user)}>
+                    <Pencil className="mr-2 size-4" />
+                    {t("users.editUser")}
+                  </DropdownMenuItem>
+                ) : null}
+                {canDelete ? (
+                  <DropdownMenuItem
+                    variant="destructive"
+                    className="cursor-pointer"
+                    onClick={() => setDeletingUser(user)}
+                  >
+                    <Trash2 className="mr-2 size-4" />
+                    {t("common.delete")}
+                  </DropdownMenuItem>
+                ) : null}
               </DropdownMenuContent>
             </DropdownMenu>
           );
         },
-      },
-    ],
-    [isMutating, locale, onDeleteUser, t],
+        });
+      }
+
+      return nextColumns;
+    },
+    [canDelete, canSelectRows, canUpdate, isMutating, locale, t],
   );
   const table = useReactTable({
     data: users,
@@ -352,18 +369,20 @@ export function DataTable({
         </AdminFiltersDialog>
 
         <div className="ml-auto">
-          <UserFormDialog
-            mode="create"
-            open={createOpen}
-            onOpenChange={setCreateOpen}
-            onSubmit={onCreateUser}
-            isSubmitting={isMutating}
-            availableRoles={roles}
-          />
+          {canCreate ? (
+            <UserFormDialog
+              mode="create"
+              open={createOpen}
+              onOpenChange={setCreateOpen}
+              onSubmit={onCreateUser}
+              isSubmitting={isMutating}
+              availableRoles={roles}
+            />
+          ) : null}
         </div>
       </AdminListToolbar>
 
-      {selectedCount > 0 ? (
+      {canDelete && selectedCount > 0 ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/30 px-3 py-2">
           <span className="text-sm text-muted-foreground">
             {t("common.selectedCount", { count: selectedCount })}
@@ -448,46 +467,50 @@ export function DataTable({
         canNextPage={table.getCanNextPage()}
       />
 
-      <UserFormDialog
-        mode="edit"
-        open={Boolean(editingUser)}
-        onOpenChange={(open) => {
-          if (!open) {
-            setEditingUser(null);
-          }
-        }}
-        onSubmit={async (values) => {
-          if (!editingUser) {
-            return;
-          }
+      {canUpdate ? (
+        <UserFormDialog
+          mode="edit"
+          open={Boolean(editingUser)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setEditingUser(null);
+            }
+          }}
+          onSubmit={async (values) => {
+            if (!editingUser) {
+              return;
+            }
 
-          await onUpdateUser(editingUser.id, values as UpdateManagedUserInput);
-        }}
-        isSubmitting={isMutating}
-        user={editingUser}
-        availableRoles={roles}
-      />
+            await onUpdateUser(editingUser.id, values as UpdateManagedUserInput);
+          }}
+          isSubmitting={isMutating}
+          user={editingUser}
+          availableRoles={roles}
+        />
+      ) : null}
 
-      <ConfirmDeleteDialog
-        open={Boolean(deletingUser)}
-        onOpenChange={(open) => {
-          if (!open) {
+      {canDelete ? (
+        <ConfirmDeleteDialog
+          open={Boolean(deletingUser)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setDeletingUser(null);
+            }
+          }}
+          description={
+            deletingUser ? t("users.confirmDelete", { name: deletingUser.name }) : ""
+          }
+          onConfirm={async () => {
+            if (!deletingUser) {
+              return;
+            }
+
+            await onDeleteUser(deletingUser.id);
             setDeletingUser(null);
-          }
-        }}
-        description={
-          deletingUser ? t("users.confirmDelete", { name: deletingUser.name }) : ""
-        }
-        onConfirm={async () => {
-          if (!deletingUser) {
-            return;
-          }
-
-          await onDeleteUser(deletingUser.id);
-          setDeletingUser(null);
-        }}
-        isLoading={isMutating}
-      />
+          }}
+          isLoading={isMutating}
+        />
+      ) : null}
     </div>
   );
 }

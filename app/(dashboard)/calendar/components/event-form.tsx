@@ -32,6 +32,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { useResourcePermissions } from "@/hooks/use-resource-permissions"
 import { useI18n } from "@/i18n/provider"
 import { cn } from "@/lib/utils"
 import { type CalendarEvent } from "../types"
@@ -64,6 +65,7 @@ const durationOptions = ["15 min", "30 min", "45 min", "1 hour", "1.5 hours", "2
 
 export function EventForm({ event, open, onOpenChange, onSave, onDelete }: EventFormProps) {
   const { t } = useI18n()
+  const { canCreate, canUpdate, canDelete } = useResourcePermissions("calendar")
   const [formData, setFormData] = useState({
     title: event?.title || "",
     date: event?.date || new Date(),
@@ -99,6 +101,10 @@ export function EventForm({ event, open, onOpenChange, onSave, onDelete }: Event
   }, [event, open])
 
   const handleSave = () => {
+    if ((event && !canUpdate) || (!event && !canCreate)) {
+      return
+    }
+
     const eventData: Partial<CalendarEvent> = {
       ...formData,
       id: event?.id,
@@ -109,7 +115,7 @@ export function EventForm({ event, open, onOpenChange, onSave, onDelete }: Event
   }
 
   const handleDelete = () => {
-    if (event?.id && onDelete) {
+    if (event?.id && onDelete && canDelete) {
       onDelete(event.id)
       setShowDeleteConfirm(false)
       onOpenChange(false)
@@ -380,10 +386,12 @@ export function EventForm({ event, open, onOpenChange, onSave, onDelete }: Event
 
           {/* Actions */}
           <div className="flex gap-3 pt-6">
-            <Button onClick={handleSave} className="flex-1 cursor-pointer">
-              {event ? t("calendar.updateEvent") : t("calendar.createEvent")}
-            </Button>
-            {event && onDelete && (
+            {((event && canUpdate) || (!event && canCreate)) ? (
+              <Button onClick={handleSave} className="flex-1 cursor-pointer">
+                {event ? t("calendar.updateEvent") : t("calendar.createEvent")}
+              </Button>
+            ) : null}
+            {event && onDelete && canDelete && (
               <Button onClick={() => setShowDeleteConfirm(true)} variant="destructive" className="cursor-pointer">
                 {t("calendar.delete")}
               </Button>

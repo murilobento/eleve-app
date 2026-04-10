@@ -42,6 +42,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useResourcePermissions } from "@/hooks/use-resource-permissions";
 import type {
   CreateOperatorInput,
   ManagedOperator,
@@ -81,9 +82,14 @@ export function DataTable({
   const [deletingOperator, setDeletingOperator] = useState<ManagedOperator | null>(null);
   const [draftLicenseFilter, setDraftLicenseFilter] = useState("all");
   const [draftStatusFilter, setDraftStatusFilter] = useState("all");
+  const { canCreate, canUpdate, canDelete } = useResourcePermissions("operators");
+  const canSelectRows = canDelete;
 
-  const columns = useMemo<ColumnDef<ManagedOperator>[]>(() => [
-    {
+  const columns = useMemo<ColumnDef<ManagedOperator>[]>(() => {
+    const nextColumns: ColumnDef<ManagedOperator>[] = [];
+
+    if (canSelectRows) {
+      nextColumns.push({
       id: "select",
       header: ({ table }) => (
         <div className="flex items-center justify-center px-2">
@@ -106,25 +112,27 @@ export function DataTable({
       enableSorting: false,
       enableHiding: false,
       size: 50,
-    },
-    {
+      });
+    }
+
+    nextColumns.push({
       accessorKey: "name",
       header: ({ column }) => <SortableHeader column={column} title={t("operators.name")} className="-ml-3" />,
       enableHiding: false,
       cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
-    },
-    {
+    });
+    nextColumns.push({
       accessorKey: "phone",
       header: ({ column }) => <SortableHeader column={column} title={t("operators.phone")} className="-ml-3" />,
       cell: ({ row }) => <span className="text-sm">{row.original.phone}</span>,
-    },
-    {
+    });
+    nextColumns.push({
       accessorKey: "license",
       header: ({ column }) => <SortableHeader column={column} title={t("operators.license")} className="-ml-3" />,
       cell: ({ row }) => <Badge variant="outline">{row.original.license}</Badge>,
       filterFn: "equals",
-    },
-    {
+    });
+    nextColumns.push({
       accessorKey: "status",
       header: ({ column }) => <SortableHeader column={column} title={t("operators.status")} className="-ml-3" />,
       cell: ({ row }) => {
@@ -137,42 +145,50 @@ export function DataTable({
         );
       },
       filterFn: "equals",
-    },
-    {
-      id: "actions",
-      header: t("operators.actions"),
-      enableSorting: false,
-      enableHiding: false,
-      cell: ({ row }) => {
-        const operator = row.original;
+    });
+    if (canUpdate || canDelete) {
+      nextColumns.push({
+        id: "actions",
+        header: t("operators.actions"),
+        enableSorting: false,
+        enableHiding: false,
+        cell: ({ row }) => {
+          const operator = row.original;
 
-        return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer" disabled={isMutating}>
-                <EllipsisVertical className="size-4" />
-                <span className="sr-only">{t("operators.actions")}</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem className="cursor-pointer" onClick={() => setEditingOperator(operator)}>
-                <Pencil className="mr-2 size-4" />
-                {t("operators.editOperator")}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                variant="destructive"
-                className="cursor-pointer"
-                onClick={() => setDeletingOperator(operator)}
-              >
-                <Trash2 className="mr-2 size-4" />
-                {t("common.delete")}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        );
-      },
-    },
-  ], [isMutating, locale, t]);
+          return (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer" disabled={isMutating}>
+                  <EllipsisVertical className="size-4" />
+                  <span className="sr-only">{t("operators.actions")}</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {canUpdate ? (
+                  <DropdownMenuItem className="cursor-pointer" onClick={() => setEditingOperator(operator)}>
+                    <Pencil className="mr-2 size-4" />
+                    {t("operators.editOperator")}
+                  </DropdownMenuItem>
+                ) : null}
+                {canDelete ? (
+                  <DropdownMenuItem
+                    variant="destructive"
+                    className="cursor-pointer"
+                    onClick={() => setDeletingOperator(operator)}
+                  >
+                    <Trash2 className="mr-2 size-4" />
+                    {t("common.delete")}
+                  </DropdownMenuItem>
+                ) : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          );
+        },
+      });
+    }
+
+    return nextColumns;
+  }, [canDelete, canSelectRows, canUpdate, isMutating, locale, t]);
 
   const table = useReactTable({
     data: operators,
@@ -297,17 +313,19 @@ export function DataTable({
         </AdminFiltersDialog>
 
         <div className="ml-auto">
-          <OperatorFormDialog
-            mode="create"
-            open={createOpen}
-            onOpenChange={setCreateOpen}
-            onSubmit={onCreateOperator}
-            isSubmitting={isMutating}
-          />
+          {canCreate ? (
+            <OperatorFormDialog
+              mode="create"
+              open={createOpen}
+              onOpenChange={setCreateOpen}
+              onSubmit={onCreateOperator}
+              isSubmitting={isMutating}
+            />
+          ) : null}
         </div>
       </AdminListToolbar>
 
-      {selectedCount > 0 ? (
+      {canDelete && selectedCount > 0 ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/30 px-3 py-2">
           <span className="text-sm text-muted-foreground">
             {t("common.selectedCount", { count: selectedCount })}
@@ -387,43 +405,47 @@ export function DataTable({
         canNextPage={table.getCanNextPage()}
       />
 
-      <OperatorFormDialog
-        mode="edit"
-        open={Boolean(editingOperator)}
-        onOpenChange={(open) => {
-          if (!open) {
-            setEditingOperator(null);
-          }
-        }}
-        onSubmit={async (values) => {
-          if (!editingOperator) {
-            return;
-          }
+      {canUpdate ? (
+        <OperatorFormDialog
+          mode="edit"
+          open={Boolean(editingOperator)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setEditingOperator(null);
+            }
+          }}
+          onSubmit={async (values) => {
+            if (!editingOperator) {
+              return;
+            }
 
-          await onUpdateOperator(editingOperator.id, values as UpdateOperatorInput);
-        }}
-        isSubmitting={isMutating}
-        operator={editingOperator}
-      />
+            await onUpdateOperator(editingOperator.id, values as UpdateOperatorInput);
+          }}
+          isSubmitting={isMutating}
+          operator={editingOperator}
+        />
+      ) : null}
 
-      <ConfirmDeleteDialog
-        open={Boolean(deletingOperator)}
-        onOpenChange={(open) => {
-          if (!open) {
+      {canDelete ? (
+        <ConfirmDeleteDialog
+          open={Boolean(deletingOperator)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setDeletingOperator(null);
+            }
+          }}
+          description={deletingOperator ? t("operators.confirmDelete", { name: deletingOperator.name }) : ""}
+          onConfirm={async () => {
+            if (!deletingOperator) {
+              return;
+            }
+
+            await onDeleteOperator(deletingOperator.id);
             setDeletingOperator(null);
-          }
-        }}
-        description={deletingOperator ? t("operators.confirmDelete", { name: deletingOperator.name }) : ""}
-        onConfirm={async () => {
-          if (!deletingOperator) {
-            return;
-          }
-
-          await onDeleteOperator(deletingOperator.id);
-          setDeletingOperator(null);
-        }}
-        isLoading={isMutating}
-      />
+          }}
+          isLoading={isMutating}
+        />
+      ) : null}
     </div>
   );
 }

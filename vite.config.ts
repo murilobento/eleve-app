@@ -14,6 +14,7 @@ export default defineConfig({
       "puppeteer-core",
       "@puppeteer/browsers",
       "semver",
+      "@napi-rs/canvas",
     ],
   },
   optimizeDeps: {
@@ -21,6 +22,7 @@ export default defineConfig({
       "puppeteer-core",
       "@puppeteer/browsers",
       "semver",
+      "@napi-rs/canvas",
     ],
   },
   resolve: {

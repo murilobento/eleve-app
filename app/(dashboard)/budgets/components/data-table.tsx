@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
 import { DatePickerInput } from "@/components/date-picker-input";
+import { useResourcePermissions } from "@/hooks/use-resource-permissions";
 import {
   AdminFiltersDialog,
   AdminFiltersSection,
@@ -460,6 +461,8 @@ export function DataTable({
   const [draftStatusFilter, setDraftStatusFilter] = useState("all");
   const [draftCreatedDateFilter, setDraftCreatedDateFilter] = useState<DateFilterValue>({ preset: "all" });
   const [draftServiceDateFilter, setDraftServiceDateFilter] = useState<DateFilterValue>({ preset: "all" });
+  const { canCreate, canUpdate } = useResourcePermissions("budgets");
+  const canSelectRows = canUpdate;
   const createdDateRange = useMemo(() => resolveDateFilterRange(createdDateFilter), [createdDateFilter]);
   const serviceDateRange = useMemo(() => resolveDateFilterRange(serviceDateFilter), [serviceDateFilter]);
   const filteredBudgets = useMemo(
@@ -472,8 +475,11 @@ export function DataTable({
     [budgets, createdDateRange, serviceDateRange],
   );
 
-  const columns = useMemo<ColumnDef<ManagedBudget>[]>(() => [
-    {
+  const columns = useMemo<ColumnDef<ManagedBudget>[]>(() => {
+    const nextColumns: ColumnDef<ManagedBudget>[] = [];
+
+    if (canSelectRows) {
+      nextColumns.push({
       id: "select",
       header: ({ table }) => (
         <div className="flex items-center justify-center px-2">
@@ -496,8 +502,10 @@ export function DataTable({
       enableSorting: false,
       enableHiding: false,
       size: 50,
-    },
-    {
+      });
+    }
+
+    nextColumns.push({
       accessorKey: "number",
       header: ({ column }) => <SortableHeader column={column} title={t("budgets.number")} className="-ml-3" />,
       enableHiding: false,
@@ -507,8 +515,8 @@ export function DataTable({
           <div className="text-sm text-muted-foreground">{row.original.clientName}</div>
         </div>
       ),
-    },
-    {
+    });
+    nextColumns.push({
       id: "services",
       accessorFn: (row) => buildServicesSummary(row, t),
       header: ({ column }) => <SortableHeader column={column} title={t("budgets.services")} className="-ml-3" />,
@@ -518,8 +526,8 @@ export function DataTable({
           <div className="text-muted-foreground">{t("budgets.itemsCountSummary", { count: row.original.itemCount })}</div>
         </div>
       ),
-    },
-    {
+    });
+    nextColumns.push({
       id: "schedule",
       accessorFn: (row) => buildScheduleSummary(row, locale, t),
       header: ({ column }) => <SortableHeader column={column} title={t("budgets.schedule")} className="-ml-3" />,
@@ -533,8 +541,8 @@ export function DataTable({
           </div>
         </div>
       ),
-    },
-    {
+    });
+    nextColumns.push({
       accessorKey: "totalValue",
       header: ({ column }) => <SortableHeader column={column} title={t("budgets.totalValue")} className="-ml-3" />,
       cell: ({ row }) => (
@@ -548,8 +556,8 @@ export function DataTable({
           </div>
         </div>
       ),
-    },
-    {
+    });
+    nextColumns.push({
       accessorKey: "status",
       header: ({ column }) => <SortableHeader column={column} title={t("budgets.status")} className="-ml-3" />,
       cell: ({ row }) => (
@@ -558,8 +566,8 @@ export function DataTable({
         </Badge>
       ),
       filterFn: "equals",
-    },
-    {
+    });
+    nextColumns.push({
       id: "actions",
       header: t("budgets.actions"),
       enableSorting: false,
@@ -579,7 +587,7 @@ export function DataTable({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              {isPending ? (
+              {canUpdate && isPending ? (
                 <DropdownMenuItem className="cursor-pointer" onClick={() => setEditingBudget(budget)}>
                   <Pencil className="mr-2 size-4" />
                   {t("budgets.editBudget")}
@@ -618,7 +626,7 @@ export function DataTable({
                 <Clock3 className="mr-2 size-4" />
                 {t("budgets.viewHistory")}
               </DropdownMenuItem>
-              {isPending ? (
+              {canUpdate && isPending ? (
                 <DropdownMenuItem
                   className="cursor-pointer"
                   onClick={() => setPendingStatusAction({ budget, status: "approved" })}
@@ -627,7 +635,7 @@ export function DataTable({
                   {t("budgets.approveBudget")}
                 </DropdownMenuItem>
               ) : null}
-              {isPending ? (
+              {canUpdate && isPending ? (
                 <DropdownMenuItem
                   className="cursor-pointer"
                   onClick={() => setPendingStatusAction({ budget, status: "cancelled" })}
@@ -636,7 +644,7 @@ export function DataTable({
                   {t("budgets.cancelBudget")}
                 </DropdownMenuItem>
               ) : null}
-              {isApproved || isCancelled ? (
+              {canUpdate && (isApproved || isCancelled) ? (
                 <DropdownMenuItem
                   className="cursor-pointer"
                   onClick={() => setPendingStatusAction({ budget, status: "pending" })}
@@ -649,8 +657,10 @@ export function DataTable({
           </DropdownMenu>
         );
       },
-    },
-  ], [isMutating, locale, t]);
+    });
+
+    return nextColumns;
+  }, [canSelectRows, canUpdate, isMutating, locale, t]);
 
   const table = useReactTable({
     data: filteredBudgets,
@@ -820,21 +830,23 @@ export function DataTable({
         </AdminFiltersDialog>
 
         <div className="ml-auto">
-          <BudgetFormDialog
-            mode="create"
-            open={createOpen}
-            onOpenChange={setCreateOpen}
-            onSubmit={onCreateBudget}
-            isSubmitting={isMutating}
-            clients={clients}
-            equipment={equipment}
-            serviceTypes={serviceTypes}
-            operators={operators}
-          />
+          {canCreate ? (
+            <BudgetFormDialog
+              mode="create"
+              open={createOpen}
+              onOpenChange={setCreateOpen}
+              onSubmit={onCreateBudget}
+              isSubmitting={isMutating}
+              clients={clients}
+              equipment={equipment}
+              serviceTypes={serviceTypes}
+              operators={operators}
+            />
+          ) : null}
         </div>
       </AdminListToolbar>
 
-      {selectedCount > 0 ? (
+      {canUpdate && selectedCount > 0 ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/30 px-3 py-2">
           <span className="text-sm text-muted-foreground">
             {t("common.selectedCount", { count: selectedCount })}
@@ -908,77 +920,81 @@ export function DataTable({
         canNextPage={table.getCanNextPage()}
       />
 
-      <BudgetFormDialog
-        mode="edit"
-        open={Boolean(editingBudget)}
-        onOpenChange={(nextOpen) => {
-          if (!nextOpen) {
-            setEditingBudget(null);
-          }
-        }}
-        onSubmit={async (values) => {
-          if (!editingBudget) {
-            return;
-          }
+      {canUpdate ? (
+        <>
+          <BudgetFormDialog
+            mode="edit"
+            open={Boolean(editingBudget)}
+            onOpenChange={(nextOpen) => {
+              if (!nextOpen) {
+                setEditingBudget(null);
+              }
+            }}
+            onSubmit={async (values) => {
+              if (!editingBudget) {
+                return;
+              }
 
-          await onUpdateBudget(editingBudget.id, values);
-          setEditingBudget(null);
-        }}
-        isSubmitting={isMutating}
-        budget={editingBudget}
-        clients={clients}
-        equipment={equipment}
-        serviceTypes={serviceTypes}
-        operators={operators}
-      />
+              await onUpdateBudget(editingBudget.id, values);
+              setEditingBudget(null);
+            }}
+            isSubmitting={isMutating}
+            budget={editingBudget}
+            clients={clients}
+            equipment={equipment}
+            serviceTypes={serviceTypes}
+            operators={operators}
+          />
 
-      <StatusTransitionDialog
-        open={Boolean(pendingStatusAction)}
-        onOpenChange={(nextOpen) => {
-          if (!nextOpen) {
-            setPendingStatusAction(null);
-          }
-        }}
-        title={
-          pendingStatusAction?.status === "approved"
-            ? t("budgets.confirmApproveTitle")
-            : pendingStatusAction?.status === "cancelled"
-              ? t("budgets.confirmCancelTitle")
-              : t("budgets.confirmRevertTitle")
-        }
-        description={
-          pendingStatusAction?.status === "approved"
-            ? t("budgets.confirmApproveDescription")
-            : pendingStatusAction?.status === "cancelled"
-              ? t("budgets.confirmCancelDescription")
-              : t("budgets.confirmRevertDescription")
-        }
-        confirmLabel={
-          pendingStatusAction?.status === "approved"
-            ? t("budgets.approveBudget")
-            : pendingStatusAction?.status === "cancelled"
-              ? t("budgets.cancelBudget")
-              : t("budgets.revertBudget")
-        }
-        confirmVariant={pendingStatusAction?.status === "cancelled" ? "destructive" : "default"}
-        requireReason={pendingStatusAction?.status === "pending"}
-        onConfirm={async (reason) => {
-          if (!pendingStatusAction) {
-            return;
-          }
+          <StatusTransitionDialog
+            open={Boolean(pendingStatusAction)}
+            onOpenChange={(nextOpen) => {
+              if (!nextOpen) {
+                setPendingStatusAction(null);
+              }
+            }}
+            title={
+              pendingStatusAction?.status === "approved"
+                ? t("budgets.confirmApproveTitle")
+                : pendingStatusAction?.status === "cancelled"
+                  ? t("budgets.confirmCancelTitle")
+                  : t("budgets.confirmRevertTitle")
+            }
+            description={
+              pendingStatusAction?.status === "approved"
+                ? t("budgets.confirmApproveDescription")
+                : pendingStatusAction?.status === "cancelled"
+                  ? t("budgets.confirmCancelDescription")
+                  : t("budgets.confirmRevertDescription")
+            }
+            confirmLabel={
+              pendingStatusAction?.status === "approved"
+                ? t("budgets.approveBudget")
+                : pendingStatusAction?.status === "cancelled"
+                  ? t("budgets.cancelBudget")
+                  : t("budgets.revertBudget")
+            }
+            confirmVariant={pendingStatusAction?.status === "cancelled" ? "destructive" : "default"}
+            requireReason={pendingStatusAction?.status === "pending"}
+            onConfirm={async (reason) => {
+              if (!pendingStatusAction) {
+                return;
+              }
 
-          if (pendingStatusAction.status === "approved") {
-            await onApproveBudget(pendingStatusAction.budget.id, reason);
-          } else if (pendingStatusAction.status === "cancelled") {
-            await onCancelBudget(pendingStatusAction.budget.id, reason);
-          } else {
-            await onRevertBudget(pendingStatusAction.budget.id, reason);
-          }
+              if (pendingStatusAction.status === "approved") {
+                await onApproveBudget(pendingStatusAction.budget.id, reason);
+              } else if (pendingStatusAction.status === "cancelled") {
+                await onCancelBudget(pendingStatusAction.budget.id, reason);
+              } else {
+                await onRevertBudget(pendingStatusAction.budget.id, reason);
+              }
 
-          setPendingStatusAction(null);
-        }}
-        isLoading={isMutating}
-      />
+              setPendingStatusAction(null);
+            }}
+            isLoading={isMutating}
+          />
+        </>
+      ) : null}
 
       <StatusHistoryDialog
         open={Boolean(historyBudget)}
@@ -996,29 +1012,31 @@ export function DataTable({
         getStatusLabel={(status) => getBudgetStatusLabel(status as ManagedBudget["status"], t)}
       />
 
-      <ConfirmDeleteDialog
-        open={bulkCancelDialog}
-        onOpenChange={setBulkCancelDialog}
-        title={t("budgets.bulkCancelTitle")}
-        description={t("budgets.bulkCancelDescription", { count: selectedCount })}
-        onConfirm={async () => {
-          const selectedRows = table.getSelectedRowModel().rows;
-          const pendingBudgets = selectedRows.filter((row) => row.original.status === "pending");
-          
-          if (pendingBudgets.length === 0) {
-            toast.error(t("budgets.noPendingBudgetsSelected"));
-            setBulkCancelDialog(false);
-            return;
-          }
+      {canUpdate ? (
+        <ConfirmDeleteDialog
+          open={bulkCancelDialog}
+          onOpenChange={setBulkCancelDialog}
+          title={t("budgets.bulkCancelTitle")}
+          description={t("budgets.bulkCancelDescription", { count: selectedCount })}
+          onConfirm={async () => {
+            const selectedRows = table.getSelectedRowModel().rows;
+            const pendingBudgets = selectedRows.filter((row) => row.original.status === "pending");
 
-          const ids = pendingBudgets.map((row) => row.original.id);
-          await onCancelBudgets(ids);
-          table.resetRowSelection();
-          setBulkCancelDialog(false);
-        }}
-        isLoading={isMutating}
-        confirmLabel={t("budgets.cancelSelected")}
-      />
+            if (pendingBudgets.length === 0) {
+              toast.error(t("budgets.noPendingBudgetsSelected"));
+              setBulkCancelDialog(false);
+              return;
+            }
+
+            const ids = pendingBudgets.map((row) => row.original.id);
+            await onCancelBudgets(ids);
+            table.resetRowSelection();
+            setBulkCancelDialog(false);
+          }}
+          isLoading={isMutating}
+          confirmLabel={t("budgets.cancelSelected")}
+        />
+      ) : null}
     </div>
   );
 }

@@ -46,6 +46,7 @@ import type {
   ServiceOrderItemInput,
   ServiceOrderTransitionStatus,
 } from "@/lib/service-orders-admin";
+import { isDateBeforeToday } from "@/lib/service-date";
 import type { ManagedServiceType } from "@/lib/service-types-admin";
 import type {
   ManagedSupplier,
@@ -2351,6 +2352,14 @@ async function replaceServiceOrderItems(
   }
 }
 
+function assertServiceDatesNotInPast(items: Array<{ serviceDate: string }>) {
+  const invalidItem = items.find((item) => isDateBeforeToday(item.serviceDate));
+
+  if (invalidItem) {
+    throw new Error("Service date cannot be earlier than today.");
+  }
+}
+
 async function createServiceOrderFromApprovedBudget(
   client: { query: <T = unknown>(queryText: string, values?: unknown[]) => Promise<{ rows: T[] }> },
   budget: ManagedBudget,
@@ -2359,6 +2368,8 @@ async function createServiceOrderFromApprovedBudget(
   if (budget.status !== "approved") {
     throw new Error("Only approved budgets can generate service orders.");
   }
+
+  assertServiceDatesNotInPast(budget.items);
 
   const existingResult = await client.query<{ id: string }>(
     `
@@ -5227,6 +5238,7 @@ export async function createBudget(input: {
   items: BudgetServiceItemInput[];
 }, actor?: StatusActorInput | null) {
   await bootstrapRbac();
+  assertServiceDatesNotInPast(input.items);
   const serviceTypeMap = await assertBudgetRelationsExist(input);
 
   const id = randomUUID();
@@ -5355,6 +5367,7 @@ export async function updateBudget(
     throw new Error("Only pending budgets can be edited.");
   }
 
+  assertServiceDatesNotInPast(input.items);
   const serviceTypeMap = await assertBudgetRelationsExist(input);
   const primaryItem = getPrimaryBudgetItem(input.items);
   const subtotalValue = calculateBudgetSubtotal(input.items);
@@ -5756,6 +5769,11 @@ export async function createServiceOrder(input: {
 }, actor?: StatusActorInput | null) {
   await bootstrapRbac();
   const relationData = await assertServiceOrderRelationsExist(input);
+
+  if (input.originType === "budget") {
+    assertServiceDatesNotInPast(input.items);
+  }
+
   const id = randomUUID();
   const client = await pool.connect();
 
@@ -5867,6 +5885,11 @@ export async function updateServiceOrder(
   }
 
   const relationData = await assertServiceOrderRelationsExist(input);
+
+  if (input.originType === "budget") {
+    assertServiceDatesNotInPast(input.items);
+  }
+
   const client = await pool.connect();
 
   try {

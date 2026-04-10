@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { isDateBeforeToday } from "@/lib/service-date";
 import type { ManagedServiceType } from "@/lib/service-types-admin";
 
 export const budgetStatusSchema = z.enum(["pending", "approved", "cancelled"]);
@@ -41,7 +42,8 @@ const postalCodeSchema = z
 const serviceDateSchema = z
   .string()
   .trim()
-  .refine((value) => /^\d{4}-\d{2}-\d{2}$/.test(value), "Select a valid service date.");
+  .refine((value) => /^\d{4}-\d{2}-\d{2}$/.test(value), "Select a valid service date.")
+  .refine((value) => !isDateBeforeToday(value), "Service date cannot be earlier than today.");
 
 const timeSchema = z
   .string()

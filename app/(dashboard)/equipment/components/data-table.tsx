@@ -50,7 +50,7 @@ import type {
 } from "@/lib/equipment-admin";
 import type { ManagedEquipmentType } from "@/lib/equipment-types-admin";
 import { getSemanticStatusBadgeClass } from "@/lib/status-badge";
-import { useRbac } from "@/hooks/use-rbac";
+import { useResourcePermissions } from "@/hooks/use-resource-permissions";
 import { useI18n, useLocale } from "@/i18n/provider";
 import { getAppUrl } from "@/lib/utils";
 
@@ -77,7 +77,7 @@ export function DataTable({
 }: DataTableProps) {
   const { t } = useI18n();
   const locale = useLocale();
-  const { hasPermission } = useRbac();
+  const { canCreate, canUpdate, canDelete, hasPermission } = useResourcePermissions("equipment");
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [rowSelection, setRowSelection] = useState({});
@@ -89,9 +89,14 @@ export function DataTable({
   const [draftTypeFilter, setDraftTypeFilter] = useState("all");
   const [draftLicenseFilter, setDraftLicenseFilter] = useState("all");
   const [draftStatusFilter, setDraftStatusFilter] = useState("all");
+  const canSelectRows = canDelete;
+  const canManageRows = canUpdate || canDelete;
 
-  const columns = useMemo<ColumnDef<ManagedEquipment>[]>(() => [
-    {
+  const columns = useMemo<ColumnDef<ManagedEquipment>[]>(() => {
+    const nextColumns: ColumnDef<ManagedEquipment>[] = [];
+
+    if (canSelectRows) {
+      nextColumns.push({
       id: "select",
       header: ({ table }) => (
         <div className="flex items-center justify-center px-2">
@@ -114,8 +119,10 @@ export function DataTable({
       enableSorting: false,
       enableHiding: false,
       size: 50,
-    },
-    {
+      });
+    }
+
+    nextColumns.push({
       accessorKey: "name",
       header: ({ column }) => <SortableHeader column={column} title={t("equipment.name")} className="-ml-3" />,
       enableHiding: false,
@@ -131,37 +138,37 @@ export function DataTable({
           </div>
         );
       },
-    },
-    {
+    });
+    nextColumns.push({
       accessorKey: "typeName",
       header: ({ column }) => <SortableHeader column={column} title={t("equipment.type")} className="-ml-3" />,
       cell: ({ row }) => <Badge variant="outline">{row.original.typeName}</Badge>,
       filterFn: "equals",
-    },
-    {
+    });
+    nextColumns.push({
       accessorKey: "licenseRequired",
       header: ({ column }) => (
         <SortableHeader column={column} title={t("equipment.licenseRequired")} className="-ml-3" />
       ),
       cell: ({ row }) => <Badge variant="outline">{row.original.licenseRequired}</Badge>,
       filterFn: "equals",
-    },
-    {
+    });
+    nextColumns.push({
       accessorKey: "brand",
       header: ({ column }) => <SortableHeader column={column} title={t("equipment.brand")} className="-ml-3" />,
       cell: ({ row }) => <span className="text-sm">{row.original.brand}</span>,
-    },
-    {
+    });
+    nextColumns.push({
       accessorKey: "model",
       header: ({ column }) => <SortableHeader column={column} title={t("equipment.model")} className="-ml-3" />,
       cell: ({ row }) => <span className="text-sm">{row.original.model}</span>,
-    },
-    {
+    });
+    nextColumns.push({
       accessorKey: "year",
       header: ({ column }) => <SortableHeader column={column} title={t("equipment.year")} className="-ml-3" />,
       cell: ({ row }) => <span className="text-sm">{row.original.year}</span>,
-    },
-    {
+    });
+    nextColumns.push({
       accessorKey: "liftingCapacityTons",
       header: ({ column }) => (
         <SortableHeader column={column} title={t("equipment.liftingCapacityTons")} className="-ml-3" />
@@ -173,8 +180,8 @@ export function DataTable({
             : "-"}
         </span>
       ),
-    },
-    {
+    });
+    nextColumns.push({
       accessorKey: "plate",
       header: ({ column }) => <SortableHeader column={column} title={t("equipment.plate")} className="-ml-3" />,
       cell: ({ row }) => (
@@ -182,8 +189,8 @@ export function DataTable({
           {row.original.plate || t("equipment.noPlate")}
         </span>
       ),
-    },
-    {
+    });
+    nextColumns.push({
       accessorKey: "status",
       header: ({ column }) => <SortableHeader column={column} title={t("equipment.status")} className="-ml-3" />,
       cell: ({ row }) => {
@@ -196,8 +203,10 @@ export function DataTable({
         );
       },
       filterFn: "equals",
-    },
-    {
+    });
+
+    if (canManageRows) {
+      nextColumns.push({
       id: "actions",
       header: t("equipment.actions"),
       enableSorting: false,
@@ -214,24 +223,31 @@ export function DataTable({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem className="cursor-pointer" onClick={() => setEditingEquipment(equipmentItem)}>
-                <Pencil className="mr-2 size-4" />
-                {t("equipment.editEquipment")}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                variant="destructive"
-                className="cursor-pointer"
-                onClick={() => setDeletingEquipment(equipmentItem)}
-              >
-                <Trash2 className="mr-2 size-4" />
-                {t("common.delete")}
-              </DropdownMenuItem>
+              {canUpdate ? (
+                <DropdownMenuItem className="cursor-pointer" onClick={() => setEditingEquipment(equipmentItem)}>
+                  <Pencil className="mr-2 size-4" />
+                  {t("equipment.editEquipment")}
+                </DropdownMenuItem>
+              ) : null}
+              {canDelete ? (
+                <DropdownMenuItem
+                  variant="destructive"
+                  className="cursor-pointer"
+                  onClick={() => setDeletingEquipment(equipmentItem)}
+                >
+                  <Trash2 className="mr-2 size-4" />
+                  {t("common.delete")}
+                </DropdownMenuItem>
+              ) : null}
             </DropdownMenuContent>
           </DropdownMenu>
         );
       },
-    },
-  ], [isMutating, locale, t]);
+      });
+    }
+
+    return nextColumns;
+  }, [canDelete, canManageRows, canSelectRows, canUpdate, isMutating, locale, t]);
   const table = useReactTable({
     data: equipment,
     columns,
@@ -389,19 +405,21 @@ export function DataTable({
             </Button>
           ) : null}
 
-          <EquipmentFormDialog
-            mode="create"
-            open={createOpen}
-            onOpenChange={setCreateOpen}
-            onSubmit={onCreateEquipment}
-            isSubmitting={isMutating}
-            equipmentTypes={equipmentTypes}
-            canCreate={equipmentTypes.length > 0}
-          />
+          {canCreate ? (
+            <EquipmentFormDialog
+              mode="create"
+              open={createOpen}
+              onOpenChange={setCreateOpen}
+              onSubmit={onCreateEquipment}
+              isSubmitting={isMutating}
+              equipmentTypes={equipmentTypes}
+              canCreate={equipmentTypes.length > 0}
+            />
+          ) : null}
         </div>
       </AdminListToolbar>
 
-      {selectedCount > 0 ? (
+      {canDelete && selectedCount > 0 ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/30 px-3 py-2">
           <span className="text-sm text-muted-foreground">
             {t("common.selectedCount", { count: selectedCount })}
@@ -481,49 +499,53 @@ export function DataTable({
         canNextPage={table.getCanNextPage()}
       />
 
-      <EquipmentFormDialog
-        mode="edit"
-        open={Boolean(editingEquipment)}
-        onOpenChange={(open) => {
-          if (!open) {
-            setEditingEquipment(null);
-          }
-        }}
-        onSubmit={async (values) => {
-          if (!editingEquipment) {
-            return;
-          }
+      {canUpdate ? (
+        <EquipmentFormDialog
+          mode="edit"
+          open={Boolean(editingEquipment)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setEditingEquipment(null);
+            }
+          }}
+          onSubmit={async (values) => {
+            if (!editingEquipment) {
+              return;
+            }
 
-          await onUpdateEquipment(editingEquipment.id, values as UpdateEquipmentInput);
-        }}
-        isSubmitting={isMutating}
-        equipment={editingEquipment}
-        equipmentTypes={equipmentTypes}
-        canCreate={equipmentTypes.length > 0}
-      />
+            await onUpdateEquipment(editingEquipment.id, values as UpdateEquipmentInput);
+          }}
+          isSubmitting={isMutating}
+          equipment={editingEquipment}
+          equipmentTypes={equipmentTypes}
+          canCreate={equipmentTypes.length > 0}
+        />
+      ) : null}
 
-      <ConfirmDeleteDialog
-        open={Boolean(deletingEquipment)}
-        onOpenChange={(open) => {
-          if (!open) {
+      {canDelete ? (
+        <ConfirmDeleteDialog
+          open={Boolean(deletingEquipment)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setDeletingEquipment(null);
+            }
+          }}
+          description={
+            deletingEquipment
+              ? t("equipment.confirmDelete", { name: deletingEquipment.name })
+              : ""
+          }
+          onConfirm={async () => {
+            if (!deletingEquipment) {
+              return;
+            }
+
+            await onDeleteEquipment(deletingEquipment.id);
             setDeletingEquipment(null);
-          }
-        }}
-        description={
-          deletingEquipment
-            ? t("equipment.confirmDelete", { name: deletingEquipment.name })
-            : ""
-        }
-        onConfirm={async () => {
-          if (!deletingEquipment) {
-            return;
-          }
-
-          await onDeleteEquipment(deletingEquipment.id);
-          setDeletingEquipment(null);
-        }}
-        isLoading={isMutating}
-      />
+          }}
+          isLoading={isMutating}
+        />
+      ) : null}
     </div>
   );
 }

@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/select";
 import { SortableHeader } from "@/components/sortable-header";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useResourcePermissions } from "@/hooks/use-resource-permissions";
 import { useI18n, useLocale } from "@/i18n/provider";
 import type { EquipmentOption } from "@/lib/equipment-admin";
 import type {
@@ -103,9 +104,14 @@ export function DataTable({
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [draftBillingUnitFilter, setDraftBillingUnitFilter] = useState("all");
   const [draftStatusFilter, setDraftStatusFilter] = useState("all");
+  const { canCreate, canUpdate, canDelete } = useResourcePermissions("service-types");
+  const canSelectRows = canDelete;
 
-  const columns = useMemo<ColumnDef<ManagedServiceType>[]>(() => [
-    {
+  const columns = useMemo<ColumnDef<ManagedServiceType>[]>(() => {
+    const nextColumns: ColumnDef<ManagedServiceType>[] = [];
+
+    if (canSelectRows) {
+      nextColumns.push({
       id: "select",
       header: ({ table }) => (
         <div className="flex items-center justify-center px-2">
@@ -128,8 +134,10 @@ export function DataTable({
       enableSorting: false,
       enableHiding: false,
       size: 50,
-    },
-    {
+      });
+    }
+
+    nextColumns.push({
       accessorKey: "name",
       header: ({ column }) => <SortableHeader column={column} title={t("serviceTypes.name")} className="-ml-3" />,
       enableHiding: false,
@@ -141,19 +149,19 @@ export function DataTable({
           </div>
         </div>
       ),
-    },
-    {
+    });
+    nextColumns.push({
       accessorKey: "billingUnit",
       header: ({ column }) => <SortableHeader column={column} title={t("serviceTypes.billingUnit")} className="-ml-3" />,
       cell: ({ row }) => <Badge variant="outline">{t(`serviceTypes.billingUnits.${row.original.billingUnit}`)}</Badge>,
       filterFn: "equals",
-    },
-    {
+    });
+    nextColumns.push({
       accessorKey: "baseValue",
       header: ({ column }) => <SortableHeader column={column} title={t("serviceTypes.baseValue")} className="-ml-3" />,
       cell: ({ row }) => <span className="text-sm font-medium">{formatMoney(row.original.baseValue, locale)}</span>,
-    },
-    {
+    });
+    nextColumns.push({
       accessorKey: "equipmentCount",
       header: ({ column }) => (
         <SortableHeader column={column} title={t("serviceTypes.linkedEquipment")} className="-ml-3" />
@@ -169,8 +177,8 @@ export function DataTable({
           ) : null}
         </div>
       ),
-    },
-    {
+    });
+    nextColumns.push({
       accessorKey: "status",
       header: ({ column }) => <SortableHeader column={column} title={t("serviceTypes.status")} className="-ml-3" />,
       cell: ({ row }) => {
@@ -183,42 +191,50 @@ export function DataTable({
         );
       },
       filterFn: "equals",
-    },
-    {
-      id: "actions",
-      header: t("serviceTypes.actions"),
-      enableSorting: false,
-      enableHiding: false,
-      cell: ({ row }) => {
-        const serviceType = row.original;
+    });
+    if (canUpdate || canDelete) {
+      nextColumns.push({
+        id: "actions",
+        header: t("serviceTypes.actions"),
+        enableSorting: false,
+        enableHiding: false,
+        cell: ({ row }) => {
+          const serviceType = row.original;
 
-        return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer" disabled={isMutating}>
-                <EllipsisVertical className="size-4" />
-                <span className="sr-only">{t("serviceTypes.actions")}</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem className="cursor-pointer" onClick={() => setEditingServiceType(serviceType)}>
-                <Pencil className="mr-2 size-4" />
-                {t("serviceTypes.editType")}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                variant="destructive"
-                className="cursor-pointer"
-                onClick={() => setDeletingServiceType(serviceType)}
-              >
-                <Trash2 className="mr-2 size-4" />
-                {t("common.delete")}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        );
-      },
-    },
-  ], [isMutating, locale, t]);
+          return (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer" disabled={isMutating}>
+                  <EllipsisVertical className="size-4" />
+                  <span className="sr-only">{t("serviceTypes.actions")}</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {canUpdate ? (
+                  <DropdownMenuItem className="cursor-pointer" onClick={() => setEditingServiceType(serviceType)}>
+                    <Pencil className="mr-2 size-4" />
+                    {t("serviceTypes.editType")}
+                  </DropdownMenuItem>
+                ) : null}
+                {canDelete ? (
+                  <DropdownMenuItem
+                    variant="destructive"
+                    className="cursor-pointer"
+                    onClick={() => setDeletingServiceType(serviceType)}
+                  >
+                    <Trash2 className="mr-2 size-4" />
+                    {t("common.delete")}
+                  </DropdownMenuItem>
+                ) : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          );
+        },
+      });
+    }
+
+    return nextColumns;
+  }, [canDelete, canSelectRows, canUpdate, isMutating, locale, t]);
 
   const table = useReactTable({
     data: serviceTypes,
@@ -345,18 +361,20 @@ export function DataTable({
         </AdminFiltersDialog>
 
         <div className="ml-auto">
-          <ServiceTypeFormDialog
-            mode="create"
-            open={createOpen}
-            onOpenChange={setCreateOpen}
-            onSubmit={onCreateServiceType}
-            isSubmitting={isMutating}
-            equipment={equipment}
-          />
+          {canCreate ? (
+            <ServiceTypeFormDialog
+              mode="create"
+              open={createOpen}
+              onOpenChange={setCreateOpen}
+              onSubmit={onCreateServiceType}
+              isSubmitting={isMutating}
+              equipment={equipment}
+            />
+          ) : null}
         </div>
       </AdminListToolbar>
 
-      {selectedCount > 0 ? (
+      {canDelete && selectedCount > 0 ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/30 px-3 py-2">
           <span className="text-sm text-muted-foreground">
             {t("common.selectedCount", { count: selectedCount })}
@@ -429,64 +447,70 @@ export function DataTable({
         canNextPage={table.getCanNextPage()}
       />
 
-      <ServiceTypeFormDialog
-        mode="edit"
-        open={Boolean(editingServiceType)}
-        onOpenChange={(open) => {
-          if (!open) {
+      {canUpdate ? (
+        <ServiceTypeFormDialog
+          mode="edit"
+          open={Boolean(editingServiceType)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setEditingServiceType(null);
+            }
+          }}
+          onSubmit={async (values) => {
+            if (!editingServiceType) {
+              return;
+            }
+
+            await onUpdateServiceType(editingServiceType.id, values);
             setEditingServiceType(null);
-          }
-        }}
-        onSubmit={async (values) => {
-          if (!editingServiceType) {
-            return;
-          }
+          }}
+          isSubmitting={isMutating}
+          serviceType={editingServiceType}
+          equipment={equipment}
+        />
+      ) : null}
 
-          await onUpdateServiceType(editingServiceType.id, values);
-          setEditingServiceType(null);
-        }}
-        isSubmitting={isMutating}
-        serviceType={editingServiceType}
-        equipment={equipment}
-      />
+      {canDelete ? (
+        <>
+          <ConfirmDeleteDialog
+            open={bulkDeleteOpen}
+            onOpenChange={setBulkDeleteOpen}
+            description={t("serviceTypes.confirmBulkDelete", { count: selectedCount })}
+            onConfirm={async () => {
+              const ids = table.getSelectedRowModel().rows.map((row) => row.original.id);
+              if (!ids.length) {
+                return;
+              }
 
-      <ConfirmDeleteDialog
-        open={bulkDeleteOpen}
-        onOpenChange={setBulkDeleteOpen}
-        description={t("serviceTypes.confirmBulkDelete", { count: selectedCount })}
-        onConfirm={async () => {
-          const ids = table.getSelectedRowModel().rows.map((row) => row.original.id);
-          if (!ids.length) {
-            return;
-          }
+              await onDeleteServiceTypes(ids);
+              table.resetRowSelection();
+              setBulkDeleteOpen(false);
+            }}
+            isLoading={isMutating}
+          />
 
-          await onDeleteServiceTypes(ids);
-          table.resetRowSelection();
-          setBulkDeleteOpen(false);
-        }}
-        isLoading={isMutating}
-      />
+          <ConfirmDeleteDialog
+            open={Boolean(deletingServiceType)}
+            onOpenChange={(open) => {
+              if (!open) {
+                setDeletingServiceType(null);
+              }
+            }}
+            description={deletingServiceType
+              ? t("serviceTypes.confirmDelete", { name: deletingServiceType.name })
+              : ""}
+            onConfirm={async () => {
+              if (!deletingServiceType) {
+                return;
+              }
 
-      <ConfirmDeleteDialog
-        open={Boolean(deletingServiceType)}
-        onOpenChange={(open) => {
-          if (!open) {
-            setDeletingServiceType(null);
-          }
-        }}
-        description={deletingServiceType
-          ? t("serviceTypes.confirmDelete", { name: deletingServiceType.name })
-          : ""}
-        onConfirm={async () => {
-          if (!deletingServiceType) {
-            return;
-          }
-
-          await onDeleteServiceType(deletingServiceType.id);
-          setDeletingServiceType(null);
-        }}
-        isLoading={isMutating}
-      />
+              await onDeleteServiceType(deletingServiceType.id);
+              setDeletingServiceType(null);
+            }}
+            isLoading={isMutating}
+          />
+        </>
+      ) : null}
     </div>
   );
 }

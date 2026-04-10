@@ -28,15 +28,17 @@ export function CalendarSidebar({
   return (
     <div className={`flex flex-col h-full bg-background rounded-lg ${className}`}>
       {/* Add New Event Button */}
-      <div className="p-6 border-b">
-        <Button 
-          className="w-full cursor-pointer"
-          onClick={onNewEvent}
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          {t("calendar.addNewEvent")}
-        </Button>
-      </div>
+      {onNewEvent ? (
+        <div className="p-6 border-b">
+          <Button
+            className="w-full cursor-pointer"
+            onClick={onNewEvent}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            {t("calendar.addNewEvent")}
+          </Button>
+        </div>
+      ) : null}
 
       {/* Date Picker */}
       <DatePicker

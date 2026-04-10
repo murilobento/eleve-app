@@ -12,6 +12,7 @@ export interface CalendarEvent {
   equipmentName?: string
   equipmentTypeName?: string
   operatorName?: string
+  serviceTypeName?: string
   status?: "pending" | "scheduled" | "in_progress" | "completed" | "cancelled"
   address?: string
   type: "meeting" | "event" | "personal" | "task" | "reminder"

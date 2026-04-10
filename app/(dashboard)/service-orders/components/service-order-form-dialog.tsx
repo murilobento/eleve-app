@@ -39,6 +39,7 @@ import type { ManagedBudget } from "@/lib/budgets-admin";
 import type { ManagedClient, PostalCodeLookupResult } from "@/lib/clients-admin";
 import type { EquipmentOption } from "@/lib/equipment-admin";
 import type { ManagedOperator } from "@/lib/operators-admin";
+import { isDateBeforeToday } from "@/lib/service-date";
 import {
   createServiceOrderSchema,
   type CreateServiceOrderInput,
@@ -153,6 +154,7 @@ export function ServiceOrderFormDialog({
   const lastHydratedBudgetIdRef = useRef<string | null>(null);
   const lastLookedUpServicePostalCodeRef = useRef<string | null>(null);
   const [pendingAddressClient, setPendingAddressClient] = useState<ManagedClient | null>(null);
+  const [pendingRetroactiveSubmit, setPendingRetroactiveSubmit] = useState<CreateServiceOrderInput | UpdateServiceOrderInput | null>(null);
   const [serviceAddressMode, setServiceAddressMode] = useState<ServiceAddressMode>("inherit");
 
   const form = useForm<CreateServiceOrderInput | UpdateServiceOrderInput>({
@@ -302,6 +304,7 @@ export function ServiceOrderFormDialog({
     }
 
     setPendingAddressClient(null);
+    setPendingRetroactiveSubmit(null);
     setServiceAddressMode("inherit");
     lastLookedUpServicePostalCodeRef.current = null;
   }, [open]);
@@ -355,6 +358,7 @@ export function ServiceOrderFormDialog({
         })),
       });
       setPendingAddressClient(null);
+      setPendingRetroactiveSubmit(null);
       setServiceAddressMode(sameAddressAsClient ? "inherit" : "manual");
       lastLookedUpServicePostalCodeRef.current =
         sameAddressAsClient ? normalizePostalCode(serviceOrder.servicePostalCode) : null;
@@ -378,6 +382,7 @@ export function ServiceOrderFormDialog({
       items: [createEmptyItem()],
     });
     setPendingAddressClient(null);
+    setPendingRetroactiveSubmit(null);
     setServiceAddressMode("inherit");
     lastLookedUpServicePostalCodeRef.current = null;
   }, [clientsById, form, open, serviceOrder]);
@@ -485,9 +490,33 @@ export function ServiceOrderFormDialog({
   }, [form, isEdit, open, serviceAddressMode, serviceOrder, t, watchedOriginType, watchedServicePostalCode]);
 
   async function handleSubmit(values: CreateServiceOrderInput | UpdateServiceOrderInput) {
+    const hasRetroactiveDate =
+      values.originType === "manual"
+      && values.items.some((item) => isDateBeforeToday(item.serviceDate));
+
+    if (hasRetroactiveDate) {
+      setPendingRetroactiveSubmit(values);
+      return;
+    }
+
     await onSubmit(values);
     form.reset();
     setPendingAddressClient(null);
+    setPendingRetroactiveSubmit(null);
+    setServiceAddressMode("inherit");
+    lastLookedUpServicePostalCodeRef.current = null;
+    onOpenChange(false);
+  }
+
+  async function handleConfirmRetroactiveSubmit() {
+    if (!pendingRetroactiveSubmit) {
+      return;
+    }
+
+    await onSubmit(pendingRetroactiveSubmit);
+    form.reset();
+    setPendingAddressClient(null);
+    setPendingRetroactiveSubmit(null);
     setServiceAddressMode("inherit");
     lastLookedUpServicePostalCodeRef.current = null;
     onOpenChange(false);
@@ -1015,6 +1044,39 @@ export function ServiceOrderFormDialog({
               onClick={() => handleClientAddressDecision(true)}
             >
               {t("serviceOrders.clientAddressConfirmYes")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(pendingRetroactiveSubmit)}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            setPendingRetroactiveSubmit(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("serviceOrders.retroactiveDateConfirmTitle")}</DialogTitle>
+            <DialogDescription>{t("serviceOrders.retroactiveDateConfirmDescription")}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              className="cursor-pointer"
+              onClick={() => setPendingRetroactiveSubmit(null)}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              type="button"
+              className="cursor-pointer"
+              onClick={() => void handleConfirmRetroactiveSubmit()}
+            >
+              {t("serviceOrders.retroactiveDateConfirmAction")}
             </Button>
           </DialogFooter>
         </DialogContent>

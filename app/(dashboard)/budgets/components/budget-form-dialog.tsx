@@ -54,6 +54,7 @@ import {
 import type { ManagedClient, PostalCodeLookupResult } from "@/lib/clients-admin";
 import type { EquipmentOption } from "@/lib/equipment-admin";
 import type { ManagedOperator } from "@/lib/operators-admin";
+import { getTodayDateKey } from "@/lib/service-date";
 import type { ManagedServiceType } from "@/lib/service-types-admin";
 import { getSemanticStatusBadgeClass } from "@/lib/status-badge";
 import { useFormValidationToast } from "@/hooks/use-form-validation-toast";
@@ -272,6 +273,7 @@ export function BudgetFormDialog({
     () => new Map(serviceTypes.map((item) => [item.id, item])),
     [serviceTypes],
   );
+  const minServiceDate = useMemo(() => parseDateString(getTodayDateKey()), []);
 
   const clientsById = useMemo(
     () => new Map(clients.map((item) => [item.id, item])),
@@ -1086,6 +1088,7 @@ export function BudgetFormDialog({
                                       value={parseDateString(itemField.value)}
                                       onChange={(date) => itemField.onChange(formatDateString(date))}
                                       placeholder={t("budgets.selectDate")}
+                                      disabledDays={minServiceDate ? { before: minServiceDate } : undefined}
                                     />
                                   </FormControl>
                                   <FormMessage />

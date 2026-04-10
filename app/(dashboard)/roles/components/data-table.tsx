@@ -32,6 +32,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { SortableHeader } from "@/components/sortable-header";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useResourcePermissions } from "@/hooks/use-resource-permissions";
 import { useI18n } from "@/i18n/provider";
 import type { CreateRoleInput, ManagedRole, UpdateRoleInput } from "@/lib/roles-admin";
 
@@ -62,9 +63,15 @@ export function DataTable({
   const [createOpen, setCreateOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<ManagedRole | null>(null);
   const [deletingRole, setDeletingRole] = useState<ManagedRole | null>(null);
+  const { canCreate, canUpdate, canDelete } = useResourcePermissions("roles");
+  const canSelectRows = canDelete;
+  const canManageRows = canUpdate || canDelete;
 
-  const columns = useMemo<ColumnDef<ManagedRole>[]>(() => [
-    {
+  const columns = useMemo<ColumnDef<ManagedRole>[]>(() => {
+    const nextColumns: ColumnDef<ManagedRole>[] = [];
+
+    if (canSelectRows) {
+      nextColumns.push({
       id: "select",
       header: ({ table }) => (
         <div className="flex items-center justify-center px-2">
@@ -94,23 +101,25 @@ export function DataTable({
       enableSorting: false,
       enableHiding: false,
       size: 50,
-    },
-    {
+      });
+    }
+
+    nextColumns.push({
       accessorKey: "name",
       header: ({ column }) => <SortableHeader column={column} title={t("roles.role")} className="-ml-3" />,
       enableHiding: false,
-    },
-    {
+    });
+    nextColumns.push({
       accessorKey: "permissionsCount",
       header: ({ column }) => <SortableHeader column={column} title={t("roles.permissions")} className="-ml-3" />,
       cell: ({ row }) => <Badge variant="secondary">{row.original.permissionsCount}</Badge>,
-    },
-    {
+    });
+    nextColumns.push({
       accessorKey: "usersCount",
       header: ({ column }) => <SortableHeader column={column} title={t("roles.users")} className="-ml-3" />,
       cell: ({ row }) => <span className="text-sm">{row.original.usersCount}</span>,
-    },
-    {
+    });
+    nextColumns.push({
       accessorKey: "isSystem",
       header: ({ column }) => <SortableHeader column={column} title={t("roles.type")} className="-ml-3" />,
       cell: ({ row }) => (
@@ -124,8 +133,10 @@ export function DataTable({
         )
       ),
       sortingFn: "basic",
-    },
-    {
+    });
+
+    if (canManageRows) {
+      nextColumns.push({
       id: "actions",
       header: t("roles.actions"),
       enableSorting: false,
@@ -143,25 +154,32 @@ export function DataTable({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem className="cursor-pointer" onClick={() => setEditingRole(role)}>
-                <Pencil className="mr-2 size-4" />
-                {t("roles.editRole")}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                variant="destructive"
-                className="cursor-pointer"
-                onClick={() => setDeletingRole(role)}
-                disabled={isProtected}
-              >
-                <Trash2 className="mr-2 size-4" />
-                {t("common.delete")}
-              </DropdownMenuItem>
+              {canUpdate ? (
+                <DropdownMenuItem className="cursor-pointer" onClick={() => setEditingRole(role)}>
+                  <Pencil className="mr-2 size-4" />
+                  {t("roles.editRole")}
+                </DropdownMenuItem>
+              ) : null}
+              {canDelete ? (
+                <DropdownMenuItem
+                  variant="destructive"
+                  className="cursor-pointer"
+                  onClick={() => setDeletingRole(role)}
+                  disabled={isProtected}
+                >
+                  <Trash2 className="mr-2 size-4" />
+                  {t("common.delete")}
+                </DropdownMenuItem>
+              ) : null}
             </DropdownMenuContent>
           </DropdownMenu>
         );
       },
-    },
-  ], [isMutating, t]);
+      });
+    }
+
+    return nextColumns;
+  }, [canDelete, canManageRows, canSelectRows, canUpdate, isMutating, t]);
   const table = useReactTable({
     data: roles,
     columns,
@@ -173,7 +191,7 @@ export function DataTable({
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
-    enableRowSelection: (row) => !row.original.isSystem,
+    enableRowSelection: (row) => canSelectRows && !row.original.isSystem,
     globalFilterFn: (row, _columnId, filterValue) => {
       const value = String(filterValue).toLowerCase();
 
@@ -208,17 +226,19 @@ export function DataTable({
         </div>
 
         <div className="ml-auto">
-          <RoleFormDialog
-            mode="create"
-            open={createOpen}
-            onOpenChange={setCreateOpen}
-            onSubmit={onCreateRole}
-            isSubmitting={isMutating}
-          />
+          {canCreate ? (
+            <RoleFormDialog
+              mode="create"
+              open={createOpen}
+              onOpenChange={setCreateOpen}
+              onSubmit={onCreateRole}
+              isSubmitting={isMutating}
+            />
+          ) : null}
         </div>
       </AdminListToolbar>
 
-      {selectedCount > 0 ? (
+      {canDelete && selectedCount > 0 ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/30 px-3 py-2">
           <span className="text-sm text-muted-foreground">
             {t("common.selectedCount", { count: selectedCount })}
@@ -303,45 +323,49 @@ export function DataTable({
         canNextPage={table.getCanNextPage()}
       />
 
-      <RoleFormDialog
-        mode="edit"
-        open={Boolean(editingRole)}
-        onOpenChange={(open) => {
-          if (!open) {
-            setEditingRole(null);
-          }
-        }}
-        onSubmit={async (values) => {
-          if (!editingRole) {
-            return;
-          }
+      {canUpdate ? (
+        <RoleFormDialog
+          mode="edit"
+          open={Boolean(editingRole)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setEditingRole(null);
+            }
+          }}
+          onSubmit={async (values) => {
+            if (!editingRole) {
+              return;
+            }
 
-          await onUpdateRole(editingRole.id, values as UpdateRoleInput);
-        }}
-        isSubmitting={isMutating}
-        role={editingRole}
-      />
+            await onUpdateRole(editingRole.id, values as UpdateRoleInput);
+          }}
+          isSubmitting={isMutating}
+          role={editingRole}
+        />
+      ) : null}
 
-      <ConfirmDeleteDialog
-        open={Boolean(deletingRole)}
-        onOpenChange={(open) => {
-          if (!open) {
+      {canDelete ? (
+        <ConfirmDeleteDialog
+          open={Boolean(deletingRole)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setDeletingRole(null);
+            }
+          }}
+          description={
+            deletingRole ? t("roles.confirmDelete", { name: deletingRole.name }) : ""
+          }
+          onConfirm={async () => {
+            if (!deletingRole) {
+              return;
+            }
+
+            await onDeleteRole(deletingRole.id);
             setDeletingRole(null);
-          }
-        }}
-        description={
-          deletingRole ? t("roles.confirmDelete", { name: deletingRole.name }) : ""
-        }
-        onConfirm={async () => {
-          if (!deletingRole) {
-            return;
-          }
-
-          await onDeleteRole(deletingRole.id);
-          setDeletingRole(null);
-        }}
-        isLoading={isMutating}
-      />
+          }}
+          isLoading={isMutating}
+        />
+      ) : null}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { CalendarDays, X } from "lucide-react";
+import type { Matcher } from "react-day-picker";
 
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -15,6 +16,7 @@ type DatePickerInputProps = {
   onChange: (value?: Date) => void;
   placeholder: string;
   disabled?: boolean;
+  disabledDays?: Matcher | Matcher[];
   className?: string;
 };
 
@@ -54,6 +56,7 @@ export function DatePickerInput({
   onChange,
   placeholder,
   disabled = false,
+  disabledDays,
   className,
 }: DatePickerInputProps) {
   const locale = useLocale();
@@ -84,6 +87,7 @@ export function DatePickerInput({
             selected={value}
             month={value}
             onSelect={onChange}
+            disabled={disabledDays}
             initialFocus
           />
         </PopoverContent>

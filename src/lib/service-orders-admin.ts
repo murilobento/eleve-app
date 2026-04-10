@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { isDateBeforeToday } from "@/lib/service-date";
+
 export const serviceOrderOriginSchema = z.enum(["manual", "budget"]);
 export const serviceOrderStatusSchema = z.enum([
   "pending",
@@ -167,6 +169,18 @@ const baseServiceOrderSchema = z.object({
       code: z.ZodIssueCode.custom,
       path: ["sourceBudgetId"],
       message: "Manual service orders cannot be linked to a budget.",
+    });
+  }
+
+  if (value.originType === "budget") {
+    value.items.forEach((item, index) => {
+      if (isDateBeforeToday(item.serviceDate)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["items", index, "serviceDate"],
+          message: "Service date cannot be earlier than today for service orders generated from budgets.",
+        });
+      }
     });
   }
 });

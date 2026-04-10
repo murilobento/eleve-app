@@ -16,6 +16,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { useResourcePermissions } from "@/hooks/use-resource-permissions";
 import { Input } from "@/components/ui/input";
 import { useFormValidationToast } from "@/hooks/use-form-validation-toast";
 import { useI18n } from "@/i18n/provider";
@@ -92,6 +93,7 @@ export default function CompanyPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isLookingUpCnpj, setIsLookingUpCnpj] = useState(false);
   const [isLookingUpPostalCode, setIsLookingUpPostalCode] = useState(false);
+  const { canUpdate } = useResourcePermissions("company");
 
   const form = useForm<UpdateCompanyInput>({
     resolver: zodResolver(updateCompanySchema),
@@ -282,7 +284,7 @@ export default function CompanyPage() {
             <CardContent>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(handleSubmit, handleInvalidSubmit)} className={`space-y-4 ${formClassName}`}>
-                  <div className="grid gap-3">
+                  <fieldset className="grid gap-3" disabled={!canUpdate || isSaving}>
                     <div className="grid gap-3 xl:grid-cols-[220px_minmax(320px,1fr)]">
                       <FormField
                         control={form.control}
@@ -324,7 +326,7 @@ export default function CompanyPage() {
                             variant="outline"
                             className="w-full cursor-pointer md:w-auto"
                             onClick={handleCnpjLookup}
-                            disabled={isLookingUpCnpj || isLookingUpPostalCode || isSaving}
+                            disabled={!canUpdate || isLookingUpCnpj || isLookingUpPostalCode || isSaving}
                           >
                             <Search className="mr-2 size-4" />
                             {isLookingUpCnpj ? t("common.loading") : t("company.lookupCnpj")}
@@ -411,9 +413,9 @@ export default function CompanyPage() {
                         )}
                       />
                     </div>
-                  </div>
+                  </fieldset>
 
-                  <div className="grid gap-3">
+                  <fieldset className="grid gap-3" disabled={!canUpdate || isSaving}>
                     <div className="grid gap-3 xl:grid-cols-[160px_140px_minmax(0,1fr)_96px]">
                       <FormField
                         control={form.control}
@@ -440,7 +442,7 @@ export default function CompanyPage() {
                           variant="outline"
                           className="w-full cursor-pointer"
                           onClick={handlePostalCodeLookup}
-                          disabled={isLookingUpCnpj || isLookingUpPostalCode || isSaving}
+                          disabled={!canUpdate || isLookingUpCnpj || isLookingUpPostalCode || isSaving}
                         >
                           <Search className="mr-2 size-4" />
                           {isLookingUpPostalCode ? t("common.loading") : t("company.lookupPostalCode")}
@@ -532,12 +534,14 @@ export default function CompanyPage() {
                         )}
                       />
                     </div>
-                  </div>
+                  </fieldset>
 
                   <div className="flex justify-end">
-                    <Button type="submit" className="cursor-pointer" disabled={isSaving || isLookingUpCnpj || isLookingUpPostalCode}>
-                      {isSaving ? t("common.loading") : t("common.saveChanges")}
-                    </Button>
+                    {canUpdate ? (
+                      <Button type="submit" className="cursor-pointer" disabled={isSaving || isLookingUpCnpj || isLookingUpPostalCode}>
+                        {isSaving ? t("common.loading") : t("common.saveChanges")}
+                      </Button>
+                    ) : null}
                   </div>
                 </form>
               </Form>

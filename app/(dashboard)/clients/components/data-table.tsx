@@ -43,6 +43,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useResourcePermissions } from "@/hooks/use-resource-permissions";
 import type {
   CreateClientInput,
   ManagedClient,
@@ -102,6 +103,8 @@ export function DataTable({
   const [deletingClient, setDeletingClient] = useState<ManagedClient | null>(null);
   const [draftPersonTypeFilter, setDraftPersonTypeFilter] = useState("all");
   const [draftStatusFilter, setDraftStatusFilter] = useState("all");
+  const { canCreate, canUpdate, canDelete } = useResourcePermissions("clients");
+  const canSelectRows = canDelete;
 
   const getDisplayValue = (value?: string | null) => {
     if (!value?.trim()) {
@@ -171,8 +174,11 @@ export function DataTable({
     },
   ] : [];
 
-  const columns = useMemo<ColumnDef<ManagedClient>[]>(() => [
-    {
+  const columns = useMemo<ColumnDef<ManagedClient>[]>(() => {
+    const nextColumns: ColumnDef<ManagedClient>[] = [];
+
+    if (canSelectRows) {
+      nextColumns.push({
       id: "select",
       header: ({ table }) => (
         <div className="flex items-center justify-center px-2">
@@ -195,8 +201,10 @@ export function DataTable({
       enableSorting: false,
       enableHiding: false,
       size: 50,
-    },
-    {
+      });
+    }
+
+    nextColumns.push({
       accessorKey: "legalName",
       header: ({ column }) => <SortableHeader column={column} title={t("clients.name")} className="-ml-3" />,
       enableHiding: false,
@@ -208,8 +216,8 @@ export function DataTable({
           </div>
         </div>
       ),
-    },
-    {
+    });
+    nextColumns.push({
       accessorKey: "personType",
       header: ({ column }) => <SortableHeader column={column} title={t("clients.personType")} className="-ml-3" />,
       cell: ({ row }) => (
@@ -218,8 +226,8 @@ export function DataTable({
         </Badge>
       ),
       filterFn: "equals",
-    },
-    {
+    });
+    nextColumns.push({
       accessorKey: "document",
       header: ({ column }) => <SortableHeader column={column} title={t("clients.document")} className="-ml-3" />,
       cell: ({ row }) => (
@@ -227,8 +235,8 @@ export function DataTable({
           {formatDocument(row.original.document, row.original.personType)}
         </span>
       ),
-    },
-    {
+    });
+    nextColumns.push({
       accessorKey: "contactName",
       header: ({ column }) => <SortableHeader column={column} title={t("clients.contact")} className="-ml-3" />,
       cell: ({ row }) => (
@@ -237,8 +245,8 @@ export function DataTable({
           <div className="text-muted-foreground">{row.original.contactPhone || "-"}</div>
         </div>
       ),
-    },
-    {
+    });
+    nextColumns.push({
       accessorKey: "location",
       header: ({ column }) => <SortableHeader column={column} title={t("clients.location")} className="-ml-3" />,
       cell: ({ row }) => (
@@ -246,8 +254,8 @@ export function DataTable({
           {row.original.city} / {row.original.state}
         </span>
       ),
-    },
-    {
+    });
+    nextColumns.push({
       accessorKey: "status",
       header: ({ column }) => <SortableHeader column={column} title={t("clients.status")} className="-ml-3" />,
       cell: ({ row }) => {
@@ -260,8 +268,8 @@ export function DataTable({
         );
       },
       filterFn: "equals",
-    },
-    {
+    });
+    nextColumns.push({
       id: "actions",
       header: t("clients.actions"),
       enableSorting: false,
@@ -282,24 +290,30 @@ export function DataTable({
                 <Eye className="mr-2 size-4" />
                 {t("common.details")}
               </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer" onClick={() => setEditingClient(client)}>
-                <Pencil className="mr-2 size-4" />
-                {t("clients.editClient")}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                variant="destructive"
-                className="cursor-pointer"
-                onClick={() => setDeletingClient(client)}
-              >
-                <Trash2 className="mr-2 size-4" />
-                {t("common.delete")}
-              </DropdownMenuItem>
+              {canUpdate ? (
+                <DropdownMenuItem className="cursor-pointer" onClick={() => setEditingClient(client)}>
+                  <Pencil className="mr-2 size-4" />
+                  {t("clients.editClient")}
+                </DropdownMenuItem>
+              ) : null}
+              {canDelete ? (
+                <DropdownMenuItem
+                  variant="destructive"
+                  className="cursor-pointer"
+                  onClick={() => setDeletingClient(client)}
+                >
+                  <Trash2 className="mr-2 size-4" />
+                  {t("common.delete")}
+                </DropdownMenuItem>
+              ) : null}
             </DropdownMenuContent>
           </DropdownMenu>
         );
       },
-    },
-  ], [isMutating, locale, t]);
+    });
+
+    return nextColumns;
+  }, [canDelete, canSelectRows, canUpdate, isMutating, locale, t]);
 
   const table = useReactTable({
     data: clients,
@@ -440,17 +454,19 @@ export function DataTable({
         </AdminFiltersDialog>
 
         <div className="ml-auto">
-          <ClientFormDialog
-            mode="create"
-            open={createOpen}
-            onOpenChange={setCreateOpen}
-            onSubmit={onCreateClient}
-            isSubmitting={isMutating}
-          />
+          {canCreate ? (
+            <ClientFormDialog
+              mode="create"
+              open={createOpen}
+              onOpenChange={setCreateOpen}
+              onSubmit={onCreateClient}
+              isSubmitting={isMutating}
+            />
+          ) : null}
         </div>
       </AdminListToolbar>
 
-      {selectedCount > 0 ? (
+      {canDelete && selectedCount > 0 ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/30 px-3 py-2">
           <span className="text-sm text-muted-foreground">
             {t("common.selectedCount", { count: selectedCount })}
@@ -544,24 +560,26 @@ export function DataTable({
         canNextPage={table.getCanNextPage()}
       />
 
-      <ClientFormDialog
-        mode="edit"
-        open={Boolean(editingClient)}
-        onOpenChange={(open) => {
-          if (!open) {
-            setEditingClient(null);
-          }
-        }}
-        onSubmit={async (values) => {
-          if (!editingClient) {
-            return;
-          }
+      {canUpdate ? (
+        <ClientFormDialog
+          mode="edit"
+          open={Boolean(editingClient)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setEditingClient(null);
+            }
+          }}
+          onSubmit={async (values) => {
+            if (!editingClient) {
+              return;
+            }
 
-          await onUpdateClient(editingClient.id, values as UpdateClientInput);
-        }}
-        isSubmitting={isMutating}
-        client={editingClient}
-      />
+            await onUpdateClient(editingClient.id, values as UpdateClientInput);
+          }}
+          isSubmitting={isMutating}
+          client={editingClient}
+        />
+      ) : null}
 
       <EntityDetailsDialog
         open={Boolean(viewingClient)}
@@ -586,7 +604,7 @@ export function DataTable({
           </Badge>,
         ] : []}
         sections={clientDetailsSections}
-        footer={viewingClient ? (
+        footer={viewingClient && canUpdate ? (
           <div className="flex justify-end">
             <Button
               className="cursor-pointer"
@@ -602,24 +620,26 @@ export function DataTable({
         ) : null}
       />
 
-      <ConfirmDeleteDialog
-        open={Boolean(deletingClient)}
-        onOpenChange={(open) => {
-          if (!open) {
-            setDeletingClient(null);
-          }
-        }}
-        description={deletingClient ? t("clients.confirmDelete", { name: deletingClient.legalName }) : ""}
-        onConfirm={async () => {
-          if (!deletingClient) {
-            return;
-          }
+      {canDelete ? (
+        <ConfirmDeleteDialog
+          open={Boolean(deletingClient)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setDeletingClient(null);
+            }
+          }}
+          description={deletingClient ? t("clients.confirmDelete", { name: deletingClient.legalName }) : ""}
+          onConfirm={async () => {
+            if (!deletingClient) {
+              return;
+            }
 
-          await onDeleteClient(deletingClient.id);
-          setDeletingClient(null);
-        }}
-        isLoading={isMutating}
-      />
+            await onDeleteClient(deletingClient.id);
+            setDeletingClient(null);
+          }}
+          isLoading={isMutating}
+        />
+      ) : null}
     </div>
   );
 }

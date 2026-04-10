@@ -63,6 +63,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useFormValidationToast } from "@/hooks/use-form-validation-toast";
+import { useResourcePermissions } from "@/hooks/use-resource-permissions";
 import { useI18n, useLocale } from "@/i18n/provider";
 import type {
   CnpjLookupResult,
@@ -131,6 +132,8 @@ export default function SuppliersPage() {
   const [isLookingUpPostalCode, setIsLookingUpPostalCode] = useState(false);
   const [draftTypeFilter, setDraftTypeFilter] = useState("all");
   const [draftStatusFilter, setDraftStatusFilter] = useState("all");
+  const { canCreate, canUpdate, canDelete } = useResourcePermissions("suppliers");
+  const canSelectRows = canDelete;
 
   const isEdit = Boolean(editing);
   const schema = isEdit ? updateSupplierSchema : createSupplierSchema;
@@ -420,8 +423,11 @@ export default function SuppliersPage() {
     handleInvalidFormSubmit(errors);
   }
 
-  const columns = useMemo<ColumnDef<ManagedSupplier>[]>(() => [
-    {
+  const columns = useMemo<ColumnDef<ManagedSupplier>[]>(() => {
+    const nextColumns: ColumnDef<ManagedSupplier>[] = [];
+
+    if (canSelectRows) {
+      nextColumns.push({
       id: "select",
       header: ({ table }) => (
         <div className="flex items-center justify-center px-2">
@@ -444,8 +450,10 @@ export default function SuppliersPage() {
       enableSorting: false,
       enableHiding: false,
       size: 50,
-    },
-    {
+      });
+    }
+
+    nextColumns.push({
       accessorKey: "legalName",
       header: ({ column }) => <SortableHeader column={column} title={t("suppliers.name")} className="-ml-3" />,
       enableHiding: false,
@@ -457,19 +465,19 @@ export default function SuppliersPage() {
           </div>
         </div>
       ),
-    },
-    {
+    });
+    nextColumns.push({
       accessorKey: "supplierType",
       header: ({ column }) => <SortableHeader column={column} title={t("suppliers.type")} className="-ml-3" />,
       cell: ({ row }) => <Badge variant="outline">{t(`suppliers.types.${row.original.supplierType}`)}</Badge>,
       filterFn: "equals",
-    },
-    {
+    });
+    nextColumns.push({
       accessorKey: "document",
       header: ({ column }) => <SortableHeader column={column} title={t("suppliers.document")} className="-ml-3" />,
       cell: ({ row }) => <span className="text-sm">{formatSupplierDocument(row.original.document)}</span>,
-    },
-    {
+    });
+    nextColumns.push({
       accessorKey: "contactName",
       header: ({ column }) => <SortableHeader column={column} title={t("suppliers.contactName")} className="-ml-3" />,
       cell: ({ row }) => (
@@ -478,8 +486,8 @@ export default function SuppliersPage() {
           <div className="text-muted-foreground">{row.original.contactPhone || "-"}</div>
         </div>
       ),
-    },
-    {
+    });
+    nextColumns.push({
       accessorKey: "location",
       header: ({ column }) => <SortableHeader column={column} title={t("suppliers.location")} className="-ml-3" />,
       cell: ({ row }) => (
@@ -487,8 +495,8 @@ export default function SuppliersPage() {
           {row.original.city} / {row.original.state}
         </span>
       ),
-    },
-    {
+    });
+    nextColumns.push({
       accessorKey: "status",
       header: ({ column }) => <SortableHeader column={column} title={t("suppliers.status")} className="-ml-3" />,
       cell: ({ row }) => {
@@ -501,8 +509,8 @@ export default function SuppliersPage() {
         );
       },
       filterFn: "equals",
-    },
-    {
+    });
+    nextColumns.push({
       id: "actions",
       header: t("suppliers.actions"),
       enableSorting: false,
@@ -523,24 +531,30 @@ export default function SuppliersPage() {
                 <Eye className="mr-2 size-4" />
                 {t("common.details")}
               </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer" onClick={() => setEditing(supplier)}>
-                <Pencil className="mr-2 size-4" />
-                {t("suppliers.edit")}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                variant="destructive"
-                className="cursor-pointer"
-                onClick={() => setDeleting(supplier)}
-              >
-                <Trash2 className="mr-2 size-4" />
-                {t("common.delete")}
-              </DropdownMenuItem>
+              {canUpdate ? (
+                <DropdownMenuItem className="cursor-pointer" onClick={() => setEditing(supplier)}>
+                  <Pencil className="mr-2 size-4" />
+                  {t("suppliers.edit")}
+                </DropdownMenuItem>
+              ) : null}
+              {canDelete ? (
+                <DropdownMenuItem
+                  variant="destructive"
+                  className="cursor-pointer"
+                  onClick={() => setDeleting(supplier)}
+                >
+                  <Trash2 className="mr-2 size-4" />
+                  {t("common.delete")}
+                </DropdownMenuItem>
+              ) : null}
             </DropdownMenuContent>
           </DropdownMenu>
         );
       },
-    },
-  ], [isMutating, locale, t]);
+    });
+
+    return nextColumns;
+  }, [canDelete, canSelectRows, canUpdate, isMutating, locale, t]);
 
   const table = useReactTable({
     data: suppliers,
@@ -689,23 +703,25 @@ export default function SuppliersPage() {
             </AdminFiltersSection>
           </AdminFiltersDialog>
 
-          <Button
-            className="ml-auto cursor-pointer"
-            onClick={() => {
-              setEditing(null);
-              setCreateOpen(true);
-            }}
-          >
-            <Plus className="mr-2 size-4" />
-            {t("suppliers.add")}
-          </Button>
+          {canCreate ? (
+            <Button
+              className="ml-auto cursor-pointer"
+              onClick={() => {
+                setEditing(null);
+                setCreateOpen(true);
+              }}
+            >
+              <Plus className="mr-2 size-4" />
+              {t("suppliers.add")}
+            </Button>
+          ) : null}
         </AdminListToolbar>
 
         {loading ? (
           <div className="rounded-md border px-6 py-10 text-sm text-muted-foreground">{t("suppliers.loading")}</div>
         ) : (
           <>
-            {selectedCount > 0 ? (
+            {canDelete && selectedCount > 0 ? (
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/30 px-3 py-2">
                 <span className="text-sm text-muted-foreground">
                   {t("common.selectedCount", { count: selectedCount })}
@@ -802,17 +818,18 @@ export default function SuppliersPage() {
         )}
       </div>
 
-      <Dialog
-        open={open}
-        onOpenChange={(nextOpen) => {
-          if (!nextOpen) {
-            closeDialog();
-          }
-        }}
-      >
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-5xl">
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleSubmit, handleInvalidSubmit)} className={`space-y-3 ${formClassName}`}>
+      {(canCreate || canUpdate) ? (
+        <Dialog
+          open={open}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) {
+              closeDialog();
+            }
+          }}
+        >
+          <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-5xl">
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(handleSubmit, handleInvalidSubmit)} className={`space-y-3 ${formClassName}`}>
               <DialogHeader>
                 <div className="flex flex-wrap items-center gap-3 pr-8">
                   <DialogTitle>{editing ? t("suppliers.edit") : t("suppliers.add")}</DialogTitle>
@@ -1110,18 +1127,19 @@ export default function SuppliersPage() {
                 />
               </div>
 
-              <DialogFooter>
-                <Button type="button" variant="outline" className="cursor-pointer" onClick={closeDialog}>
-                  {t("common.cancel")}
-                </Button>
-                <Button type="submit" className="cursor-pointer" disabled={isMutating}>
-                  {isMutating ? t("common.loading") : t("common.saveChanges")}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
+                <DialogFooter>
+                  <Button type="button" variant="outline" className="cursor-pointer" onClick={closeDialog}>
+                    {t("common.cancel")}
+                  </Button>
+                  <Button type="submit" className="cursor-pointer" disabled={isMutating}>
+                    {isMutating ? t("common.loading") : t("common.saveChanges")}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+      ) : null}
 
       <EntityDetailsDialog
         open={Boolean(viewing)}
@@ -1146,7 +1164,7 @@ export default function SuppliersPage() {
           </Badge>,
         ] : []}
         sections={supplierDetailsSections}
-        footer={viewing ? (
+        footer={viewing && canUpdate ? (
           <div className="flex justify-end">
             <Button
               className="cursor-pointer"
@@ -1162,26 +1180,28 @@ export default function SuppliersPage() {
         ) : null}
       />
 
-      <ConfirmDeleteDialog
-        open={Boolean(deleting)}
-        onOpenChange={(nextOpen) => {
-          if (!nextOpen) {
-            setDeleting(null);
-          }
-        }}
-        description={deleting ? t("suppliers.confirmDelete", { name: deleting.tradeName || deleting.legalName }) : ""}
-        onConfirm={async () => {
-          if (!deleting) {
-            return;
-          }
+      {canDelete ? (
+        <ConfirmDeleteDialog
+          open={Boolean(deleting)}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) {
+              setDeleting(null);
+            }
+          }}
+          description={deleting ? t("suppliers.confirmDelete", { name: deleting.tradeName || deleting.legalName }) : ""}
+          onConfirm={async () => {
+            if (!deleting) {
+              return;
+            }
 
-          await runMutation(async () => {
-            await parseResponse(await fetch(`/api/suppliers/${deleting.id}`, { method: "DELETE" }));
-          }, t("common.supplierDeleteSuccess"));
-          setDeleting(null);
-        }}
-        isLoading={isMutating}
-      />
+            await runMutation(async () => {
+              await parseResponse(await fetch(`/api/suppliers/${deleting.id}`, { method: "DELETE" }));
+            }, t("common.supplierDeleteSuccess"));
+            setDeleting(null);
+          }}
+          isLoading={isMutating}
+        />
+      ) : null}
     </>
   );
 }
