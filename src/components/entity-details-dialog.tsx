@@ -53,8 +53,8 @@ export function EntityDetailsDialog({
 }: EntityDetailsDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[88vh] overflow-hidden p-0 sm:max-w-5xl">
-        <div className="border-b bg-gradient-to-r from-muted/70 via-background to-background px-5 py-4">
+      <DialogContent className="flex max-h-[88vh] flex-col overflow-hidden p-0 sm:max-w-5xl">
+        <div className="shrink-0 border-b bg-gradient-to-r from-muted/70 via-background to-background px-5 py-4">
           <DialogHeader className="gap-2 text-left">
             <div className="flex flex-col gap-3 pr-8 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0 space-y-1">
@@ -73,35 +73,35 @@ export function EntityDetailsDialog({
           </DialogHeader>
         </div>
 
-        <div className="max-h-[calc(88vh-132px)] overflow-y-auto p-5">
+        <div className="min-h-0 flex-1 overflow-y-auto p-5">
           <div className="grid gap-3 lg:grid-cols-2">
-          {sections.map((section) => (
-            <Card key={section.title} className="gap-0 py-0">
-              <CardHeader className="border-b px-4 py-2 gap-0 grid-rows-[auto] [.border-b]:pb-2">
-                <CardTitle className="text-sm">{section.title}</CardTitle>
-                {section.description ? <CardDescription className="text-xs">{section.description}</CardDescription> : null}
-              </CardHeader>
-              <CardContent className="px-4 py-3">
-                <div className="grid gap-x-4 gap-y-3 md:grid-cols-2">
-                  {section.fields.map((field) => (
-                    <div
-                      key={`${section.title}-${field.label}`}
-                      className={cn("space-y-1", field.fullWidth ? "md:col-span-2" : undefined)}
-                    >
-                      <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                        {field.label}
+            {sections.map((section) => (
+              <Card key={section.title} className="gap-0 py-0">
+                <CardHeader className="grid-rows-[auto] gap-0 border-b px-4 py-2 [.border-b]:pb-2">
+                  <CardTitle className="text-sm">{section.title}</CardTitle>
+                  {section.description ? <CardDescription className="text-xs">{section.description}</CardDescription> : null}
+                </CardHeader>
+                <CardContent className="px-4 py-3">
+                  <div className="grid gap-x-4 gap-y-3 md:grid-cols-2">
+                    {section.fields.map((field) => (
+                      <div
+                        key={`${section.title}-${field.label}`}
+                        className={cn("space-y-1", field.fullWidth ? "md:col-span-2" : undefined)}
+                      >
+                        <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                          {field.label}
+                        </div>
+                        <div className="break-words text-sm leading-5">{field.value}</div>
                       </div>
-                      <div className="break-words text-sm leading-5">{field.value}</div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </div>
 
-        {footer ? <div className="border-t px-5 py-3">{footer}</div> : null}
+        {footer ? <div className="shrink-0 border-t bg-background px-5 py-3">{footer}</div> : null}
       </DialogContent>
     </Dialog>
   );

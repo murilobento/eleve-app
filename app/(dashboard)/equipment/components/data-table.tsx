@@ -66,13 +66,6 @@ type DataTableProps = {
   isMutating: boolean;
 };
 
-function formatDate(value: string, locale: string) {
-  return new Intl.DateTimeFormat(locale, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
-
 export function DataTable({
   equipment,
   equipmentTypes,
@@ -189,11 +182,6 @@ export function DataTable({
           {row.original.plate || t("equipment.noPlate")}
         </span>
       ),
-    },
-    {
-      accessorKey: "updatedAt",
-      header: ({ column }) => <SortableHeader column={column} title={t("equipment.updated")} className="-ml-3" />,
-      cell: ({ row }) => <span className="text-sm">{formatDate(row.original.updatedAt, locale)}</span>,
     },
     {
       accessorKey: "status",

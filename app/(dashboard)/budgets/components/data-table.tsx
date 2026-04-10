@@ -135,13 +135,6 @@ function formatDate(value: string, locale: string) {
   return formatCalendarDate(parseDateOnly(value), locale);
 }
 
-function formatDateTime(value: string, locale: string) {
-  return new Intl.DateTimeFormat(locale, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
-
 function formatMoney(value: number, locale: string) {
   return new Intl.NumberFormat(locale, {
     style: "currency",
@@ -565,11 +558,6 @@ export function DataTable({
         </Badge>
       ),
       filterFn: "equals",
-    },
-    {
-      accessorKey: "updatedAt",
-      header: ({ column }) => <SortableHeader column={column} title={t("budgets.updatedAt")} className="-ml-3" />,
-      cell: ({ row }) => <span className="text-sm">{formatDateTime(row.original.updatedAt, locale)}</span>,
     },
     {
       id: "actions",

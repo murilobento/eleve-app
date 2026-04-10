@@ -61,13 +61,6 @@ type DataTableProps = {
   isMutating: boolean;
 };
 
-function formatDate(value: string, locale: string) {
-  return new Intl.DateTimeFormat(locale, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
-
 export function DataTable({
   operators,
   onCreateOperator,
@@ -130,11 +123,6 @@ export function DataTable({
       header: ({ column }) => <SortableHeader column={column} title={t("operators.license")} className="-ml-3" />,
       cell: ({ row }) => <Badge variant="outline">{row.original.license}</Badge>,
       filterFn: "equals",
-    },
-    {
-      accessorKey: "updatedAt",
-      header: ({ column }) => <SortableHeader column={column} title={t("operators.updated")} className="-ml-3" />,
-      cell: ({ row }) => <span className="text-sm">{formatDate(row.original.updatedAt, locale)}</span>,
     },
     {
       accessorKey: "status",

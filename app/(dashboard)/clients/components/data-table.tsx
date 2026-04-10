@@ -239,11 +239,6 @@ export function DataTable({
       ),
     },
     {
-      accessorKey: "email",
-      header: ({ column }) => <SortableHeader column={column} title={t("clients.email")} className="-ml-3" />,
-      cell: ({ row }) => <span className="text-sm">{row.original.email || "-"}</span>,
-    },
-    {
       accessorKey: "location",
       header: ({ column }) => <SortableHeader column={column} title={t("clients.location")} className="-ml-3" />,
       cell: ({ row }) => (
@@ -251,11 +246,6 @@ export function DataTable({
           {row.original.city} / {row.original.state}
         </span>
       ),
-    },
-    {
-      accessorKey: "updatedAt",
-      header: ({ column }) => <SortableHeader column={column} title={t("clients.updated")} className="-ml-3" />,
-      cell: ({ row }) => <span className="text-sm">{formatDate(row.original.updatedAt, locale)}</span>,
     },
     {
       accessorKey: "status",

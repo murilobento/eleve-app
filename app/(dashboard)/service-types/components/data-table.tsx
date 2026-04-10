@@ -74,13 +74,6 @@ const billingUnits = [
   "counterweight_transport",
 ] as const;
 
-function formatDate(value: string, locale: string) {
-  return new Intl.DateTimeFormat(locale, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
-
 function formatMoney(value: number, locale: string) {
   return new Intl.NumberFormat(locale, {
     style: "currency",
@@ -190,11 +183,6 @@ export function DataTable({
         );
       },
       filterFn: "equals",
-    },
-    {
-      accessorKey: "updatedAt",
-      header: ({ column }) => <SortableHeader column={column} title={t("serviceTypes.updated")} className="-ml-3" />,
-      cell: ({ row }) => <span className="text-sm">{formatDate(row.original.updatedAt, locale)}</span>,
     },
     {
       id: "actions",

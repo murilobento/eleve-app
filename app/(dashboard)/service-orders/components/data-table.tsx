@@ -137,13 +137,6 @@ function formatDate(value: string, locale: string) {
   return formatCalendarDate(parseDateOnly(value), locale);
 }
 
-function formatDateTime(value: string, locale: string) {
-  return new Intl.DateTimeFormat(locale, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
-
 function normalizeCustomDateRange(from?: Date, to?: Date) {
   if (from && to && from > to) {
     return {
@@ -585,11 +578,6 @@ export function DataTable({
         </Badge>
       ),
       filterFn: "equals",
-    },
-    {
-      accessorKey: "createdAt",
-      header: ({ column }) => <SortableHeader column={column} title={t("serviceOrders.createdAt")} className="-ml-3" />,
-      cell: ({ row }) => <span className="text-sm text-muted-foreground">{formatDateTime(row.original.createdAt, locale)}</span>,
     },
     {
       id: "actions",

@@ -480,11 +480,6 @@ export default function SuppliersPage() {
       ),
     },
     {
-      accessorKey: "email",
-      header: ({ column }) => <SortableHeader column={column} title={t("suppliers.email")} className="-ml-3" />,
-      cell: ({ row }) => <span className="text-sm">{row.original.email || "-"}</span>,
-    },
-    {
       accessorKey: "location",
       header: ({ column }) => <SortableHeader column={column} title={t("suppliers.location")} className="-ml-3" />,
       cell: ({ row }) => (
@@ -492,11 +487,6 @@ export default function SuppliersPage() {
           {row.original.city} / {row.original.state}
         </span>
       ),
-    },
-    {
-      accessorKey: "updatedAt",
-      header: ({ column }) => <SortableHeader column={column} title={t("suppliers.updated")} className="-ml-3" />,
-      cell: ({ row }) => <span className="text-sm">{formatDate(row.original.updatedAt, locale)}</span>,
     },
     {
       accessorKey: "status",
