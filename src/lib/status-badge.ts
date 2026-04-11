@@ -3,6 +3,7 @@ const NEGATIVE_STATUS_BADGE_CLASS = "bg-red-500/10 text-red-700 dark:text-red-40
 const NEUTRAL_STATUS_BADGE_CLASS = "bg-muted text-muted-foreground";
 const WARNING_STATUS_BADGE_CLASS = "bg-amber-500/10 text-amber-700 dark:text-amber-400";
 const INFO_STATUS_BADGE_CLASS = "bg-blue-500/10 text-blue-700 dark:text-blue-400";
+const SERVICE_ORDER_DEFAULT_STATUS_BADGE_CLASS = NEUTRAL_STATUS_BADGE_CLASS;
 
 const positiveStatuses = new Set([
   "active",
@@ -89,4 +90,8 @@ export function getSemanticStatusBadgeClass(status?: string | null, fallbackClas
   }
 
   return fallbackClassName;
+}
+
+export function getServiceOrderStatusBadgeClass(status?: string | null) {
+  return getSemanticStatusBadgeClass(status, SERVICE_ORDER_DEFAULT_STATUS_BADGE_CLASS);
 }

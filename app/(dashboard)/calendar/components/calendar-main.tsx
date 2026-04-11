@@ -379,26 +379,26 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
                           onClick={() => handleEventClick(event)}
                         >
                           <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
-                            <div className="flex min-w-0 flex-1 items-center gap-2 text-[11px] uppercase text-white/95">
+                            <div className="flex min-w-0 flex-1 items-center gap-2 text-[11px] uppercase">
                               <Truck className="h-3.5 w-3.5 shrink-0" />
                               <span className="truncate font-semibold">
                                 {event.equipmentName || event.title}
                               </span>
                               {event.clientName ? (
-                                <span className="truncate text-white/85">{event.clientName}</span>
+                                <span className="truncate opacity-90">{event.clientName}</span>
                               ) : null}
-                              <div className="flex shrink-0 items-center gap-1 text-white/90">
+                              <div className="flex shrink-0 items-center gap-1 opacity-90">
                                 <Clock className="h-3 w-3 shrink-0" />
                                 <span>{timeRange || formatTimeLabel(startTime)}</span>
                               </div>
                               {event.operatorName ? (
-                                <div className="flex min-w-0 items-center gap-1 text-white/90">
+                                <div className="flex min-w-0 items-center gap-1 opacity-90">
                                   <UserCog className="h-3 w-3 shrink-0" />
                                   <span className="truncate">{event.operatorName}</span>
                                 </div>
                               ) : null}
                             </div>
-                            <Badge variant="secondary" className="shrink-0 px-1.5 py-0 text-[10px] bg-white/15 text-white hover:bg-white/15">
+                            <Badge variant="secondary" className="shrink-0 px-1.5 py-0 text-[10px] border-transparent bg-background/70 text-current hover:bg-background/70">
                               {event.equipmentTypeName || getEventTypeLabel(event.type)}
                             </Badge>
                           </div>
@@ -528,7 +528,7 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
                     {t("serviceOrders.status")}
                   </div>
                   <div className="mt-1 uppercase">
-                    <Badge variant="secondary" className={cn("text-white", selectedEvent.color)}>
+                    <Badge variant="secondary" className={cn(selectedEvent.color)}>
                       {getEventStatusLabel(selectedEvent.status) ?? getEventTypeLabel(selectedEvent.type)}
                     </Badge>
                   </div>

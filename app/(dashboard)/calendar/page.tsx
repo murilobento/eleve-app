@@ -6,7 +6,7 @@ import { toast } from "sonner"
 import { Calendar } from "./components/calendar"
 import { useI18n } from "@/i18n/provider"
 import type { ManagedServiceOrder } from "@/lib/service-orders-admin"
-import { getServiceAgendaStatusColor, listServiceAgendaEntries } from "@/lib/service-agenda"
+import { getServiceAgendaStatusBadgeClass, listServiceAgendaEntries } from "@/lib/service-agenda"
 
 type ServiceOrdersResponse = {
   serviceOrders: ManagedServiceOrder[]
@@ -61,7 +61,7 @@ export default function CalendarPage() {
       type: "event" as const,
       attendees: entry.operatorName ? [entry.operatorName] : [],
       location: entry.location,
-      color: getServiceAgendaStatusColor(entry.status),
+      color: getServiceAgendaStatusBadgeClass(entry.status),
       description: entry.notes || undefined,
     }))
   ), [serviceOrders])

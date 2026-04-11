@@ -1,4 +1,5 @@
 import type { ManagedServiceOrder } from "@/lib/service-orders-admin";
+import { getServiceOrderStatusBadgeClass } from "@/lib/status-badge";
 
 export type ServiceAgendaEntry = {
   id: string;
@@ -20,19 +21,8 @@ export type ServiceAgendaEntry = {
   notes: string | null;
 };
 
-export function getServiceAgendaStatusColor(status: ManagedServiceOrder["status"]) {
-  switch (status) {
-    case "completed":
-      return "bg-emerald-500";
-    case "cancelled":
-      return "bg-red-500";
-    case "in_progress":
-      return "bg-blue-500";
-    case "scheduled":
-      return "bg-amber-500";
-    default:
-      return "bg-slate-500";
-  }
+export function getServiceAgendaStatusBadgeClass(status: ManagedServiceOrder["status"]) {
+  return getServiceOrderStatusBadgeClass(status);
 }
 
 export function formatAgendaDateKey(date: Date) {

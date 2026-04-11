@@ -67,7 +67,7 @@ import type {
   UpdateServiceOrderInput,
 } from "@/lib/service-orders-admin";
 import type { ManagedServiceType } from "@/lib/service-types-admin";
-import { getSemanticStatusBadgeClass } from "@/lib/status-badge";
+import { getServiceOrderStatusBadgeClass } from "@/lib/status-badge";
 import { useI18n, useLocale } from "@/i18n/provider";
 import { toast } from "sonner";
 
@@ -382,14 +382,7 @@ function DateFilterControl({
 }
 
 function getStatusBadgeClass(status: ManagedServiceOrder["status"]) {
-  switch (status) {
-    case "in_progress":
-      return "bg-blue-500/10 text-blue-700 dark:text-blue-400";
-    case "scheduled":
-      return "bg-amber-500/10 text-amber-700 dark:text-amber-400";
-    default:
-      return getSemanticStatusBadgeClass(status, "bg-muted text-muted-foreground");
-  }
+  return getServiceOrderStatusBadgeClass(status);
 }
 
 function getStatusLabel(status: ManagedServiceOrder["status"], t: ReturnType<typeof useI18n>["t"]) {
