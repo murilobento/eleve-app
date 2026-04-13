@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-import { fuelTypeSchema, type FuelType } from "@/lib/fuel-admin";
 import { requisitionStatusSchema } from "@/lib/maintenance-requisitions-admin";
 
 const relationIdSchema = (label: string) => z.string().uuid(`Select a valid ${label}.`);
@@ -34,17 +33,17 @@ const optionalDateSchema = (label: string) =>
     .transform((value) => (value && value.length > 0 ? value : undefined))
     .refine((value) => !value || /^\d{4}-\d{2}-\d{2}$/.test(value), `${label} must be a valid date.`);
 
-export const createFuelRequisitionSchema = z.object({
+export const createPartsRequisitionSchema = z.object({
   equipmentId: relationIdSchema("equipment"),
   supplierId: relationIdSchema("supplier"),
   scheduledDate: dateSchema("Scheduled date"),
-  fuelType: fuelTypeSchema.optional(),
+  description: textFieldSchema("Description"),
   notes: optionalTextFieldSchema("Notes"),
 });
 
-export const updateFuelRequisitionSchema = createFuelRequisitionSchema;
+export const updatePartsRequisitionSchema = createPartsRequisitionSchema;
 
-export const updateFuelRequisitionStatusSchema = z.object({
+export const updatePartsRequisitionStatusSchema = z.object({
   status: requisitionStatusSchema,
   completedAt: optionalDateSchema("Completed at"),
   completionNotes: optionalTextFieldSchema("Completion notes"),
@@ -66,11 +65,11 @@ export const updateFuelRequisitionStatusSchema = z.object({
   }
 });
 
-export type CreateFuelRequisitionInput = z.infer<typeof createFuelRequisitionSchema>;
-export type UpdateFuelRequisitionInput = z.infer<typeof updateFuelRequisitionSchema>;
-export type UpdateFuelRequisitionStatusInput = z.infer<typeof updateFuelRequisitionStatusSchema>;
+export type CreatePartsRequisitionInput = z.infer<typeof createPartsRequisitionSchema>;
+export type UpdatePartsRequisitionInput = z.infer<typeof updatePartsRequisitionSchema>;
+export type UpdatePartsRequisitionStatusInput = z.infer<typeof updatePartsRequisitionStatusSchema>;
 
-export type ManagedFuelRequisition = {
+export type ManagedPartsRequisition = {
   id: string;
   number: string;
   revisionNumber: number;
@@ -84,9 +83,9 @@ export type ManagedFuelRequisition = {
   requesterUserId: string | null;
   requesterNameSnapshot: string | null;
   requesterEmailSnapshot: string | null;
-  status: "draft" | "issued" | "completed" | "cancelled";
+  status: z.infer<typeof requisitionStatusSchema>;
   scheduledDate: string;
-  fuelType: FuelType | null;
+  description: string;
   notes: string | null;
   completionNotes: string | null;
   issuedAt: string | null;

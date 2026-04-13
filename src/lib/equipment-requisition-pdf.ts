@@ -3,7 +3,8 @@ import { getPdfBrowserLaunchOptions, resolvePdfBrowserExecutablePath } from "@/l
 
 import type { ManagedCompany } from "@/lib/company-admin";
 import type { ManagedFuelRequisition } from "@/lib/fuel-requisitions-admin";
-import type { ManagedMaintenanceRequisition } from "@/lib/maintenance-requisitions-admin";
+import type { ManagedMaintenanceRequisition, RequisitionStatus } from "@/lib/maintenance-requisitions-admin";
+import type { ManagedPartsRequisition } from "@/lib/parts-requisitions-admin";
 import type { ManagedSupplier } from "@/lib/suppliers-admin";
 import { formatCnpj, formatPhone, formatPostalCode } from "@/lib/utils";
 
@@ -18,6 +19,10 @@ type MaintenancePdfPayload = RequisitionPdfBasePayload & {
 
 type FuelPdfPayload = RequisitionPdfBasePayload & {
   requisition: ManagedFuelRequisition;
+};
+
+type PartsPdfPayload = RequisitionPdfBasePayload & {
+  requisition: ManagedPartsRequisition;
 };
 
 function escapeHtml(value: string) {
@@ -43,6 +48,19 @@ function formatDateTime(value: string | null | undefined) {
   }
 
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
+}
+
+function translateRequisitionStatus(status: RequisitionStatus) {
+  switch (status) {
+    case "draft":
+      return "Rascunho";
+    case "issued":
+      return "Emitida";
+    case "completed":
+      return "Concluida";
+    case "cancelled":
+      return "Cancelada";
+  }
 }
 
 function renderBaseHtml(args: {
@@ -191,7 +209,7 @@ export function renderMaintenanceRequisitionPdfHtml(payload: MaintenancePdfPaylo
     title: "Requisicao de Manutencao",
     number: payload.requisition.number,
     revisionNumber: payload.requisition.revisionNumber,
-    status: payload.requisition.status,
+    status: translateRequisitionStatus(payload.requisition.status),
     issuedAt: payload.requisition.issuedAt,
     scheduledDate: payload.requisition.scheduledDate,
     equipmentLabel: `${payload.requisition.equipmentName} • ${payload.requisition.equipmentBrand} • ${payload.requisition.equipmentModel}`,
@@ -209,19 +227,55 @@ export function renderFuelRequisitionPdfHtml(payload: FuelPdfPayload) {
   const requesterLabel = payload.requisition.requesterNameSnapshot
     || payload.requisition.requesterEmailSnapshot
     || "-";
+  const fuelTypeLabel = payload.requisition.fuelType
+    ? {
+      diesel: "Diesel",
+      gasoline: "Gasolina",
+      ethanol: "Etanol",
+      gnv: "GNV",
+      other: "Outro",
+    }[payload.requisition.fuelType]
+    : null;
+  const bodyBlockContent = [
+    fuelTypeLabel ? `Combustivel: ${escapeHtml(fuelTypeLabel)}` : "",
+    payload.requisition.notes ? `Observacoes:\n${escapeHtml(payload.requisition.notes)}` : "",
+  ].filter(Boolean).join("\n\n") || "-";
 
   return renderBaseHtml({
     title: "Requisicao de Abastecimento",
     number: payload.requisition.number,
     revisionNumber: payload.requisition.revisionNumber,
-    status: payload.requisition.status,
+    status: translateRequisitionStatus(payload.requisition.status),
     issuedAt: payload.requisition.issuedAt,
     scheduledDate: payload.requisition.scheduledDate,
     equipmentLabel: `${payload.requisition.equipmentName} • ${payload.requisition.equipmentBrand} • ${payload.requisition.equipmentModel}`,
     supplier: payload.supplier,
     requesterLabel,
     bodyBlockTitle: "Instrucoes",
-    bodyBlockContent: payload.requisition.notes ? escapeHtml(payload.requisition.notes) : "-",
+    bodyBlockContent,
+    completionNotes: payload.requisition.completionNotes,
+    company: payload.company,
+  });
+}
+
+export function renderPartsRequisitionPdfHtml(payload: PartsPdfPayload) {
+  const requesterLabel = payload.requisition.requesterNameSnapshot
+    || payload.requisition.requesterEmailSnapshot
+    || "-";
+
+  return renderBaseHtml({
+    title: "Requisicao de Pecas",
+    number: payload.requisition.number,
+    revisionNumber: payload.requisition.revisionNumber,
+    status: translateRequisitionStatus(payload.requisition.status),
+    issuedAt: payload.requisition.issuedAt,
+    scheduledDate: payload.requisition.scheduledDate,
+    equipmentLabel: `${payload.requisition.equipmentName} • ${payload.requisition.equipmentBrand} • ${payload.requisition.equipmentModel}`,
+    supplier: payload.supplier,
+    requesterLabel,
+    bodyBlockTitle: "Descricao da requisicao",
+    bodyBlockContent: escapeHtml(payload.requisition.description)
+      + (payload.requisition.notes ? `\n\nObservacoes:\n${escapeHtml(payload.requisition.notes)}` : ""),
     completionNotes: payload.requisition.completionNotes,
     company: payload.company,
   });
@@ -260,4 +314,8 @@ export async function renderMaintenanceRequisitionPdf(payload: MaintenancePdfPay
 
 export async function renderFuelRequisitionPdf(payload: FuelPdfPayload) {
   return renderPdfFromHtml(renderFuelRequisitionPdfHtml(payload));
+}
+
+export async function renderPartsRequisitionPdf(payload: PartsPdfPayload) {
+  return renderPdfFromHtml(renderPartsRequisitionPdfHtml(payload));
 }

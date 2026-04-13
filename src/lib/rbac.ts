@@ -39,6 +39,10 @@ import type {
   UpdateMaintenanceRequisitionStatusInput,
 } from "@/lib/maintenance-requisitions-admin";
 import type {
+  ManagedPartsRequisition,
+  UpdatePartsRequisitionStatusInput,
+} from "@/lib/parts-requisitions-admin";
+import type {
   ManagedServiceOrder,
   ManagedServiceOrderItem,
   ManagedServiceOrderStatusHistory,
@@ -224,6 +228,34 @@ type FuelRequisitionRow = {
   requester_email_snapshot: string | null;
   status: RequisitionStatus;
   scheduled_date: string;
+  fuel_type: FuelType | null;
+  notes: string | null;
+  completion_notes: string | null;
+  issued_at: string | null;
+  last_issued_at: string | null;
+  completed_at: string | null;
+  cancelled_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type PartsRequisitionRow = {
+  id: string;
+  number: string;
+  revision_number: string | number;
+  equipment_id: string;
+  equipment_name: string;
+  equipment_brand: string;
+  equipment_model: string;
+  supplier_id: string;
+  supplier_name: string;
+  supplier_type: SupplierType;
+  requester_user_id: string | null;
+  requester_name_snapshot: string | null;
+  requester_email_snapshot: string | null;
+  status: RequisitionStatus;
+  scheduled_date: string;
+  description: string;
   notes: string | null;
   completion_notes: string | null;
   issued_at: string | null;
@@ -735,8 +767,42 @@ async function ensureSchema() {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS parts_requisitions (
+      id text PRIMARY KEY,
+      number text NOT NULL UNIQUE,
+      revision_number integer NOT NULL DEFAULT 1,
+      equipment_id text NOT NULL REFERENCES equipment(id) ON DELETE RESTRICT,
+      supplier_id text NOT NULL REFERENCES suppliers(id) ON DELETE RESTRICT,
+      requester_user_id text REFERENCES "user"(id) ON DELETE SET NULL,
+      requester_name_snapshot text,
+      requester_email_snapshot text,
+      status text NOT NULL DEFAULT 'draft',
+      scheduled_date date NOT NULL,
+      description text NOT NULL,
+      notes text,
+      completion_notes text,
+      issued_at timestamptz,
+      last_issued_at timestamptz,
+      completed_at date,
+      cancelled_at timestamptz,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS parts_requisitions_status_idx
+    ON parts_requisitions (status, scheduled_date DESC);
+  `);
+
+  await pool.query(`
     ALTER TABLE fuel_requisitions
     ALTER COLUMN notes DROP NOT NULL;
+  `);
+
+  await pool.query(`
+    ALTER TABLE fuel_requisitions
+    ADD COLUMN IF NOT EXISTS fuel_type text;
   `);
 
   await pool.query(`
@@ -1755,6 +1821,36 @@ function mapFuelRequisitionRow(row: FuelRequisitionRow): ManagedFuelRequisition 
     requesterEmailSnapshot: row.requester_email_snapshot,
     status: row.status,
     scheduledDate: row.scheduled_date.slice(0, 10),
+    fuelType: row.fuel_type,
+    notes: row.notes,
+    completionNotes: row.completion_notes,
+    issuedAt: row.issued_at,
+    lastIssuedAt: row.last_issued_at,
+    completedAt: formatDateOnly(row.completed_at),
+    cancelledAt: row.cancelled_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapPartsRequisitionRow(row: PartsRequisitionRow): ManagedPartsRequisition {
+  return {
+    id: row.id,
+    number: row.number,
+    revisionNumber: Number(row.revision_number),
+    equipmentId: row.equipment_id,
+    equipmentName: row.equipment_name,
+    equipmentBrand: row.equipment_brand,
+    equipmentModel: row.equipment_model,
+    supplierId: row.supplier_id,
+    supplierName: row.supplier_name,
+    supplierType: row.supplier_type,
+    requesterUserId: row.requester_user_id,
+    requesterNameSnapshot: row.requester_name_snapshot,
+    requesterEmailSnapshot: row.requester_email_snapshot,
+    status: row.status,
+    scheduledDate: row.scheduled_date.slice(0, 10),
+    description: row.description,
     notes: row.notes,
     completionNotes: row.completion_notes,
     issuedAt: row.issued_at,
@@ -2013,6 +2109,10 @@ function formatMaintenanceRequisitionNumber(sequence: number) {
 
 function formatFuelRequisitionNumber(sequence: number) {
   return `REQ-AB-${sequence.toString().padStart(6, "0")}`;
+}
+
+function formatPartsRequisitionNumber(sequence: number) {
+  return `REQ-PC-${sequence.toString().padStart(6, "0")}`;
 }
 
 async function assertBudgetRelationsExist(input: {
@@ -3351,6 +3451,15 @@ export async function deleteEquipment(equipmentId: string) {
     throw new Error("Remove fuel requisitions linked to this equipment before deleting it.");
   }
 
+  const partsReqCount = await pool.query<{ total: string }>(
+    `SELECT COUNT(*)::text AS total FROM parts_requisitions WHERE equipment_id = $1`,
+    [equipmentId],
+  );
+
+  if (Number(partsReqCount.rows[0]?.total ?? "0") > 0) {
+    throw new Error("Remove parts requisitions linked to this equipment before deleting it.");
+  }
+
   await pool.query(`DELETE FROM equipment WHERE id = $1`, [equipmentId]);
 }
 
@@ -3960,6 +4069,19 @@ async function nextFuelRequisitionNumber() {
   return formatFuelRequisitionNumber(current + 1);
 }
 
+async function nextPartsRequisitionNumber() {
+  const result = await pool.query<{ max_sequence: string }>(
+    `
+      SELECT COALESCE(MAX(CAST(SUBSTRING(number FROM 8) AS integer)), 0)::text AS max_sequence
+      FROM parts_requisitions
+      WHERE number LIKE 'REQ-PC-%'
+    `,
+  );
+
+  const current = Number(result.rows[0]?.max_sequence ?? "0");
+  return formatPartsRequisitionNumber(current + 1);
+}
+
 export async function listSuppliers(): Promise<ManagedSupplier[]> {
   await bootstrapRbac();
   const result = await pool.query<SupplierRow>(
@@ -4250,6 +4372,15 @@ export async function deleteSupplier(supplierId: string) {
     throw new Error("Remove fuel requisitions linked to this supplier before deleting it.");
   }
 
+  const partsReqCount = await pool.query<{ total: string }>(
+    `SELECT COUNT(*)::text AS total FROM parts_requisitions WHERE supplier_id = $1`,
+    [supplierId],
+  );
+
+  if (Number(partsReqCount.rows[0]?.total ?? "0") > 0) {
+    throw new Error("Remove parts requisitions linked to this supplier before deleting it.");
+  }
+
   await pool.query(`DELETE FROM suppliers WHERE id = $1`, [supplierId]);
 }
 
@@ -4538,6 +4669,7 @@ export async function listFuelRequisitions(): Promise<ManagedFuelRequisition[]> 
         fr.requester_email_snapshot,
         fr.status,
         fr.scheduled_date::text,
+        fr.fuel_type,
         fr.notes,
         fr.completion_notes,
         fr.issued_at,
@@ -4576,6 +4708,7 @@ export async function getFuelRequisitionById(id: string): Promise<ManagedFuelReq
         fr.requester_email_snapshot,
         fr.status,
         fr.scheduled_date::text,
+        fr.fuel_type,
         fr.notes,
         fr.completion_notes,
         fr.issued_at,
@@ -4601,6 +4734,7 @@ export async function createFuelRequisition(input: {
   equipmentId: string;
   supplierId: string;
   scheduledDate: string;
+  fuelType?: FuelType;
   notes?: string;
   requester?: RequisitionRequester;
 }) {
@@ -4625,9 +4759,10 @@ export async function createFuelRequisition(input: {
         requester_email_snapshot,
         status,
         scheduled_date,
+        fuel_type,
         notes
       )
-      VALUES ($1, $2, 1, $3, $4, $5, $6, $7, 'draft', $8, $9)
+      VALUES ($1, $2, 1, $3, $4, $5, $6, $7, 'draft', $8, $9, $10)
     `,
     [
       id,
@@ -4638,6 +4773,7 @@ export async function createFuelRequisition(input: {
       normalizedRequester.name,
       normalizedRequester.email,
       input.scheduledDate,
+      input.fuelType ?? null,
       input.notes?.trim() || null,
     ],
   );
@@ -4651,6 +4787,7 @@ export async function updateFuelRequisition(
     equipmentId: string;
     supplierId: string;
     scheduledDate: string;
+    fuelType?: FuelType;
     notes?: string;
   },
 ) {
@@ -4675,8 +4812,9 @@ export async function updateFuelRequisition(
       SET equipment_id = $2,
           supplier_id = $3,
           scheduled_date = $4,
-          notes = $5,
-          revision_number = revision_number + $6,
+          fuel_type = $5,
+          notes = $6,
+          revision_number = revision_number + $7,
           last_issued_at = CASE WHEN status = 'issued' THEN now() ELSE last_issued_at END,
           updated_at = now()
       WHERE id = $1
@@ -4686,6 +4824,7 @@ export async function updateFuelRequisition(
       input.equipmentId,
       input.supplierId,
       input.scheduledDate,
+      input.fuelType ?? null,
       input.notes?.trim() || null,
       revisionIncrement,
     ],
@@ -4743,6 +4882,241 @@ export async function deleteFuelRequisition(id: string) {
   }
 
   await pool.query(`DELETE FROM fuel_requisitions WHERE id = $1`, [id]);
+}
+
+export async function listPartsRequisitions(): Promise<ManagedPartsRequisition[]> {
+  await bootstrapRbac();
+  const result = await pool.query<PartsRequisitionRow>(
+    `
+      SELECT
+        pr.id,
+        pr.number,
+        pr.revision_number,
+        pr.equipment_id,
+        e.name AS equipment_name,
+        e.brand AS equipment_brand,
+        e.model AS equipment_model,
+        pr.supplier_id,
+        s.legal_name AS supplier_name,
+        s.supplier_type,
+        pr.requester_user_id,
+        pr.requester_name_snapshot,
+        pr.requester_email_snapshot,
+        pr.status,
+        pr.scheduled_date::text,
+        pr.description,
+        pr.notes,
+        pr.completion_notes,
+        pr.issued_at,
+        pr.last_issued_at,
+        pr.completed_at::text,
+        pr.cancelled_at,
+        pr.created_at,
+        pr.updated_at
+      FROM parts_requisitions pr
+      INNER JOIN equipment e ON e.id = pr.equipment_id
+      INNER JOIN suppliers s ON s.id = pr.supplier_id
+      ORDER BY pr.updated_at DESC, pr.number DESC
+    `,
+  );
+
+  return result.rows.map(mapPartsRequisitionRow);
+}
+
+export async function getPartsRequisitionById(id: string): Promise<ManagedPartsRequisition | null> {
+  await bootstrapRbac();
+  const result = await pool.query<PartsRequisitionRow>(
+    `
+      SELECT
+        pr.id,
+        pr.number,
+        pr.revision_number,
+        pr.equipment_id,
+        e.name AS equipment_name,
+        e.brand AS equipment_brand,
+        e.model AS equipment_model,
+        pr.supplier_id,
+        s.legal_name AS supplier_name,
+        s.supplier_type,
+        pr.requester_user_id,
+        pr.requester_name_snapshot,
+        pr.requester_email_snapshot,
+        pr.status,
+        pr.scheduled_date::text,
+        pr.description,
+        pr.notes,
+        pr.completion_notes,
+        pr.issued_at,
+        pr.last_issued_at,
+        pr.completed_at::text,
+        pr.cancelled_at,
+        pr.created_at,
+        pr.updated_at
+      FROM parts_requisitions pr
+      INNER JOIN equipment e ON e.id = pr.equipment_id
+      INNER JOIN suppliers s ON s.id = pr.supplier_id
+      WHERE pr.id = $1
+      LIMIT 1
+    `,
+    [id],
+  );
+
+  const row = result.rows[0];
+  return row ? mapPartsRequisitionRow(row) : null;
+}
+
+export async function createPartsRequisition(input: {
+  equipmentId: string;
+  supplierId: string;
+  scheduledDate: string;
+  description: string;
+  notes?: string;
+  requester?: RequisitionRequester;
+}) {
+  await bootstrapRbac();
+  await assertEquipmentExists(input.equipmentId);
+  await assertSupplierExists(input.supplierId);
+
+  const number = await nextPartsRequisitionNumber();
+  const normalizedRequester = normalizeRequester(input.requester);
+  const id = randomUUID();
+
+  await pool.query(
+    `
+      INSERT INTO parts_requisitions (
+        id,
+        number,
+        revision_number,
+        equipment_id,
+        supplier_id,
+        requester_user_id,
+        requester_name_snapshot,
+        requester_email_snapshot,
+        status,
+        scheduled_date,
+        description,
+        notes
+      )
+      VALUES ($1, $2, 1, $3, $4, $5, $6, $7, 'draft', $8, $9, $10)
+    `,
+    [
+      id,
+      number,
+      input.equipmentId,
+      input.supplierId,
+      normalizedRequester.userId,
+      normalizedRequester.name,
+      normalizedRequester.email,
+      input.scheduledDate,
+      input.description.trim(),
+      input.notes?.trim() || null,
+    ],
+  );
+
+  return id;
+}
+
+export async function updatePartsRequisition(
+  id: string,
+  input: {
+    equipmentId: string;
+    supplierId: string;
+    scheduledDate: string;
+    description: string;
+    notes?: string;
+  },
+) {
+  await bootstrapRbac();
+  const current = await getPartsRequisitionById(id);
+
+  if (!current) {
+    throw new Error("Parts requisition not found.");
+  }
+
+  if (current.status === "completed" || current.status === "cancelled") {
+    throw new Error("Completed or cancelled requisitions cannot be edited.");
+  }
+
+  await assertEquipmentExists(input.equipmentId);
+  await assertSupplierExists(input.supplierId);
+
+  const revisionIncrement = current.status === "issued" ? 1 : 0;
+  await pool.query(
+    `
+      UPDATE parts_requisitions
+      SET equipment_id = $2,
+          supplier_id = $3,
+          scheduled_date = $4,
+          description = $5,
+          notes = $6,
+          revision_number = revision_number + $7,
+          last_issued_at = CASE WHEN status = 'issued' THEN now() ELSE last_issued_at END,
+          updated_at = now()
+      WHERE id = $1
+    `,
+    [
+      id,
+      input.equipmentId,
+      input.supplierId,
+      input.scheduledDate,
+      input.description.trim(),
+      input.notes?.trim() || null,
+      revisionIncrement,
+    ],
+  );
+}
+
+export async function updatePartsRequisitionStatus(
+  id: string,
+  input: UpdatePartsRequisitionStatusInput,
+) {
+  await bootstrapRbac();
+  const current = await getPartsRequisitionById(id);
+
+  if (!current) {
+    throw new Error("Parts requisition not found.");
+  }
+
+  assertValidRequisitionStatusTransition(current.status, input.status);
+
+  await pool.query(
+    `
+      UPDATE parts_requisitions
+      SET status = $2,
+          issued_at = CASE WHEN $2 = 'issued' AND issued_at IS NULL THEN now() ELSE issued_at END,
+          last_issued_at = CASE WHEN $2 = 'issued' THEN now() ELSE last_issued_at END,
+          completed_at = CASE WHEN $2 = 'completed' THEN $3::date ELSE completed_at END,
+          completion_notes = CASE
+            WHEN $2 = 'completed' THEN $4
+            WHEN $2 = 'cancelled' THEN $4
+            ELSE completion_notes
+          END,
+          cancelled_at = CASE WHEN $2 = 'cancelled' THEN now() ELSE cancelled_at END,
+          updated_at = now()
+      WHERE id = $1
+    `,
+    [
+      id,
+      input.status,
+      input.completedAt ?? null,
+      input.completionNotes?.trim() || null,
+    ],
+  );
+}
+
+export async function deletePartsRequisition(id: string) {
+  await bootstrapRbac();
+  const current = await getPartsRequisitionById(id);
+
+  if (!current) {
+    throw new Error("Parts requisition not found.");
+  }
+
+  if (current.status !== "draft") {
+    throw new Error("Only draft requisitions can be deleted.");
+  }
+
+  await pool.query(`DELETE FROM parts_requisitions WHERE id = $1`, [id]);
 }
 
 export async function listServiceTypes() {

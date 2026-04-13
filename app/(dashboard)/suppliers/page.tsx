@@ -91,11 +91,28 @@ type PostalCodeLookupResponse = {
   postalCode: PostalCodeLookupResult;
 };
 
-async function parseResponse<T>(response: Response): Promise<T> {
+function getLocalizedSupplierError(message: string, t: ReturnType<typeof useI18n>["t"]) {
+  switch (message) {
+    case "Supplier not found.":
+      return t("suppliers.errors.notFound");
+    case "Remove maintenance requisitions linked to this supplier before deleting it.":
+      return t("suppliers.errors.removeLinkedMaintenanceRequisitions");
+    case "Remove fuel requisitions linked to this supplier before deleting it.":
+      return t("suppliers.errors.removeLinkedFuelRequisitions");
+    case "Remove parts requisitions linked to this supplier before deleting it.":
+      return t("suppliers.errors.removeLinkedPartsRequisitions");
+    case "Request failed.":
+      return t("common.requestFailed");
+    default:
+      return message;
+  }
+}
+
+async function parseResponse<T>(response: Response, t: ReturnType<typeof useI18n>["t"]): Promise<T> {
   const payload = await response.json().catch(() => null);
 
   if (!response.ok) {
-    throw new Error(payload?.error || "Request failed.");
+    throw new Error(getLocalizedSupplierError(payload?.error || "Request failed.", t));
   }
 
   return payload as T;
@@ -238,7 +255,7 @@ export default function SuppliersPage() {
   async function loadSuppliers() {
     setLoading(true);
     try {
-      const payload = await parseResponse<SuppliersResponse>(await fetch("/api/suppliers", { cache: "no-store" }));
+      const payload = await parseResponse<SuppliersResponse>(await fetch("/api/suppliers", { cache: "no-store" }), t);
       setSuppliers(payload.suppliers);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t("suppliers.loadError"));
@@ -307,6 +324,7 @@ export default function SuppliersPage() {
             await fetch(`/api/suppliers/${id}`, {
               method: "DELETE",
             }),
+            t,
           );
         }),
       );
@@ -349,6 +367,7 @@ export default function SuppliersPage() {
         await fetch(`/api/suppliers/document?cnpj=${document}`, {
           cache: "no-store",
         }),
+        t,
       );
 
       form.setValue("document", formatCnpj(payload.document.document), { shouldDirty: true, shouldValidate: true });
@@ -386,6 +405,7 @@ export default function SuppliersPage() {
         await fetch(`/api/suppliers/postal-code?postalCode=${postalCode}`, {
           cache: "no-store",
         }),
+        t,
       );
 
       form.setValue("postalCode", formatPostalCode(payload.postalCode.postalCode), { shouldDirty: true, shouldValidate: true });
@@ -413,6 +433,7 @@ export default function SuppliersPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(values),
         }),
+        t,
       );
     }, editing ? t("common.supplierUpdateSuccess") : t("common.supplierCreateSuccess"));
 
@@ -1190,15 +1211,15 @@ export default function SuppliersPage() {
           }}
           description={deleting ? t("suppliers.confirmDelete", { name: deleting.tradeName || deleting.legalName }) : ""}
           onConfirm={async () => {
-            if (!deleting) {
-              return;
-            }
+          if (!deleting) {
+            return;
+          }
 
-            await runMutation(async () => {
-              await parseResponse(await fetch(`/api/suppliers/${deleting.id}`, { method: "DELETE" }));
-            }, t("common.supplierDeleteSuccess"));
-            setDeleting(null);
-          }}
+          await runMutation(async () => {
+              await parseResponse(await fetch(`/api/suppliers/${deleting.id}`, { method: "DELETE" }), t);
+          }, t("common.supplierDeleteSuccess"));
+          setDeleting(null);
+        }}
           isLoading={isMutating}
         />
       ) : null}

@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Calendar as CalendarIcon,
   Clock,
+  Info,
   FileDown,
   MapPin,
   Truck,
@@ -29,6 +30,7 @@ import { cn, getAppUrl } from "@/lib/utils"
 import { useI18n, useLocale } from "@/i18n/provider"
 import { getDateFnsLocale } from "@/lib/date-locale"
 import { formatAgendaDateKey } from "@/lib/service-agenda"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { type CalendarEvent } from "../types"
 
 const HOUR_ROW_HEIGHT = 60
@@ -113,6 +115,7 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
   const locale = useLocale()
   const { canRead, canUpdate } = useResourcePermissions("service-orders")
   const dateLocale = getDateFnsLocale(locale)
+  const isMobile = useIsMobile()
   const calendarEvents = events ?? []
 
   const [currentDate, setCurrentDate] = useState(selectedDate || new Date())
@@ -362,6 +365,46 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
                       const width = `calc((100% - ${horizontalPadding * 2}px - ${(groupColumns - 1) * horizontalGap}px) / ${groupColumns})`
                       const left = `calc(${horizontalPadding}px + ${columnIndex} * (${width} + ${horizontalGap}px))`
 
+                      if (isMobile) {
+                        return (
+                          <button
+                            key={event.id}
+                            type="button"
+                            className={cn(
+                              "absolute right-3 flex items-center justify-between gap-2 rounded-md border px-2 py-1 text-left shadow-sm transition-shadow hover:shadow-md",
+                              event.color
+                            )}
+                            style={{
+                              top: `${top + 2}px`,
+                              left,
+                              width,
+                              height: `${height}px`,
+                            }}
+                            onClick={() => handleEventClick(event)}
+                            aria-label={t("calendar.eventDetails")}
+                          >
+                            <div className="flex min-w-0 items-center gap-1.5 text-[10px] uppercase">
+                              <Truck className="h-3 w-3 shrink-0" />
+                              <span className="truncate font-semibold">
+                                {event.equipmentName || event.title}
+                              </span>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-1">
+                              <Badge
+                                variant="secondary"
+                                className={cn(
+                                  "border-transparent px-1.5 py-0 text-[9px]",
+                                  event.color
+                                )}
+                              >
+                                {getEventStatusLabel(event.status) ?? getEventTypeLabel(event.type)}
+                              </Badge>
+                              <Info className="size-3 shrink-0" />
+                            </div>
+                          </button>
+                        )
+                      }
+
                       return (
                         <button
                           key={event.id}
@@ -398,8 +441,14 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
                                 </div>
                               ) : null}
                             </div>
-                            <Badge variant="secondary" className="shrink-0 px-1.5 py-0 text-[10px] border-transparent bg-background/70 text-current hover:bg-background/70">
-                              {event.equipmentTypeName || getEventTypeLabel(event.type)}
+                            <Badge
+                              variant="secondary"
+                              className={cn(
+                                "shrink-0 border-transparent px-1.5 py-0 text-[10px]",
+                                event.color
+                              )}
+                            >
+                              {getEventStatusLabel(event.status) ?? getEventTypeLabel(event.type)}
                             </Badge>
                           </div>
                         </button>
@@ -419,8 +468,12 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
     )
   }
   const currentPeriodLabel = format(currentDate, "PPP", { locale: dateLocale })
+  const canEditSelectedEvent = canUpdate
+    && selectedEvent?.status !== "completed"
+    && selectedEvent?.status !== "cancelled"
+
   const handleOpenServiceOrderEdit = () => {
-    if (!selectedEvent?.serviceOrderId) {
+    if (!selectedEvent?.serviceOrderId || !canEditSelectedEvent) {
       return
     }
 
@@ -593,7 +646,7 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
               ) : null}
 
               <div className="flex justify-end gap-2 pt-2">
-                {canUpdate ? (
+                {canEditSelectedEvent ? (
                   <Button
                     className="cursor-pointer"
                     onClick={handleOpenServiceOrderEdit}

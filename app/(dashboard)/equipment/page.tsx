@@ -33,6 +33,8 @@ function getLocalizedEquipmentError(message: string, t: ReturnType<typeof useI18
       return t("equipment.errors.removeLinkedMaintenanceRequisitions");
     case "Remove fuel requisitions linked to this equipment before deleting it.":
       return t("equipment.errors.removeLinkedFuelRequisitions");
+    case "Remove parts requisitions linked to this equipment before deleting it.":
+      return t("equipment.errors.removeLinkedPartsRequisitions");
     case "Request failed.":
       return t("common.requestFailed");
     default:
