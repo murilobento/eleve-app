@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { requisitionStatusSchema } from "@/lib/maintenance-requisitions-admin";
+import type { SupplierType } from "@/lib/suppliers-admin";
 
 const relationIdSchema = (label: string) => z.string().uuid(`Select a valid ${label}.`);
 
@@ -79,7 +80,7 @@ export type ManagedPartsRequisition = {
   equipmentModel: string;
   supplierId: string;
   supplierName: string;
-  supplierType: "fuel_station" | "workshop" | "other";
+  supplierTypes: SupplierType[];
   requesterUserId: string | null;
   requesterNameSnapshot: string | null;
   requesterEmailSnapshot: string | null;

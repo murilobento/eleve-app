@@ -82,6 +82,18 @@ type PartsResponse = {
   suppliers: SupplierOption[];
 };
 
+type MaintenanceMutationResponse = {
+  maintenanceRequisition: ManagedMaintenanceRequisition | null;
+};
+
+type FuelMutationResponse = {
+  fuelRequisition: ManagedFuelRequisition | null;
+};
+
+type PartsMutationResponse = {
+  partsRequisition: ManagedPartsRequisition | null;
+};
+
 type MaintenanceFormState = {
   equipmentId: string;
   supplierId: string;
@@ -226,6 +238,18 @@ export default function EquipmentRequisitionsPage() {
   const activeSupplierOptions = useMemo(
     () => suppliers.filter((item) => item.status === "active"),
     [suppliers],
+  );
+  const maintenanceSupplierOptions = useMemo(
+    () => activeSupplierOptions.filter((item) => item.supplierTypes.includes("mechanical") || item.supplierTypes.includes("electrical")),
+    [activeSupplierOptions],
+  );
+  const fuelSupplierOptions = useMemo(
+    () => activeSupplierOptions.filter((item) => item.supplierTypes.includes("fuel_station")),
+    [activeSupplierOptions],
+  );
+  const partsSupplierOptions = useMemo(
+    () => activeSupplierOptions.filter((item) => item.supplierTypes.includes("parts")),
+    [activeSupplierOptions],
   );
 
   const maintenanceVisible = useMemo(() => {
@@ -505,7 +529,7 @@ export default function EquipmentRequisitionsPage() {
               {canUpdate ? (
                 <DropdownMenuItem className="cursor-pointer" onClick={() => setEditMaintenance(item)} disabled={item.status === "completed" || item.status === "cancelled"}>
                   <Pencil className="mr-2 size-4" />
-                  {t("common.saveChanges")}
+                  {t("common.edit")}
                 </DropdownMenuItem>
               ) : null}
               {canUpdate && item.status === "draft" ? (
@@ -627,7 +651,7 @@ export default function EquipmentRequisitionsPage() {
               {canUpdate ? (
                 <DropdownMenuItem className="cursor-pointer" onClick={() => setEditFuel(item)} disabled={item.status === "completed" || item.status === "cancelled"}>
                   <Pencil className="mr-2 size-4" />
-                  {t("common.saveChanges")}
+                  {t("common.edit")}
                 </DropdownMenuItem>
               ) : null}
               {canUpdate && item.status === "draft" ? (
@@ -740,7 +764,7 @@ export default function EquipmentRequisitionsPage() {
               {canUpdate ? (
                 <DropdownMenuItem className="cursor-pointer" onClick={() => setEditParts(item)} disabled={item.status === "completed" || item.status === "cancelled"}>
                   <Pencil className="mr-2 size-4" />
-                  {t("common.saveChanges")}
+                  {t("common.edit")}
                 </DropdownMenuItem>
               ) : null}
               {canUpdate && item.status === "draft" ? (
@@ -873,19 +897,21 @@ export default function EquipmentRequisitionsPage() {
   const saveMaintenance = async () => {
     const path = editMaintenance ? `${getRequisitionBasePath("maintenance")}/${editMaintenance.id}` : getRequisitionBasePath("maintenance");
     const method = editMaintenance ? "PUT" : "POST";
+    let saved: ManagedMaintenanceRequisition | null = null;
 
     await runMutation(async () => {
-      await parseResponse(
+      const payload = await parseResponse<MaintenanceMutationResponse>(
         await fetch(path, {
           method,
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(maintenanceForm),
         }),
       );
+      saved = payload.maintenanceRequisition;
     }, editMaintenance ? t("common.requisitionUpdateSuccess") : t("common.requisitionCreateSuccess"));
 
-    if (editMaintenance?.status === "issued") {
-      await handleOpenPdf("maintenance", editMaintenance.id);
+    if (saved?.status === "issued") {
+      await handleOpenPdf("maintenance", saved.id);
     }
 
     closeMaintenanceDialog();
@@ -894,19 +920,21 @@ export default function EquipmentRequisitionsPage() {
   const saveFuel = async () => {
     const path = editFuel ? `${getRequisitionBasePath("fuel")}/${editFuel.id}` : getRequisitionBasePath("fuel");
     const method = editFuel ? "PUT" : "POST";
+    let saved: ManagedFuelRequisition | null = null;
 
     await runMutation(async () => {
-      await parseResponse(
+      const payload = await parseResponse<FuelMutationResponse>(
         await fetch(path, {
           method,
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(fuelForm),
         }),
       );
+      saved = payload.fuelRequisition;
     }, editFuel ? t("common.requisitionUpdateSuccess") : t("common.requisitionCreateSuccess"));
 
-    if (editFuel?.status === "issued") {
-      await handleOpenPdf("fuel", editFuel.id);
+    if (saved?.status === "issued") {
+      await handleOpenPdf("fuel", saved.id);
     }
 
     closeFuelDialog();
@@ -915,19 +943,21 @@ export default function EquipmentRequisitionsPage() {
   const saveParts = async () => {
     const path = editParts ? `${getRequisitionBasePath("parts")}/${editParts.id}` : getRequisitionBasePath("parts");
     const method = editParts ? "PUT" : "POST";
+    let saved: ManagedPartsRequisition | null = null;
 
     await runMutation(async () => {
-      await parseResponse(
+      const payload = await parseResponse<PartsMutationResponse>(
         await fetch(path, {
           method,
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(partsForm),
         }),
       );
+      saved = payload.partsRequisition;
     }, editParts ? t("common.requisitionUpdateSuccess") : t("common.requisitionCreateSuccess"));
 
-    if (editParts?.status === "issued") {
-      await handleOpenPdf("parts", editParts.id);
+    if (saved?.status === "issued") {
+      await handleOpenPdf("parts", saved.id);
     }
 
     closePartsDialog();
@@ -1226,7 +1256,7 @@ export default function EquipmentRequisitionsPage() {
               <Select value={maintenanceForm.supplierId} onValueChange={(value) => setMaintenanceForm((current) => ({ ...current, supplierId: value }))}>
                 <SelectTrigger className="w-full cursor-pointer"><SelectValue placeholder={t("equipmentRequisitions.selectSupplier")} /></SelectTrigger>
                 <SelectContent>
-                  {activeSupplierOptions.map((item) => (
+                  {maintenanceSupplierOptions.map((item) => (
                     <SelectItem key={item.id} value={item.id}>{supplierLabel(item)}</SelectItem>
                   ))}
                 </SelectContent>
@@ -1285,7 +1315,7 @@ export default function EquipmentRequisitionsPage() {
               <Select value={fuelForm.supplierId} onValueChange={(value) => setFuelForm((current) => ({ ...current, supplierId: value }))}>
                 <SelectTrigger className="w-full cursor-pointer"><SelectValue placeholder={t("equipmentRequisitions.selectSupplier")} /></SelectTrigger>
                 <SelectContent>
-                  {activeSupplierOptions.map((item) => (
+                  {fuelSupplierOptions.map((item) => (
                     <SelectItem key={item.id} value={item.id}>{supplierLabel(item)}</SelectItem>
                   ))}
                 </SelectContent>
@@ -1354,7 +1384,7 @@ export default function EquipmentRequisitionsPage() {
               <Select value={partsForm.supplierId} onValueChange={(value) => setPartsForm((current) => ({ ...current, supplierId: value }))}>
                 <SelectTrigger className="w-full cursor-pointer"><SelectValue placeholder={t("equipmentRequisitions.selectSupplier")} /></SelectTrigger>
                 <SelectContent>
-                  {activeSupplierOptions.map((item) => (
+                  {partsSupplierOptions.map((item) => (
                     <SelectItem key={item.id} value={item.id}>{supplierLabel(item)}</SelectItem>
                   ))}
                 </SelectContent>

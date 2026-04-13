@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const supplierTypeSchema = z.enum(["fuel_station", "workshop", "other"]);
+export const supplierTypeSchema = z.enum(["fuel_station", "mechanical", "electrical", "parts"]);
 export const supplierStatusSchema = z.enum(["active", "inactive"]);
 
 const textFieldSchema = z
@@ -61,8 +61,12 @@ const addressNumberSchema = z
   .min(1, "Number is required.")
   .max(20, "Number must be at most 20 characters.");
 
+const supplierTypesSchema = z
+  .array(supplierTypeSchema)
+  .min(1, "Select at least one supplier type.");
+
 const baseSupplierSchema = z.object({
-  supplierType: supplierTypeSchema,
+  supplierTypes: supplierTypesSchema,
   status: supplierStatusSchema,
   legalName: textFieldSchema,
   tradeName: optionalTextSchema,
@@ -108,13 +112,13 @@ export type SupplierOption = {
   id: string;
   legalName: string;
   tradeName: string | null;
-  supplierType: SupplierType;
+  supplierTypes: SupplierType[];
   status: SupplierStatus;
 };
 
 export type ManagedSupplier = {
   id: string;
-  supplierType: SupplierType;
+  supplierTypes: SupplierType[];
   status: SupplierStatus;
   legalName: string;
   tradeName: string | null;

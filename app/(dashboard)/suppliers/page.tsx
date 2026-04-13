@@ -70,6 +70,7 @@ import type {
   CreateSupplierInput,
   ManagedSupplier,
   PostalCodeLookupResult,
+  SupplierType,
   UpdateSupplierInput,
 } from "@/lib/suppliers-admin";
 import {
@@ -130,6 +131,8 @@ function formatDate(value: string, locale: string) {
   }).format(new Date(value));
 }
 
+const supplierTypeOptions: SupplierType[] = ["fuel_station", "mechanical", "electrical", "parts"];
+
 export default function SuppliersPage() {
   const { t } = useI18n();
   const locale = useLocale();
@@ -182,7 +185,7 @@ export default function SuppliersPage() {
       fields: [
         { label: t("suppliers.name"), value: getDisplayValue(viewing.legalName) },
         { label: t("suppliers.tradeName"), value: getDisplayValue(viewing.tradeName) },
-        { label: t("suppliers.type"), value: t(`suppliers.types.${viewing.supplierType}`) },
+        { label: t("suppliers.type"), value: viewing.supplierTypes.map((type) => t(`suppliers.types.${type}`)).join(", ") },
         { label: t("suppliers.document"), value: formatSupplierDocument(viewing.document) },
       ],
     },
@@ -226,7 +229,7 @@ export default function SuppliersPage() {
     mode: "onBlur",
     reValidateMode: "onBlur",
     defaultValues: {
-      supplierType: "workshop",
+      supplierTypes: ["mechanical"],
       status: "active",
       legalName: "",
       tradeName: "",
@@ -274,7 +277,7 @@ export default function SuppliersPage() {
     }
 
     form.reset({
-      supplierType: editing?.supplierType ?? "workshop",
+      supplierTypes: editing?.supplierTypes ?? ["mechanical"],
       status: editing?.status ?? "active",
       legalName: editing?.legalName ?? "",
       tradeName: editing?.tradeName ?? "",
@@ -488,10 +491,17 @@ export default function SuppliersPage() {
       ),
     });
     nextColumns.push({
-      accessorKey: "supplierType",
+      id: "supplierTypes",
       header: ({ column }) => <SortableHeader column={column} title={t("suppliers.type")} className="-ml-3" />,
-      cell: ({ row }) => <Badge variant="outline">{t(`suppliers.types.${row.original.supplierType}`)}</Badge>,
-      filterFn: "equals",
+      accessorFn: (row) => row.supplierTypes.join(","),
+      cell: ({ row }) => (
+        <div className="flex flex-wrap gap-1">
+          {row.original.supplierTypes.map((type) => (
+            <Badge key={type} variant="outline">{t(`suppliers.types.${type}`)}</Badge>
+          ))}
+        </div>
+      ),
+      filterFn: (row, _columnId, filterValue) => row.original.supplierTypes.includes(filterValue as SupplierType),
     });
     nextColumns.push({
       accessorKey: "document",
@@ -600,6 +610,7 @@ export default function SuppliersPage() {
         row.original.email ?? "",
         row.original.city,
         row.original.state,
+        ...row.original.supplierTypes.map((type) => t(`suppliers.types.${type}`)),
       ].some((item) => item.toLowerCase().includes(value));
     },
     state: {
@@ -615,7 +626,7 @@ export default function SuppliersPage() {
     },
   });
 
-  const typeFilter = (table.getColumn("supplierType")?.getFilterValue() as string) || "all";
+  const typeFilter = (table.getColumn("supplierTypes")?.getFilterValue() as string) || "all";
   const statusFilter = (table.getColumn("status")?.getFilterValue() as string) || "all";
   const selectedCount = table.getFilteredSelectedRowModel().rows.length;
   const activeFilterCount = [typeFilter, statusFilter].filter((value) => value !== "all").length;
@@ -630,7 +641,7 @@ export default function SuppliersPage() {
   };
 
   const handleApplyFilters = () => {
-    table.getColumn("supplierType")?.setFilterValue(draftTypeFilter === "all" ? undefined : draftTypeFilter);
+    table.getColumn("supplierTypes")?.setFilterValue(draftTypeFilter === "all" ? undefined : draftTypeFilter);
     table.getColumn("status")?.setFilterValue(draftStatusFilter === "all" ? undefined : draftStatusFilter);
     table.setPageIndex(0);
     setFiltersOpen(false);
@@ -701,8 +712,9 @@ export default function SuppliersPage() {
                     <SelectContent>
                       <SelectItem value="all">{t("suppliers.allTypes")}</SelectItem>
                       <SelectItem value="fuel_station">{t("suppliers.types.fuel_station")}</SelectItem>
-                      <SelectItem value="workshop">{t("suppliers.types.workshop")}</SelectItem>
-                      <SelectItem value="other">{t("suppliers.types.other")}</SelectItem>
+                      <SelectItem value="mechanical">{t("suppliers.types.mechanical")}</SelectItem>
+                      <SelectItem value="electrical">{t("suppliers.types.electrical")}</SelectItem>
+                      <SelectItem value="parts">{t("suppliers.types.parts")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -878,22 +890,31 @@ export default function SuppliersPage() {
               <div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)]">
                 <FormField
                   control={form.control}
-                  name="supplierType"
+                  name="supplierTypes"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>{t("suppliers.type")}</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger className="w-full cursor-pointer">
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="fuel_station">{t("suppliers.types.fuel_station")}</SelectItem>
-                          <SelectItem value="workshop">{t("suppliers.types.workshop")}</SelectItem>
-                          <SelectItem value="other">{t("suppliers.types.other")}</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <div className="grid gap-2 rounded-md border p-3 md:grid-cols-2">
+                        {supplierTypeOptions.map((type) => {
+                          const checked = field.value.includes(type);
+
+                          return (
+                            <label key={type} className="flex items-center gap-2 text-sm">
+                              <Checkbox
+                                checked={checked}
+                                onCheckedChange={(nextChecked) => {
+                                  field.onChange(
+                                    nextChecked
+                                      ? [...field.value, type]
+                                      : field.value.filter((value) => value !== type),
+                                  );
+                                }}
+                              />
+                              <span>{t(`suppliers.types.${type}`)}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
                     </FormItem>
                   )}
                 />
@@ -1173,9 +1194,11 @@ export default function SuppliersPage() {
         description={t("suppliers.detailsDescription")}
         subtitle={viewing ? (viewing.tradeName || viewing.contactName || viewing.email || null) : null}
         badges={viewing ? [
-          <Badge key="type" variant="outline">
-            {t(`suppliers.types.${viewing.supplierType}`)}
-          </Badge>,
+          ...viewing.supplierTypes.map((type) => (
+            <Badge key={type} variant="outline">
+              {t(`suppliers.types.${type}`)}
+            </Badge>
+          )),
           <Badge
             key="status"
             variant="secondary"

@@ -1,3 +1,4 @@
+import type { SupplierType } from "@/lib/suppliers-admin";
 import { z } from "zod";
 
 export const requisitionStatusSchema = z.enum(["draft", "issued", "completed", "cancelled"]);
@@ -80,7 +81,7 @@ export type ManagedMaintenanceRequisition = {
   equipmentModel: string;
   supplierId: string;
   supplierName: string;
-  supplierType: "fuel_station" | "workshop" | "other";
+  supplierTypes: SupplierType[];
   requesterUserId: string | null;
   requesterNameSnapshot: string | null;
   requesterEmailSnapshot: string | null;

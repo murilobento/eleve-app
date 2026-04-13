@@ -163,7 +163,8 @@ type FuelRecordRow = {
 
 type SupplierRow = {
   id: string;
-  supplier_type: SupplierType;
+  supplier_type: SupplierType | null;
+  supplier_types: SupplierType[] | null;
   status: SupplierStatus;
   legal_name: string;
   trade_name: string | null;
@@ -195,7 +196,7 @@ type MaintenanceRequisitionRow = {
   equipment_model: string;
   supplier_id: string;
   supplier_name: string;
-  supplier_type: SupplierType;
+  supplier_types: SupplierType[] | null;
   requester_user_id: string | null;
   requester_name_snapshot: string | null;
   requester_email_snapshot: string | null;
@@ -222,7 +223,7 @@ type FuelRequisitionRow = {
   equipment_model: string;
   supplier_id: string;
   supplier_name: string;
-  supplier_type: SupplierType;
+  supplier_types: SupplierType[] | null;
   requester_user_id: string | null;
   requester_name_snapshot: string | null;
   requester_email_snapshot: string | null;
@@ -249,7 +250,7 @@ type PartsRequisitionRow = {
   equipment_model: string;
   supplier_id: string;
   supplier_name: string;
-  supplier_type: SupplierType;
+  supplier_types: SupplierType[] | null;
   requester_user_id: string | null;
   requester_name_snapshot: string | null;
   requester_email_snapshot: string | null;
@@ -682,6 +683,7 @@ async function ensureSchema() {
     CREATE TABLE IF NOT EXISTS suppliers (
       id text PRIMARY KEY,
       supplier_type text NOT NULL,
+      supplier_types text[],
       status text NOT NULL DEFAULT 'active',
       legal_name text NOT NULL,
       trade_name text,
@@ -707,6 +709,25 @@ async function ensureSchema() {
   await pool.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS suppliers_legal_name_document_idx
     ON suppliers ((lower(legal_name)), document);
+  `);
+
+  await pool.query(`
+    ALTER TABLE suppliers
+    ADD COLUMN IF NOT EXISTS supplier_types text[];
+  `);
+
+  await pool.query(`
+    UPDATE suppliers
+    SET supplier_types = CASE supplier_type
+      WHEN 'fuel_station' THEN ARRAY['fuel_station']
+      WHEN 'workshop' THEN ARRAY['mechanical']
+      WHEN 'other' THEN ARRAY['parts']
+      WHEN 'mechanical' THEN ARRAY['mechanical']
+      WHEN 'electrical' THEN ARRAY['electrical']
+      WHEN 'parts' THEN ARRAY['parts']
+      ELSE ARRAY['parts']
+    END::text[]
+    WHERE supplier_types IS NULL OR cardinality(supplier_types) = 0;
   `);
 
   await pool.query(`
@@ -1740,9 +1761,11 @@ function mapFuelRecordRow(
 }
 
 function mapSupplierRow(row: SupplierRow): ManagedSupplier {
+  const supplierTypes = row.supplier_types ?? (row.supplier_type ? [row.supplier_type] : []);
+
   return {
     id: row.id,
-    supplierType: row.supplier_type,
+    supplierTypes,
     status: row.status,
     legalName: row.legal_name,
     tradeName: row.trade_name,
@@ -1765,17 +1788,23 @@ function mapSupplierRow(row: SupplierRow): ManagedSupplier {
   };
 }
 
-function mapSupplierOptionRow(row: Pick<SupplierRow, "id" | "legal_name" | "trade_name" | "supplier_type" | "status">): SupplierOption {
+function mapSupplierOptionRow(
+  row: Pick<SupplierRow, "id" | "legal_name" | "trade_name" | "supplier_type" | "supplier_types" | "status">,
+): SupplierOption {
+  const supplierTypes = row.supplier_types ?? (row.supplier_type ? [row.supplier_type] : []);
+
   return {
     id: row.id,
     legalName: row.legal_name,
     tradeName: row.trade_name,
-    supplierType: row.supplier_type,
+    supplierTypes,
     status: row.status,
   };
 }
 
 function mapMaintenanceRequisitionRow(row: MaintenanceRequisitionRow): ManagedMaintenanceRequisition {
+  const supplierTypes = row.supplier_types ?? [];
+
   return {
     id: row.id,
     number: row.number,
@@ -1786,7 +1815,7 @@ function mapMaintenanceRequisitionRow(row: MaintenanceRequisitionRow): ManagedMa
     equipmentModel: row.equipment_model,
     supplierId: row.supplier_id,
     supplierName: row.supplier_name,
-    supplierType: row.supplier_type,
+    supplierTypes,
     requesterUserId: row.requester_user_id,
     requesterNameSnapshot: row.requester_name_snapshot,
     requesterEmailSnapshot: row.requester_email_snapshot,
@@ -1805,6 +1834,8 @@ function mapMaintenanceRequisitionRow(row: MaintenanceRequisitionRow): ManagedMa
 }
 
 function mapFuelRequisitionRow(row: FuelRequisitionRow): ManagedFuelRequisition {
+  const supplierTypes = row.supplier_types ?? [];
+
   return {
     id: row.id,
     number: row.number,
@@ -1815,7 +1846,7 @@ function mapFuelRequisitionRow(row: FuelRequisitionRow): ManagedFuelRequisition 
     equipmentModel: row.equipment_model,
     supplierId: row.supplier_id,
     supplierName: row.supplier_name,
-    supplierType: row.supplier_type,
+    supplierTypes,
     requesterUserId: row.requester_user_id,
     requesterNameSnapshot: row.requester_name_snapshot,
     requesterEmailSnapshot: row.requester_email_snapshot,
@@ -1834,6 +1865,8 @@ function mapFuelRequisitionRow(row: FuelRequisitionRow): ManagedFuelRequisition 
 }
 
 function mapPartsRequisitionRow(row: PartsRequisitionRow): ManagedPartsRequisition {
+  const supplierTypes = row.supplier_types ?? [];
+
   return {
     id: row.id,
     number: row.number,
@@ -1844,7 +1877,7 @@ function mapPartsRequisitionRow(row: PartsRequisitionRow): ManagedPartsRequisiti
     equipmentModel: row.equipment_model,
     supplierId: row.supplier_id,
     supplierName: row.supplier_name,
-    supplierType: row.supplier_type,
+    supplierTypes,
     requesterUserId: row.requester_user_id,
     requesterNameSnapshot: row.requester_name_snapshot,
     requesterEmailSnapshot: row.requester_email_snapshot,
@@ -4089,6 +4122,7 @@ export async function listSuppliers(): Promise<ManagedSupplier[]> {
       SELECT
         id,
         supplier_type,
+        supplier_types,
         status,
         legal_name,
         trade_name,
@@ -4120,18 +4154,18 @@ export async function listSupplierOptions(onlyActive = true): Promise<SupplierOp
   await bootstrapRbac();
   const query = onlyActive
     ? `
-        SELECT id, legal_name, trade_name, supplier_type, status
+        SELECT id, legal_name, trade_name, supplier_type, supplier_types, status
         FROM suppliers
         WHERE status = $1
         ORDER BY legal_name ASC
       `
     : `
-        SELECT id, legal_name, trade_name, supplier_type, status
+        SELECT id, legal_name, trade_name, supplier_type, supplier_types, status
         FROM suppliers
         ORDER BY legal_name ASC
       `;
   const params = onlyActive ? ["active"] : [];
-  const result = await pool.query<Pick<SupplierRow, "id" | "legal_name" | "trade_name" | "supplier_type" | "status">>(
+  const result = await pool.query<Pick<SupplierRow, "id" | "legal_name" | "trade_name" | "supplier_type" | "supplier_types" | "status">>(
     query,
     params,
   );
@@ -4146,6 +4180,7 @@ export async function getSupplierById(supplierId: string): Promise<ManagedSuppli
       SELECT
         id,
         supplier_type,
+        supplier_types,
         status,
         legal_name,
         trade_name,
@@ -4177,7 +4212,7 @@ export async function getSupplierById(supplierId: string): Promise<ManagedSuppli
 }
 
 export async function createSupplier(input: {
-  supplierType: SupplierType;
+  supplierTypes: SupplierType[];
   status: SupplierStatus;
   legalName: string;
   tradeName?: string;
@@ -4213,6 +4248,7 @@ export async function createSupplier(input: {
       INSERT INTO suppliers (
         id,
         supplier_type,
+        supplier_types,
         status,
         legal_name,
         trade_name,
@@ -4231,11 +4267,12 @@ export async function createSupplier(input: {
         state,
         country
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+      VALUES ($1, $2, $3::text[], $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
     `,
     [
       id,
-      input.supplierType,
+      input.supplierTypes[0],
+      input.supplierTypes,
       input.status,
       input.legalName.trim(),
       input.tradeName?.trim() || null,
@@ -4262,7 +4299,7 @@ export async function createSupplier(input: {
 export async function updateSupplier(
   supplierId: string,
   input: {
-    supplierType: SupplierType;
+    supplierTypes: SupplierType[];
     status: SupplierStatus;
     legalName: string;
     tradeName?: string;
@@ -4302,29 +4339,31 @@ export async function updateSupplier(
     `
       UPDATE suppliers
       SET supplier_type = $2,
-          status = $3,
-          legal_name = $4,
-          trade_name = $5,
-          document = $6,
-          contact_name = $7,
-          contact_phone = $8,
-          email = $9,
-          phone = $10,
-          website = $11,
-          postal_code = $12,
-          street = $13,
-          number = $14,
-          complement = $15,
-          district = $16,
-          city = $17,
-          state = $18,
-          country = $19,
+          supplier_types = $3::text[],
+          status = $4,
+          legal_name = $5,
+          trade_name = $6,
+          document = $7,
+          contact_name = $8,
+          contact_phone = $9,
+          email = $10,
+          phone = $11,
+          website = $12,
+          postal_code = $13,
+          street = $14,
+          number = $15,
+          complement = $16,
+          district = $17,
+          city = $18,
+          state = $19,
+          country = $20,
           updated_at = now()
       WHERE id = $1
     `,
     [
       supplierId,
-      input.supplierType,
+      input.supplierTypes[0],
+      input.supplierTypes,
       input.status,
       input.legalName.trim(),
       input.tradeName?.trim() || null,
@@ -4428,7 +4467,7 @@ export async function listMaintenanceRequisitions(): Promise<ManagedMaintenanceR
         e.model AS equipment_model,
         mr.supplier_id,
         s.legal_name AS supplier_name,
-        s.supplier_type,
+        s.supplier_types,
         mr.requester_user_id,
         mr.requester_name_snapshot,
         mr.requester_email_snapshot,
@@ -4467,7 +4506,7 @@ export async function getMaintenanceRequisitionById(id: string): Promise<Managed
         e.model AS equipment_model,
         mr.supplier_id,
         s.legal_name AS supplier_name,
-        s.supplier_type,
+        s.supplier_types,
         mr.requester_user_id,
         mr.requester_name_snapshot,
         mr.requester_email_snapshot,
@@ -4525,9 +4564,11 @@ export async function createMaintenanceRequisition(input: {
         status,
         scheduled_date,
         description,
-        notes
+        notes,
+        issued_at,
+        last_issued_at
       )
-      VALUES ($1, $2, 1, $3, $4, $5, $6, $7, 'draft', $8, $9, $10)
+      VALUES ($1, $2, 1, $3, $4, $5, $6, $7, 'issued', $8, $9, $10, now(), now())
     `,
     [
       id,
@@ -4663,7 +4704,7 @@ export async function listFuelRequisitions(): Promise<ManagedFuelRequisition[]> 
         e.model AS equipment_model,
         fr.supplier_id,
         s.legal_name AS supplier_name,
-        s.supplier_type,
+        s.supplier_types,
         fr.requester_user_id,
         fr.requester_name_snapshot,
         fr.requester_email_snapshot,
@@ -4702,7 +4743,7 @@ export async function getFuelRequisitionById(id: string): Promise<ManagedFuelReq
         e.model AS equipment_model,
         fr.supplier_id,
         s.legal_name AS supplier_name,
-        s.supplier_type,
+        s.supplier_types,
         fr.requester_user_id,
         fr.requester_name_snapshot,
         fr.requester_email_snapshot,
@@ -4760,9 +4801,11 @@ export async function createFuelRequisition(input: {
         status,
         scheduled_date,
         fuel_type,
-        notes
+        notes,
+        issued_at,
+        last_issued_at
       )
-      VALUES ($1, $2, 1, $3, $4, $5, $6, $7, 'draft', $8, $9, $10)
+      VALUES ($1, $2, 1, $3, $4, $5, $6, $7, 'issued', $8, $9, $10, now(), now())
     `,
     [
       id,
@@ -4898,7 +4941,7 @@ export async function listPartsRequisitions(): Promise<ManagedPartsRequisition[]
         e.model AS equipment_model,
         pr.supplier_id,
         s.legal_name AS supplier_name,
-        s.supplier_type,
+        s.supplier_types,
         pr.requester_user_id,
         pr.requester_name_snapshot,
         pr.requester_email_snapshot,
@@ -4937,7 +4980,7 @@ export async function getPartsRequisitionById(id: string): Promise<ManagedPartsR
         e.model AS equipment_model,
         pr.supplier_id,
         s.legal_name AS supplier_name,
-        s.supplier_type,
+        s.supplier_types,
         pr.requester_user_id,
         pr.requester_name_snapshot,
         pr.requester_email_snapshot,
@@ -4995,9 +5038,11 @@ export async function createPartsRequisition(input: {
         status,
         scheduled_date,
         description,
-        notes
+        notes,
+        issued_at,
+        last_issued_at
       )
-      VALUES ($1, $2, 1, $3, $4, $5, $6, $7, 'draft', $8, $9, $10)
+      VALUES ($1, $2, 1, $3, $4, $5, $6, $7, 'issued', $8, $9, $10, now(), now())
     `,
     [
       id,
