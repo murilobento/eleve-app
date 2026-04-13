@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { CalendarDays, X } from "lucide-react";
 import type { Matcher } from "react-day-picker";
 
@@ -61,10 +62,19 @@ export function DatePickerInput({
 }: DatePickerInputProps) {
   const locale = useLocale();
   const dateLocale = getDateFnsLocale(locale);
+  const [open, setOpen] = useState(false);
+
+  function handleSelect(nextValue?: Date) {
+    onChange(nextValue);
+
+    if (nextValue) {
+      setOpen(false);
+    }
+  }
 
   return (
     <div className={cn("flex items-center gap-2", className)}>
-      <Popover>
+      <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
             id={id}
@@ -86,7 +96,7 @@ export function DatePickerInput({
             locale={dateLocale}
             selected={value}
             month={value}
-            onSelect={onChange}
+            onSelect={handleSelect}
             disabled={disabledDays}
             initialFocus
           />
