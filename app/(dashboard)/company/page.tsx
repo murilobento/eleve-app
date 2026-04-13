@@ -36,11 +36,30 @@ type CnpjResponse = {
   cnpj: CnpjLookupResult;
 };
 
-async function parseResponse<T>(response: Response): Promise<T> {
+function getLocalizedCompanyError(message: string, t: ReturnType<typeof useI18n>["t"]) {
+  switch (message) {
+    case "Failed to save company details.":
+      return t("company.errors.saveFailed");
+    case "CNPJ not found.":
+      return t("company.cnpjLookupError");
+    case "Failed to look up the CNPJ.":
+      return t("company.cnpjLookupError");
+    case "Postal code not found.":
+      return t("company.postalCodeLookupError");
+    case "Failed to look up the postal code.":
+      return t("company.postalCodeLookupError");
+    case "Request failed.":
+      return t("common.requestFailed");
+    default:
+      return message;
+  }
+}
+
+async function parseResponse<T>(response: Response, t: ReturnType<typeof useI18n>["t"]): Promise<T> {
   const payload = await response.json().catch(() => null);
 
   if (!response.ok) {
-    throw new Error(payload?.error || "Request failed.");
+    throw new Error(getLocalizedCompanyError(payload?.error || "Request failed.", t));
   }
 
   return payload as T;
@@ -89,7 +108,6 @@ function mapCompanyToFormValues(company: ManagedCompany | null): UpdateCompanyIn
 export default function CompanyPage() {
   const { t } = useI18n();
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isLookingUpCnpj, setIsLookingUpCnpj] = useState(false);
   const [isLookingUpPostalCode, setIsLookingUpPostalCode] = useState(false);
@@ -109,16 +127,15 @@ export default function CompanyPage() {
 
   const loadCompany = async () => {
     setLoading(true);
-    setError(null);
 
     try {
       const payload = await parseResponse<CompanyResponse>(await fetch("/api/company", {
         cache: "no-store",
-      }));
+      }), t);
 
       form.reset(mapCompanyToFormValues(payload.company));
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : t("company.loadError"));
+      toast.error(loadError instanceof Error ? loadError.message : t("company.loadError"));
     } finally {
       setLoading(false);
     }
@@ -139,13 +156,13 @@ export default function CompanyPage() {
     }
 
     setIsLookingUpCnpj(true);
-    setError(null);
 
     try {
       const payload = await parseResponse<CnpjResponse>(
         await fetch(`/api/company/cnpj?cnpj=${normalizedCnpj}`, {
           cache: "no-store",
         }),
+        t,
       );
 
       form.setValue("cnpj", formatCnpj(payload.cnpj.cnpj), { shouldValidate: true });
@@ -187,7 +204,6 @@ export default function CompanyPage() {
       toast.success(t("company.cnpjLookupSuccess"));
     } catch (lookupError) {
       const message = lookupError instanceof Error ? lookupError.message : t("company.cnpjLookupError");
-      setError(message);
       toast.error(message);
     } finally {
       setIsLookingUpCnpj(false);
@@ -205,13 +221,13 @@ export default function CompanyPage() {
     }
 
     setIsLookingUpPostalCode(true);
-    setError(null);
 
     try {
       const payload = await parseResponse<PostalCodeResponse>(
         await fetch(`/api/company/postal-code?postalCode=${normalizedPostalCode}`, {
           cache: "no-store",
         }),
+        t,
       );
 
       form.setValue("postalCode", formatPostalCode(payload.postalCode.postalCode), { shouldValidate: true });
@@ -222,7 +238,6 @@ export default function CompanyPage() {
       toast.success(t("company.postalCodeLookupSuccess"));
     } catch (lookupError) {
       const message = lookupError instanceof Error ? lookupError.message : t("company.postalCodeLookupError");
-      setError(message);
       toast.error(message);
     } finally {
       setIsLookingUpPostalCode(false);
@@ -231,7 +246,6 @@ export default function CompanyPage() {
 
   const handleSubmit = async (values: UpdateCompanyInput) => {
     setIsSaving(true);
-    setError(null);
 
     try {
       const payload = await parseResponse<CompanyResponse>(
@@ -242,13 +256,13 @@ export default function CompanyPage() {
           },
           body: JSON.stringify(values),
         }),
+        t,
       );
 
       form.reset(mapCompanyToFormValues(payload.company));
       toast.success(t("common.companyUpdateSuccess"));
     } catch (saveError) {
       const message = saveError instanceof Error ? saveError.message : t("company.updateError");
-      setError(message);
       toast.error(message);
     } finally {
       setIsSaving(false);
@@ -265,12 +279,6 @@ export default function CompanyPage() {
       </div>
 
       <div className="@container/main mt-2 px-4 lg:mt-4 lg:px-6">
-        {error ? (
-          <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            {error}
-          </div>
-        ) : null}
-
         {loading ? (
           <div className="rounded-md border px-6 py-10 text-sm text-muted-foreground">
             {t("common.loadingCompany")}

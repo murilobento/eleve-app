@@ -11,11 +11,24 @@ type RolesResponse = {
   roles: ManagedRole[];
 };
 
-async function parseResponse(response: Response) {
+function getLocalizedRoleError(message: string, t: ReturnType<typeof useI18n>["t"]) {
+  switch (message) {
+    case "Role not found.":
+      return t("roles.errors.notFound");
+    case "Remove this role from users before deleting it.":
+      return t("roles.errors.removeAssignedUsers");
+    case "Request failed.":
+      return t("common.requestFailed");
+    default:
+      return message;
+  }
+}
+
+async function parseResponse(response: Response, t: ReturnType<typeof useI18n>["t"]) {
   const payload = await response.json().catch(() => null);
 
   if (!response.ok) {
-    throw new Error(payload?.error || "Request failed.");
+    throw new Error(getLocalizedRoleError(payload?.error || "Request failed.", t));
   }
 
   return payload;
@@ -25,21 +38,19 @@ export default function RolesPage() {
   const { t } = useI18n();
   const [roles, setRoles] = useState<ManagedRole[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [isMutating, setIsMutating] = useState(false);
 
   const loadRoles = async () => {
     setLoading(true);
-    setError(null);
 
     try {
       const payload = (await parseResponse(await fetch("/api/roles", {
         cache: "no-store",
-      }))) as RolesResponse;
+      }), t)) as RolesResponse;
 
       setRoles(payload.roles);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : t("roles.loadError"));
+      toast.error(loadError instanceof Error ? loadError.message : t("roles.loadError"));
     } finally {
       setLoading(false);
     }
@@ -55,7 +66,6 @@ export default function RolesPage() {
     fallbackErrorMessage: string,
   ) => {
     setIsMutating(true);
-    setError(null);
 
     try {
       await operation();
@@ -64,7 +74,6 @@ export default function RolesPage() {
     } catch (mutationError) {
       const message =
         mutationError instanceof Error ? mutationError.message : fallbackErrorMessage;
-      setError(message);
       toast.error(message);
       throw mutationError;
     } finally {
@@ -82,6 +91,7 @@ export default function RolesPage() {
           },
           body: JSON.stringify(values),
         }),
+        t,
       );
     }, t("common.roleCreateSuccess"), t("roles.updateError"));
   };
@@ -96,6 +106,7 @@ export default function RolesPage() {
           },
           body: JSON.stringify(values),
         }),
+        t,
       );
     }, t("common.roleUpdateSuccess"), t("roles.updateError"));
   };
@@ -106,6 +117,7 @@ export default function RolesPage() {
         await fetch(`/api/roles/${id}`, {
           method: "DELETE",
         }),
+        t,
       );
     }, t("common.roleDeleteSuccess"), t("roles.updateError"));
   };
@@ -116,7 +128,6 @@ export default function RolesPage() {
     }
 
     setIsMutating(true);
-    setError(null);
 
     try {
       const results = await Promise.allSettled(
@@ -125,6 +136,7 @@ export default function RolesPage() {
             await fetch(`/api/roles/${id}`, {
               method: "DELETE",
             }),
+            t,
           );
         }),
       );
@@ -140,7 +152,6 @@ export default function RolesPage() {
 
       if (failedCount > 0) {
         const message = t("common.bulkDeletePartialError", { failed: failedCount, total: ids.length });
-        setError(message);
         toast.error(message);
       }
     } finally {
@@ -160,12 +171,6 @@ export default function RolesPage() {
       </div>
 
       <div className="@container/main px-4 lg:px-6 mt-2 lg:mt-4">
-        {error ? (
-          <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            {error}
-          </div>
-        ) : null}
-
         {loading ? (
           <div className="rounded-md border px-6 py-10 text-sm text-muted-foreground">
             {t("common.loadingRoles")}

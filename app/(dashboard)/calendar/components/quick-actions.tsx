@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import { useI18n } from "@/i18n/provider"
 
 interface QuickActionsProps {
   onNewEvent?: () => void
@@ -28,10 +29,12 @@ export function QuickActions({
   onNewReminder, 
   onSettings 
 }: QuickActionsProps) {
+  const { t } = useI18n()
+
   const quickStats = [
-    { label: "Today's Events", value: "3", color: "bg-chart-1" },
-    { label: "This Week", value: "12", color: "bg-chart-2" },
-    { label: "Pending", value: "2", color: "bg-chart-4" }
+    { label: t("calendar.quickActions.todayEvents"), value: "3", color: "bg-chart-1" },
+    { label: t("calendar.quickActions.thisWeek"), value: "12", color: "bg-chart-2" },
+    { label: t("calendar.quickActions.pending"), value: "2", color: "bg-chart-4" }
   ]
 
   return (
@@ -39,7 +42,7 @@ export function QuickActions({
       {/* Quick Stats */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium">Overview</CardTitle>
+          <CardTitle className="text-sm font-medium">{t("calendar.quickActions.overview")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {quickStats.map((stat, index) => (
@@ -57,7 +60,7 @@ export function QuickActions({
       {/* Quick Actions */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium">Quick Actions</CardTitle>
+          <CardTitle className="text-sm font-medium">{t("calendar.quickActions.title")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           <Button 
@@ -66,7 +69,7 @@ export function QuickActions({
             onClick={onNewEvent}
           >
             <Plus className="w-4 h-4 mr-2" />
-            New Event
+            {t("calendar.quickActions.newEvent")}
           </Button>
           
           <Button 
@@ -75,7 +78,7 @@ export function QuickActions({
             onClick={onNewMeeting}
           >
             <Users className="w-4 h-4 mr-2" />
-            Schedule Meeting
+            {t("calendar.quickActions.scheduleMeeting")}
           </Button>
           
           <Button 
@@ -84,7 +87,7 @@ export function QuickActions({
             onClick={onNewReminder}
           >
             <Bell className="w-4 h-4 mr-2" />
-            Set Reminder
+            {t("calendar.quickActions.setReminder")}
           </Button>
 
           <Separator className="my-3" />
@@ -95,7 +98,7 @@ export function QuickActions({
             className="w-full justify-start cursor-pointer" 
           >
             <Share className="w-4 h-4 mr-2" />
-            Share Calendar
+            {t("calendar.quickActions.shareCalendar")}
           </Button>
           
           <Button 
@@ -104,7 +107,7 @@ export function QuickActions({
             className="w-full justify-start cursor-pointer" 
           >
             <Download className="w-4 h-4 mr-2" />
-            Export
+            {t("calendar.quickActions.export")}
           </Button>
           
           <Button 
@@ -114,7 +117,7 @@ export function QuickActions({
             onClick={onSettings}
           >
             <Settings className="w-4 h-4 mr-2" />
-            Settings
+            {t("calendar.quickActions.settings")}
           </Button>
         </CardContent>
       </Card>
@@ -124,7 +127,7 @@ export function QuickActions({
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             <Clock className="w-4 h-4" />
-            Next Up
+            {t("calendar.quickActions.nextUp")}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -132,16 +135,16 @@ export function QuickActions({
             <div className="flex items-start gap-3">
               <div className="w-2 h-2 bg-chart-1 rounded-full mt-2" />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">Team Standup</p>
-                <p className="text-xs text-muted-foreground">9:00 AM • Conference Room A</p>
+                <p className="text-sm font-medium truncate">{t("calendar.quickActions.teamStandup")}</p>
+                <p className="text-xs text-muted-foreground">{t("calendar.quickActions.teamStandupTime")}</p>
               </div>
             </div>
             
             <div className="flex items-start gap-3">
               <div className="w-2 h-2 bg-chart-5 rounded-full mt-2" />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">Design Review</p>
-                <p className="text-xs text-muted-foreground">2:00 PM • Virtual</p>
+                <p className="text-sm font-medium truncate">{t("calendar.quickActions.designReview")}</p>
+                <p className="text-xs text-muted-foreground">{t("calendar.quickActions.designReviewTime")}</p>
               </div>
             </div>
           </div>

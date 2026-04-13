@@ -17,11 +17,26 @@ type ServiceTypesResponse = {
   equipment: EquipmentOption[];
 };
 
-async function parseResponse(response: Response) {
+function getLocalizedServiceTypeError(message: string, t: ReturnType<typeof useI18n>["t"]) {
+  switch (message) {
+    case "Service type not found.":
+      return t("serviceTypes.errors.notFound");
+    case "Remove budgets linked to this service type before deleting it.":
+      return t("serviceTypes.errors.removeLinkedBudgets");
+    case "Remove linked equipment before deleting this service type.":
+      return t("serviceTypes.errors.removeLinkedEquipment");
+    case "Request failed.":
+      return t("common.requestFailed");
+    default:
+      return message;
+  }
+}
+
+async function parseResponse(response: Response, t: ReturnType<typeof useI18n>["t"]) {
   const payload = await response.json().catch(() => null);
 
   if (!response.ok) {
-    throw new Error(payload?.error || "Request failed.");
+    throw new Error(getLocalizedServiceTypeError(payload?.error || "Request failed.", t));
   }
 
   return payload;
@@ -32,22 +47,20 @@ export default function ServiceTypesPage() {
   const [serviceTypes, setServiceTypes] = useState<ManagedServiceType[]>([]);
   const [equipment, setEquipment] = useState<EquipmentOption[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [isMutating, setIsMutating] = useState(false);
 
   const loadServiceTypes = async () => {
     setLoading(true);
-    setError(null);
 
     try {
       const payload = (await parseResponse(await fetch("/api/service-types", {
         cache: "no-store",
-      }))) as ServiceTypesResponse;
+      }), t)) as ServiceTypesResponse;
 
       setServiceTypes(payload.serviceTypes);
       setEquipment(payload.equipment);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : t("serviceTypes.loadError"));
+      toast.error(loadError instanceof Error ? loadError.message : t("serviceTypes.loadError"));
     } finally {
       setLoading(false);
     }
@@ -63,7 +76,6 @@ export default function ServiceTypesPage() {
     fallbackErrorMessage: string,
   ) => {
     setIsMutating(true);
-    setError(null);
 
     try {
       await operation();
@@ -72,7 +84,6 @@ export default function ServiceTypesPage() {
     } catch (mutationError) {
       const message =
         mutationError instanceof Error ? mutationError.message : fallbackErrorMessage;
-      setError(message);
       toast.error(message);
       throw mutationError;
     } finally {
@@ -90,6 +101,7 @@ export default function ServiceTypesPage() {
           },
           body: JSON.stringify(values),
         }),
+        t,
       );
     }, t("common.serviceTypeCreateSuccess"), t("serviceTypes.updateError"));
   };
@@ -104,6 +116,7 @@ export default function ServiceTypesPage() {
           },
           body: JSON.stringify(values),
         }),
+        t,
       );
     }, t("common.serviceTypeUpdateSuccess"), t("serviceTypes.updateError"));
   };
@@ -114,6 +127,7 @@ export default function ServiceTypesPage() {
         await fetch(`/api/service-types/${id}`, {
           method: "DELETE",
         }),
+        t,
       );
     }, t("common.serviceTypeDeleteSuccess"), t("serviceTypes.updateError"));
   };
@@ -124,7 +138,6 @@ export default function ServiceTypesPage() {
     }
 
     setIsMutating(true);
-    setError(null);
 
     try {
       const results = await Promise.allSettled(
@@ -133,6 +146,7 @@ export default function ServiceTypesPage() {
             await fetch(`/api/service-types/${id}`, {
               method: "DELETE",
             }),
+            t,
           );
         }),
       );
@@ -148,7 +162,6 @@ export default function ServiceTypesPage() {
 
       if (failedCount > 0) {
         const message = t("common.bulkDeletePartialError", { failed: failedCount, total: ids.length });
-        setError(message);
         toast.error(message);
       }
     } finally {
@@ -166,12 +179,6 @@ export default function ServiceTypesPage() {
       </div>
 
       <div className="@container/main mt-2 px-4 lg:mt-4 lg:px-6">
-        {error ? (
-          <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            {error}
-          </div>
-        ) : null}
-
         {loading ? (
           <div className="rounded-md border px-6 py-10 text-sm text-muted-foreground">
             {t("common.loadingServiceTypes")}

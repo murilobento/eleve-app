@@ -17,11 +17,34 @@ type EquipmentResponse = {
   equipmentTypes: ManagedEquipmentType[];
 };
 
-async function parseResponse(response: Response) {
+function getLocalizedEquipmentError(message: string, t: ReturnType<typeof useI18n>["t"]) {
+  switch (message) {
+    case "Equipment not found.":
+      return t("equipment.errors.notFound");
+    case "Equipment type not found.":
+      return t("equipment.errors.typeNotFound");
+    case "Remove budgets linked to this equipment before deleting it.":
+      return t("equipment.errors.removeLinkedBudgets");
+    case "Remove maintenance records linked to this equipment before deleting it.":
+      return t("equipment.errors.removeLinkedMaintenance");
+    case "Remove fuel records linked to this equipment before deleting it.":
+      return t("equipment.errors.removeLinkedFuel");
+    case "Remove maintenance requisitions linked to this equipment before deleting it.":
+      return t("equipment.errors.removeLinkedMaintenanceRequisitions");
+    case "Remove fuel requisitions linked to this equipment before deleting it.":
+      return t("equipment.errors.removeLinkedFuelRequisitions");
+    case "Request failed.":
+      return t("common.requestFailed");
+    default:
+      return message;
+  }
+}
+
+async function parseResponse(response: Response, t: ReturnType<typeof useI18n>["t"]) {
   const payload = await response.json().catch(() => null);
 
   if (!response.ok) {
-    throw new Error(payload?.error || "Request failed.");
+    throw new Error(getLocalizedEquipmentError(payload?.error || "Request failed.", t));
   }
 
   return payload;
@@ -32,22 +55,20 @@ export default function EquipmentPage() {
   const [equipment, setEquipment] = useState<ManagedEquipment[]>([]);
   const [equipmentTypes, setEquipmentTypes] = useState<ManagedEquipmentType[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [isMutating, setIsMutating] = useState(false);
 
   const loadEquipment = async () => {
     setLoading(true);
-    setError(null);
 
     try {
       const payload = (await parseResponse(await fetch("/api/equipment", {
         cache: "no-store",
-      }))) as EquipmentResponse;
+      }), t)) as EquipmentResponse;
 
       setEquipment(payload.equipment);
       setEquipmentTypes(payload.equipmentTypes);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : t("equipment.loadError"));
+      toast.error(loadError instanceof Error ? loadError.message : t("equipment.loadError"));
     } finally {
       setLoading(false);
     }
@@ -63,7 +84,6 @@ export default function EquipmentPage() {
     fallbackErrorMessage: string,
   ) => {
     setIsMutating(true);
-    setError(null);
 
     try {
       await operation();
@@ -72,7 +92,6 @@ export default function EquipmentPage() {
     } catch (mutationError) {
       const message =
         mutationError instanceof Error ? mutationError.message : fallbackErrorMessage;
-      setError(message);
       toast.error(message);
       throw mutationError;
     } finally {
@@ -90,6 +109,7 @@ export default function EquipmentPage() {
           },
           body: JSON.stringify(values),
         }),
+        t,
       );
     }, t("common.equipmentCreateSuccess"), t("equipment.updateError"));
   };
@@ -104,6 +124,7 @@ export default function EquipmentPage() {
           },
           body: JSON.stringify(values),
         }),
+        t,
       );
     }, t("common.equipmentUpdateSuccess"), t("equipment.updateError"));
   };
@@ -114,6 +135,7 @@ export default function EquipmentPage() {
         await fetch(`/api/equipment/${id}`, {
           method: "DELETE",
         }),
+        t,
       );
     }, t("common.equipmentDeleteSuccess"), t("equipment.updateError"));
   };
@@ -124,7 +146,6 @@ export default function EquipmentPage() {
     }
 
     setIsMutating(true);
-    setError(null);
 
     try {
       const results = await Promise.allSettled(
@@ -133,6 +154,7 @@ export default function EquipmentPage() {
             await fetch(`/api/equipment/${id}`, {
               method: "DELETE",
             }),
+            t,
           );
         }),
       );
@@ -148,7 +170,6 @@ export default function EquipmentPage() {
 
       if (failedCount > 0) {
         const message = t("common.bulkDeletePartialError", { failed: failedCount, total: ids.length });
-        setError(message);
         toast.error(message);
       }
     } finally {
@@ -166,12 +187,6 @@ export default function EquipmentPage() {
       </div>
 
       <div className="@container/main mt-2 px-4 lg:mt-4 lg:px-6">
-        {error ? (
-          <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            {error}
-          </div>
-        ) : null}
-
         {!loading && equipmentTypes.length === 0 ? (
           <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300">
             {t("equipment.emptyTypesHint")}

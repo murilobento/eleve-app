@@ -15,11 +15,24 @@ type ClientsResponse = {
   clients: ManagedClient[];
 };
 
-async function parseResponse(response: Response) {
+function getLocalizedClientError(message: string, t: ReturnType<typeof useI18n>["t"]) {
+  switch (message) {
+    case "Client not found.":
+      return t("clients.errors.notFound");
+    case "Remove budgets linked to this client before deleting it.":
+      return t("clients.errors.removeLinkedBudgets");
+    case "Request failed.":
+      return t("common.requestFailed");
+    default:
+      return message;
+  }
+}
+
+async function parseResponse(response: Response, t: ReturnType<typeof useI18n>["t"]) {
   const payload = await response.json().catch(() => null);
 
   if (!response.ok) {
-    throw new Error(payload?.error || "Request failed.");
+    throw new Error(getLocalizedClientError(payload?.error || "Request failed.", t));
   }
 
   return payload;
@@ -29,21 +42,19 @@ export default function ClientsPage() {
   const { t } = useI18n();
   const [clients, setClients] = useState<ManagedClient[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [isMutating, setIsMutating] = useState(false);
 
   const loadClients = async () => {
     setLoading(true);
-    setError(null);
 
     try {
       const payload = (await parseResponse(await fetch("/api/clients", {
         cache: "no-store",
-      }))) as ClientsResponse;
+      }), t)) as ClientsResponse;
 
       setClients(payload.clients);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : t("clients.loadError"));
+      toast.error(loadError instanceof Error ? loadError.message : t("clients.loadError"));
     } finally {
       setLoading(false);
     }
@@ -59,7 +70,6 @@ export default function ClientsPage() {
     fallbackErrorMessage: string,
   ) => {
     setIsMutating(true);
-    setError(null);
 
     try {
       await operation();
@@ -68,7 +78,6 @@ export default function ClientsPage() {
     } catch (mutationError) {
       const message =
         mutationError instanceof Error ? mutationError.message : fallbackErrorMessage;
-      setError(message);
       toast.error(message);
       throw mutationError;
     } finally {
@@ -86,6 +95,7 @@ export default function ClientsPage() {
           },
           body: JSON.stringify(values),
         }),
+        t,
       );
     }, t("common.clientCreateSuccess"), t("clients.updateError"));
   };
@@ -100,6 +110,7 @@ export default function ClientsPage() {
           },
           body: JSON.stringify(values),
         }),
+        t,
       );
     }, t("common.clientUpdateSuccess"), t("clients.updateError"));
   };
@@ -110,6 +121,7 @@ export default function ClientsPage() {
         await fetch(`/api/clients/${id}`, {
           method: "DELETE",
         }),
+        t,
       );
     }, t("common.clientDeleteSuccess"), t("clients.updateError"));
   };
@@ -120,7 +132,6 @@ export default function ClientsPage() {
     }
 
     setIsMutating(true);
-    setError(null);
 
     try {
       const results = await Promise.allSettled(
@@ -129,6 +140,7 @@ export default function ClientsPage() {
             await fetch(`/api/clients/${id}`, {
               method: "DELETE",
             }),
+            t,
           );
         }),
       );
@@ -144,7 +156,6 @@ export default function ClientsPage() {
 
       if (failedCount > 0) {
         const message = t("common.bulkDeletePartialError", { failed: failedCount, total: ids.length });
-        setError(message);
         toast.error(message);
       }
     } finally {
@@ -162,12 +173,6 @@ export default function ClientsPage() {
       </div>
 
       <div className="@container/main mt-2 px-4 lg:mt-4 lg:px-6">
-        {error ? (
-          <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            {error}
-          </div>
-        ) : null}
-
         {loading ? (
           <div className="rounded-md border px-6 py-10 text-sm text-muted-foreground">
             {t("common.loadingClients")}

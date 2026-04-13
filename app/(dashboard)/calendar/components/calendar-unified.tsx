@@ -36,6 +36,8 @@ import {
   DialogTitle
 } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
+import { useI18n } from "@/i18n/provider"
+import { getDateFnsLocale } from "@/lib/date-locale"
 import { type CalendarEvent } from "../types"
 import { getAvatarInitials } from "../utils"
 
@@ -48,6 +50,8 @@ interface CalendarMainProps {
 }
 
 export function CalendarMain({ eventDates = [] }: CalendarMainProps) {
+  const { locale, t } = useI18n()
+  const dateLocale = getDateFnsLocale(locale)
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [currentDate, setCurrentDate] = useState(new Date())
   const [viewMode, setViewMode] = useState<"month" | "week" | "day" | "list">("month")
@@ -105,8 +109,24 @@ export function CalendarMain({ eventDates = [] }: CalendarMainProps) {
     // In a real app, this would open event form
   }
 
+  const calendarNameMap: Record<string, string> = {
+    personal: t("calendar.calendarPersonal"),
+    work: t("calendar.calendarWork"),
+    shared: t("calendar.calendarShared"),
+    meetings: t("calendar.calendarMeetings"),
+    events: t("calendar.calendarEvents"),
+  }
+
+  const eventTypeMap: Record<CalendarEvent["type"], string> = {
+    meeting: t("calendar.scheduleMeeting"),
+    event: t("calendar.event"),
+    personal: t("calendar.personal"),
+    task: t("calendar.task"),
+    reminder: t("calendar.reminderType"),
+  }
+
   const renderCalendarGrid = () => {
-    const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    const weekDays = t("calendar.weekdays") as string[]
     
     return (
       <div className="flex-1 bg-background">
@@ -165,7 +185,7 @@ export function CalendarMain({ eventDates = [] }: CalendarMainProps) {
                   ))}
                   {dayEvents.length > 3 && (
                     <div className="text-xs text-muted-foreground px-2">
-                      +{dayEvents.length - 3} more
+                      {t("calendar.moreEvents", { count: dayEvents.length - 3 })}
                     </div>
                   )}
                 </div>
@@ -181,10 +201,10 @@ export function CalendarMain({ eventDates = [] }: CalendarMainProps) {
     <div className="w-full h-full bg-background border-r">
       <div className="p-4 border-b">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold">Calendar</h2>
+          <h2 className="font-semibold">{t("calendar.calendar")}</h2>
           <Button size="sm" onClick={handleNewEvent}>
             <Plus className="h-4 w-4 mr-1" />
-            Event
+            {t("calendar.addEventShort")}
           </Button>
         </div>
         
@@ -194,6 +214,7 @@ export function CalendarMain({ eventDates = [] }: CalendarMainProps) {
           selected={selectedDate}
           onSelect={(date) => date && handleDateSelect(date)}
           className="rounded-md border"
+          locale={dateLocale}
           modifiers={{
             eventDay: eventDates.map(ed => ed.date)
           }}
@@ -206,7 +227,7 @@ export function CalendarMain({ eventDates = [] }: CalendarMainProps) {
       {/* Mini Calendars List */}
       <div className="p-4">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-medium">My Calendars</h3>
+          <h3 className="text-sm font-medium">{t("calendar.myCalendars")}</h3>
           <Button variant="ghost" size="sm" onClick={handleNewCalendar}>
             <Plus className="h-4 w-4" />
           </Button>
@@ -216,7 +237,7 @@ export function CalendarMain({ eventDates = [] }: CalendarMainProps) {
           {calendarsData.map((calendar) => (
             <div key={calendar.id} className="flex items-center space-x-2">
               <div className={cn("w-3 h-3 rounded-full", calendar.color)} />
-              <span className="text-sm">{calendar.name}</span>
+              <span className="text-sm">{calendarNameMap[calendar.id] ?? calendar.name}</span>
             </div>
           ))}
         </div>
@@ -254,7 +275,7 @@ export function CalendarMain({ eventDates = [] }: CalendarMainProps) {
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
                   <h2 className="text-lg font-semibold min-w-[140px] text-center">
-                    {format(currentDate, 'MMMM yyyy')}
+                    {format(currentDate, "MMMM yyyy", { locale: dateLocale })}
                   </h2>
                   <Button variant="ghost" size="sm" onClick={() => navigateMonth("next")}>
                     <ChevronRight className="h-4 w-4" />
@@ -262,7 +283,7 @@ export function CalendarMain({ eventDates = [] }: CalendarMainProps) {
                 </div>
 
                 <Button variant="outline" size="sm" onClick={goToToday}>
-                  Today
+                  {t("calendar.today")}
                 </Button>
               </div>
 
@@ -270,7 +291,7 @@ export function CalendarMain({ eventDates = [] }: CalendarMainProps) {
                 <div className="hidden sm:flex items-center space-x-2">
                   <Button variant="ghost" size="sm" className="text-xs">
                     <Search className="h-4 w-4 mr-1" />
-                    Search
+                    {t("common.search")}
                   </Button>
                 </div>
 
@@ -279,26 +300,26 @@ export function CalendarMain({ eventDates = [] }: CalendarMainProps) {
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm">
                       <Grid3X3 className="h-4 w-4 mr-1" />
-                      {viewMode === "month" ? "Month" : viewMode === "week" ? "Week" : viewMode === "day" ? "Day" : "List"}
+                      {viewMode === "month" ? t("calendar.viewMonth") : viewMode === "week" ? t("calendar.viewWeek") : viewMode === "day" ? t("calendar.viewDay") : t("calendar.viewList")}
                       <ChevronDown className="h-4 w-4 ml-1" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem onClick={() => setViewMode("month")}>
                       <Grid3X3 className="h-4 w-4 mr-2" />
-                      Month
+                      {t("calendar.viewMonth")}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setViewMode("week")}>
                       <List className="h-4 w-4 mr-2" />
-                      Week
+                      {t("calendar.viewWeek")}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setViewMode("day")}>
                       <CalendarIcon className="h-4 w-4 mr-2" />
-                      Day
+                      {t("calendar.viewDay")}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setViewMode("list")}>
                       <List className="h-4 w-4 mr-2" />
-                      List
+                      {t("calendar.viewList")}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -315,9 +336,9 @@ export function CalendarMain({ eventDates = [] }: CalendarMainProps) {
       <Sheet open={showCalendarSheet} onOpenChange={setShowCalendarSheet}>
         <SheetContent side="left" className="w-80 p-0">
           <SheetHeader className="p-4 pb-2">
-            <SheetTitle>Calendar</SheetTitle>
+            <SheetTitle>{t("calendar.calendar")}</SheetTitle>
             <SheetDescription>
-              Browse dates and manage your calendar events
+              {t("calendar.sheetDescription")}
             </SheetDescription>
           </SheetHeader>
           {renderSidebar()}
@@ -330,7 +351,7 @@ export function CalendarMain({ eventDates = [] }: CalendarMainProps) {
           <DialogHeader>
             <DialogTitle>{selectedEvent?.title}</DialogTitle>
             <DialogDescription>
-              Event details and information
+              {t("calendar.eventDetailsInfo")}
             </DialogDescription>
           </DialogHeader>
           {selectedEvent && (
@@ -370,7 +391,7 @@ export function CalendarMain({ eventDates = [] }: CalendarMainProps) {
 
               <div className="flex items-center space-x-2 pt-4">
                 <Badge variant="secondary" className={cn("text-white", selectedEvent.color)}>
-                  {selectedEvent.type}
+                  {eventTypeMap[selectedEvent.type]}
                 </Badge>
               </div>
             </div>
