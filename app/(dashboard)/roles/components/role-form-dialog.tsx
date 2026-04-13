@@ -78,8 +78,14 @@ export function RoleFormDialog({
         return t("roles.resourceOperators");
       case "equipment":
         return t("roles.resourceEquipment");
+      case "equipment-costs":
+        return t("roles.resourceEquipmentCosts");
+      case "equipment-requisitions":
+        return t("roles.resourceEquipmentRequisitions");
       case "equipment-types":
         return t("roles.resourceEquipmentTypes");
+      case "suppliers":
+        return t("roles.resourceSuppliers");
       case "service-types":
         return t("roles.resourceServiceTypes");
       case "users":
