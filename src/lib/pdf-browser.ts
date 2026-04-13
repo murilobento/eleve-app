@@ -5,6 +5,34 @@ function isExecutablePath(path: string) {
   return Boolean(path) && fs.existsSync(path);
 }
 
+export function isWindowsExecutableOnLinux(executablePath: string) {
+  return os.platform() === "linux" && executablePath.toLowerCase().endsWith(".exe");
+}
+
+export function getPdfBrowserLaunchOptions(executablePath: string) {
+  const isWindowsBrowserFromWsl = isWindowsExecutableOnLinux(executablePath);
+
+  return {
+    executablePath,
+    headless: true as const,
+    // Windows browsers launched from WSL are more stable over websocket transport than pipe transport.
+    pipe: !isWindowsBrowserFromWsl,
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+      "--disable-breakpad",
+      "--disable-crash-reporter",
+      "--disable-crashpad",
+      "--no-first-run",
+      "--no-default-browser-check",
+      "--no-zygote",
+      "--font-render-hinting=medium",
+    ],
+  };
+}
+
 export function resolvePdfBrowserExecutablePath() {
   const fromEnv = process.env.PUPPETEER_EXECUTABLE_PATH || process.env.GOOGLE_CHROME_BIN;
 
@@ -33,10 +61,6 @@ export function resolvePdfBrowserExecutablePath() {
             "/snap/bin/chromium",
             "/opt/google/chrome/chrome",
             "/usr/bin/microsoft-edge",
-            "/mnt/c/Program Files/Google/Chrome/Application/chrome.exe",
-            "/mnt/c/Program Files (x86)/Google/Chrome/Application/chrome.exe",
-            "/mnt/c/Program Files/Microsoft/Edge/Application/msedge.exe",
-            "/mnt/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
           ];
 
   const discovered = candidates.find((candidate) => isExecutablePath(candidate));
@@ -46,6 +70,6 @@ export function resolvePdfBrowserExecutablePath() {
   }
 
   throw new Error(
-    "Could not find Chrome/Chromium executable for PDF generation. Configure PUPPETEER_EXECUTABLE_PATH.",
+    "Nenhum Chrome/Chromium nativo foi encontrado para gerar PDF neste ambiente Linux/WSL. Instale chromium/google-chrome no WSL ou configure PUPPETEER_EXECUTABLE_PATH para um binario Linux.",
   );
 }

@@ -13,7 +13,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { Check, Clock3, EllipsisVertical, FileDown, Pencil, RotateCcw, Search, X, Trash2 } from "lucide-react";
+import { Check, Clock3, EllipsisVertical, Eye, FileDown, Pencil, RotateCcw, Search, Trash2, X } from "lucide-react";
 
 import { BudgetFormDialog } from "./budget-form-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
 import { DatePickerInput } from "@/components/date-picker-input";
+import { EntityDetailsDialog } from "@/components/entity-details-dialog";
 import { useResourcePermissions } from "@/hooks/use-resource-permissions";
 import {
   AdminFiltersDialog,
@@ -429,6 +430,34 @@ function buildScheduleSummary(budget: ManagedBudget, locale: string, t: ReturnTy
   });
 }
 
+function buildAddressSummary(budget: ManagedBudget) {
+  return [
+    budget.serviceStreet,
+    budget.serviceNumber,
+    budget.serviceComplement,
+    budget.serviceDistrict,
+    `${budget.serviceCity} - ${budget.serviceState}`,
+    budget.servicePostalCode,
+    budget.serviceCountry,
+  ]
+    .filter(Boolean)
+    .join(", ");
+}
+
+function buildBudgetTimeSummary(budget: ManagedBudget, t: ReturnType<typeof useI18n>["t"]) {
+  if (!budget.items.length) {
+    return t("budgets.noSchedule");
+  }
+
+  const sortedItems = [...budget.items].sort((left, right) => {
+    const leftValue = `${left.serviceDate}-${left.startTime}`;
+    const rightValue = `${right.serviceDate}-${right.startTime}`;
+    return leftValue.localeCompare(rightValue);
+  });
+
+  return `${sortedItems[0].startTime} - ${sortedItems[sortedItems.length - 1].endTime}`;
+}
+
 export function DataTable({
   budgets,
   clients,
@@ -452,6 +481,7 @@ export function DataTable({
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [editingBudget, setEditingBudget] = useState<ManagedBudget | null>(null);
+  const [viewingBudget, setViewingBudget] = useState<ManagedBudget | null>(null);
   const [pendingStatusAction, setPendingStatusAction] = useState<PendingStatusAction>(null);
   const [historyBudget, setHistoryBudget] = useState<ManagedBudget | null>(null);
   const [budgetHistory, setBudgetHistory] = useState<ManagedBudgetStatusHistory[]>([]);
@@ -474,6 +504,100 @@ export function DataTable({
       ),
     [budgets, createdDateRange, serviceDateRange],
   );
+
+  const openBudgetHistory = async (budget: ManagedBudget) => {
+    setHistoryBudget(budget);
+    setIsHistoryLoading(true);
+
+    try {
+      const response = await fetch(`/api/budgets/${budget.id}/history`, { cache: "no-store" });
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(payload?.error || t("budgets.updateError"));
+      }
+
+      setBudgetHistory(payload.history ?? []);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("budgets.updateError"));
+      setHistoryBudget(null);
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  };
+
+  const budgetDetailsSections = useMemo(() => {
+    if (!viewingBudget) {
+      return [];
+    }
+
+    const servicesList = (
+      <div className="space-y-3">
+        {viewingBudget.items.map((item) => (
+          <div key={item.id} className="rounded-lg border bg-muted/20 p-3">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="space-y-1">
+                <div className="font-medium">
+                  #{item.position} • {item.serviceTypeName}
+                </div>
+                <div className="text-sm text-muted-foreground">{item.serviceDescription}</div>
+              </div>
+              <div className="text-sm font-medium">{formatMoney(item.initialValue, locale)}</div>
+            </div>
+            <div className="mt-3 grid gap-2 text-sm text-muted-foreground md:grid-cols-2">
+              <div>
+                {formatDate(item.serviceDate, locale)} • {item.startTime} - {item.endTime}
+              </div>
+              <div>{item.equipmentName}</div>
+              <div>{item.operatorName}</div>
+              <div>{t("budgets.baseValueHint", {
+                value: formatMoney(item.baseValue, locale),
+                billingUnit: t(`budgets.billingUnits.${item.serviceTypeBillingUnit}`),
+              })}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+
+    return [
+      {
+        title: t("budgets.detailsFinancial"),
+        fields: [
+          { label: t("budgets.subtotalValue"), value: formatMoney(viewingBudget.subtotalValue, locale) },
+          { label: t("budgets.manualAdjustment"), value: formatMoney(viewingBudget.manualAdjustment, locale) },
+          { label: t("budgets.totalValue"), value: formatMoney(viewingBudget.totalValue, locale) },
+          { label: t("budgets.client"), value: viewingBudget.clientName },
+        ],
+      },
+      {
+        title: t("budgets.detailsExecution"),
+        fields: [
+          { label: t("budgets.schedule"), value: buildScheduleSummary(viewingBudget, locale, t) },
+          { label: t("budgets.detailsTimeWindow"), value: buildBudgetTimeSummary(viewingBudget, t) },
+          { label: t("budgets.createdAt"), value: new Date(viewingBudget.createdAt).toLocaleString(locale) },
+          { label: t("budgets.updatedAt"), value: new Date(viewingBudget.updatedAt).toLocaleString(locale) },
+        ],
+      },
+      {
+        title: t("budgets.locationSectionTitle"),
+        fields: [
+          { label: t("budgets.servicePostalCode"), value: viewingBudget.servicePostalCode },
+          { label: t("budgets.serviceCity"), value: `${viewingBudget.serviceCity} - ${viewingBudget.serviceState}` },
+          { label: t("budgets.serviceStreet"), value: buildAddressSummary(viewingBudget), fullWidth: true },
+        ],
+      },
+      {
+        title: t("budgets.itemsSectionTitle"),
+        fields: [
+          { label: t("budgets.services"), value: servicesList, fullWidth: true },
+          ...(viewingBudget.notes
+            ? [{ label: t("budgets.notes"), value: viewingBudget.notes, fullWidth: true }]
+            : []),
+        ],
+      },
+    ];
+  }, [locale, t, viewingBudget]);
 
   const columns = useMemo<ColumnDef<ManagedBudget>[]>(() => {
     const nextColumns: ColumnDef<ManagedBudget>[] = [];
@@ -511,7 +635,13 @@ export function DataTable({
       enableHiding: false,
       cell: ({ row }) => (
         <div className="space-y-1">
-          <div className="font-medium">{row.original.number}</div>
+          <button
+            type="button"
+            className="font-medium transition-colors hover:text-primary"
+            onClick={() => setViewingBudget(row.original)}
+          >
+            {row.original.number}
+          </button>
           <div className="text-sm text-muted-foreground">{row.original.clientName}</div>
         </div>
       ),
@@ -587,6 +717,10 @@ export function DataTable({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem className="cursor-pointer" onClick={() => setViewingBudget(budget)}>
+                <Eye className="mr-2 size-4" />
+                {t("common.details")}
+              </DropdownMenuItem>
               {canUpdate && isPending ? (
                 <DropdownMenuItem className="cursor-pointer" onClick={() => setEditingBudget(budget)}>
                   <Pencil className="mr-2 size-4" />
@@ -602,26 +736,7 @@ export function DataTable({
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="cursor-pointer"
-                onClick={async () => {
-                  setHistoryBudget(budget);
-                  setIsHistoryLoading(true);
-
-                  try {
-                    const response = await fetch(`/api/budgets/${budget.id}/history`, { cache: "no-store" });
-                    const payload = await response.json().catch(() => null);
-
-                    if (!response.ok) {
-                      throw new Error(payload?.error || t("budgets.updateError"));
-                    }
-
-                    setBudgetHistory(payload.history ?? []);
-                  } catch (error) {
-                    toast.error(error instanceof Error ? error.message : t("budgets.updateError"));
-                    setHistoryBudget(null);
-                  } finally {
-                    setIsHistoryLoading(false);
-                  }
-                }}
+                onClick={() => void openBudgetHistory(budget)}
               >
                 <Clock3 className="mr-2 size-4" />
                 {t("budgets.viewHistory")}
@@ -660,7 +775,7 @@ export function DataTable({
     });
 
     return nextColumns;
-  }, [canSelectRows, canUpdate, isMutating, locale, t]);
+  }, [canSelectRows, canUpdate, isMutating, locale, openBudgetHistory, t]);
 
   const table = useReactTable({
     data: filteredBudgets,
@@ -995,6 +1110,88 @@ export function DataTable({
           />
         </>
       ) : null}
+
+      <EntityDetailsDialog
+        open={Boolean(viewingBudget)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setViewingBudget(null);
+          }
+        }}
+        title={viewingBudget?.number ?? ""}
+        description={t("budgets.detailsDescription")}
+        subtitle={viewingBudget ? `${viewingBudget.clientName} • ${buildServicesSummary(viewingBudget, t)}` : null}
+        badges={viewingBudget ? [
+          <Badge
+            key="status"
+            variant="secondary"
+            className={getStatusBadgeClass(viewingBudget.status)}
+          >
+            {getBudgetStatusLabel(viewingBudget.status, t)}
+          </Badge>,
+        ] : []}
+        highlights={viewingBudget ? [
+          {
+            label: t("budgets.totalValue"),
+            value: formatMoney(viewingBudget.totalValue, locale),
+            helper: t("budgets.subtotalWithAdjustment", {
+              subtotal: formatMoney(viewingBudget.subtotalValue, locale),
+              adjustment: formatMoney(viewingBudget.manualAdjustment, locale),
+            }),
+          },
+          {
+            label: t("budgets.schedule"),
+            value: buildScheduleSummary(viewingBudget, locale, t),
+            helper: buildBudgetTimeSummary(viewingBudget, t),
+          },
+          {
+            label: t("budgets.services"),
+            value: t("budgets.itemsCountSummary", { count: viewingBudget.itemCount }),
+            helper: buildServicesSummary(viewingBudget, t),
+          },
+          {
+            label: t("budgets.locationSectionTitle"),
+            value: `${viewingBudget.serviceCity} - ${viewingBudget.serviceState}`,
+            helper: viewingBudget.serviceDistrict,
+          },
+        ] : []}
+        sections={budgetDetailsSections}
+        footer={viewingBudget ? (
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              className="cursor-pointer"
+              onClick={() => window.open(`/api/budgets/${viewingBudget.id}/pdf`, "_blank", "noopener,noreferrer")}
+            >
+              <FileDown className="mr-2 size-4" />
+              {t("budgets.downloadPdf")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="cursor-pointer"
+              onClick={() => void openBudgetHistory(viewingBudget)}
+            >
+              <Clock3 className="mr-2 size-4" />
+              {t("budgets.viewHistory")}
+            </Button>
+            {canUpdate && viewingBudget.status === "pending" ? (
+              <Button
+                type="button"
+                className="cursor-pointer"
+                onClick={() => {
+                  setEditingBudget(viewingBudget);
+                  setViewingBudget(null);
+                }}
+              >
+                <Pencil className="mr-2 size-4" />
+                {t("budgets.editBudget")}
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+      />
 
       <StatusHistoryDialog
         open={Boolean(historyBudget)}

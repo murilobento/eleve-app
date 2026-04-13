@@ -1,5 +1,5 @@
 import { createRequire } from "node:module";
-import { resolvePdfBrowserExecutablePath } from "@/lib/pdf-browser";
+import { getPdfBrowserLaunchOptions, resolvePdfBrowserExecutablePath } from "@/lib/pdf-browser";
 
 import type { ManagedCompany } from "@/lib/company-admin";
 import type { ManagedFuelRequisition } from "@/lib/fuel-requisitions-admin";
@@ -231,24 +231,9 @@ async function renderPdfFromHtml(html: string) {
   const require = createRequire(import.meta.url);
   const puppeteerModule = require("puppeteer-core") as typeof import("puppeteer-core");
   const puppeteer = puppeteerModule.default ?? puppeteerModule;
-  const browser = await puppeteer.launch({
-    executablePath: resolvePdfBrowserExecutablePath(),
-    headless: true,
-    pipe: true,
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-gpu",
-      "--disable-breakpad",
-      "--disable-crash-reporter",
-      "--disable-crashpad",
-      "--no-first-run",
-      "--no-default-browser-check",
-      "--no-zygote",
-      "--font-render-hinting=medium",
-    ],
-  });
+  const browser = await puppeteer.launch(
+    getPdfBrowserLaunchOptions(resolvePdfBrowserExecutablePath()),
+  );
 
   try {
     const page = await browser.newPage();

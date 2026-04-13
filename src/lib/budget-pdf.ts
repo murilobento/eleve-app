@@ -1,5 +1,5 @@
 import { createRequire } from "node:module";
-import { resolvePdfBrowserExecutablePath } from "@/lib/pdf-browser";
+import { getPdfBrowserLaunchOptions, resolvePdfBrowserExecutablePath } from "@/lib/pdf-browser";
 
 import type { ManagedBudget } from "@/lib/budgets-admin";
 import type { ManagedClient } from "@/lib/clients-admin";
@@ -114,11 +114,6 @@ function renderBudgetItemsRows(budget: ManagedBudget) {
           <td class="center-cell">
             <div>${escapeHtml(formatDate(item.serviceDate))}</div>
             <div class="meta">${escapeHtml(item.startTime)} as ${escapeHtml(item.endTime)}</div>
-          </td>
-          <td class="compact-cell">
-            <div>${escapeHtml(item.equipmentName)}</div>
-            <div class="meta">${escapeHtml(item.equipmentBrand)} • ${escapeHtml(item.equipmentModel)}</div>
-            <div class="meta">Operador: ${escapeHtml(item.operatorName)}</div>
           </td>
           <td class="money-cell">${escapeHtml(formatCurrency(item.initialValue))}</td>
         </tr>
@@ -430,24 +425,9 @@ export async function renderBudgetPdf(payload: BudgetPdfPayload) {
   const require = createRequire(import.meta.url);
   const puppeteerModule = require("puppeteer-core") as typeof import("puppeteer-core");
   const puppeteer = puppeteerModule.default ?? puppeteerModule;
-  const browser = await puppeteer.launch({
-    executablePath: resolvePdfBrowserExecutablePath(),
-    headless: true,
-    pipe: true,
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-gpu",
-      "--disable-breakpad",
-      "--disable-crash-reporter",
-      "--disable-crashpad",
-      "--no-first-run",
-      "--no-default-browser-check",
-      "--no-zygote",
-      "--font-render-hinting=medium",
-    ],
-  });
+  const browser = await puppeteer.launch(
+    getPdfBrowserLaunchOptions(resolvePdfBrowserExecutablePath()),
+  );
 
   try {
     const page = await browser.newPage();

@@ -30,6 +30,12 @@ type DetailSection = {
   fields: DetailField[];
 };
 
+type DetailHighlight = {
+  label: string;
+  value: ReactNode;
+  helper?: ReactNode;
+};
+
 type EntityDetailsDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -37,6 +43,7 @@ type EntityDetailsDialogProps = {
   description?: string;
   subtitle?: ReactNode;
   badges?: ReactNode[];
+  highlights?: DetailHighlight[];
   sections: DetailSection[];
   footer?: ReactNode;
 };
@@ -48,6 +55,7 @@ export function EntityDetailsDialog({
   description,
   subtitle,
   badges = [],
+  highlights = [],
   sections,
   footer,
 }: EntityDetailsDialogProps) {
@@ -74,7 +82,27 @@ export function EntityDetailsDialog({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-5">
-          <div className="grid gap-3 lg:grid-cols-2">
+          <div className="space-y-3">
+            {highlights.length ? (
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {highlights.map((highlight) => (
+                  <div
+                    key={highlight.label}
+                    className="rounded-xl border bg-muted/30 px-4 py-3"
+                  >
+                    <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      {highlight.label}
+                    </div>
+                    <div className="mt-2 text-base font-semibold tracking-tight">{highlight.value}</div>
+                    {highlight.helper ? (
+                      <div className="mt-1 text-xs text-muted-foreground">{highlight.helper}</div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            <div className="grid gap-3 lg:grid-cols-2">
             {sections.map((section) => (
               <Card key={section.title} className="gap-0 py-0">
                 <CardHeader className="grid-rows-[auto] gap-0 border-b px-4 py-2 [.border-b]:pb-2">
@@ -98,6 +126,7 @@ export function EntityDetailsDialog({
                 </CardContent>
               </Card>
             ))}
+            </div>
           </div>
         </div>
 

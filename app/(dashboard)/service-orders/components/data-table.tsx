@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { addDays, endOfDay, endOfMonth, startOfDay, startOfMonth, subDays, subMonths } from "date-fns";
-import { CalendarDays, CheckCircle2, Clock3, EllipsisVertical, Pencil, Play, RotateCcw, Search, Trash2, XCircle } from "lucide-react";
+import { CalendarDays, CheckCircle2, Clock3, EllipsisVertical, Eye, Pencil, Play, RotateCcw, Search, Trash2, XCircle } from "lucide-react";
 
 import { ServiceOrderFormDialog } from "./service-order-form-dialog";
 import {
@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
 import { DatePickerInput } from "@/components/date-picker-input";
+import { EntityDetailsDialog } from "@/components/entity-details-dialog";
 import { useResourcePermissions } from "@/hooks/use-resource-permissions";
 import { StatusHistoryDialog } from "@/components/status-history-dialog";
 import { StatusTransitionDialog } from "@/components/status-transition-dialog";
@@ -136,6 +137,13 @@ function formatCompactCalendarDate(value: Date, locale: string) {
 
 function formatDate(value: string, locale: string) {
   return formatCalendarDate(parseDateOnly(value), locale);
+}
+
+function formatMoney(value: number, locale: string) {
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: "BRL",
+  }).format(value);
 }
 
 function normalizeCustomDateRange(from?: Date, to?: Date) {
@@ -406,6 +414,47 @@ function getOriginLabel(originType: ManagedServiceOrder["originType"], t: Return
   return originType === "budget" ? t("serviceOrders.originBudget") : t("serviceOrders.originManual");
 }
 
+function buildServiceOrderScheduleSummary(serviceOrder: ManagedServiceOrder, locale: string, t: ReturnType<typeof useI18n>["t"]) {
+  const firstDate = serviceOrder.items[0]?.serviceDate;
+  const lastDate = serviceOrder.items[serviceOrder.items.length - 1]?.serviceDate;
+
+  if (!firstDate) {
+    return t("serviceOrders.noSchedule");
+  }
+
+  return firstDate === lastDate
+    ? formatDate(firstDate, locale)
+    : `${formatDate(firstDate, locale)} - ${formatDate(lastDate ?? firstDate, locale)}`;
+}
+
+function buildServiceOrderAddressSummary(serviceOrder: ManagedServiceOrder) {
+  return [
+    serviceOrder.serviceStreet,
+    serviceOrder.serviceNumber,
+    serviceOrder.serviceComplement,
+    serviceOrder.serviceDistrict,
+    `${serviceOrder.serviceCity} - ${serviceOrder.serviceState}`,
+    serviceOrder.servicePostalCode,
+    serviceOrder.serviceCountry,
+  ]
+    .filter(Boolean)
+    .join(", ");
+}
+
+function buildPlannedTimeSummary(serviceOrder: ManagedServiceOrder, t: ReturnType<typeof useI18n>["t"]) {
+  if (!serviceOrder.items.length) {
+    return t("serviceOrders.noSchedule");
+  }
+
+  const sortedItems = [...serviceOrder.items].sort((left, right) => {
+    const leftValue = `${left.serviceDate}-${left.plannedStartTime}`;
+    const rightValue = `${right.serviceDate}-${right.plannedStartTime}`;
+    return leftValue.localeCompare(rightValue);
+  });
+
+  return `${sortedItems[0].plannedStartTime} - ${sortedItems[sortedItems.length - 1].plannedEndTime}`;
+}
+
 export function DataTable({
   serviceOrders,
   clients,
@@ -436,6 +485,7 @@ export function DataTable({
   const [draftServiceDateFilter, setDraftServiceDateFilter] = useState<DateFilterValue>({ preset: "all" });
   const [createOpen, setCreateOpen] = useState(openCreateDialogFromQuery);
   const [editingServiceOrder, setEditingServiceOrder] = useState<ManagedServiceOrder | null>(null);
+  const [viewingServiceOrder, setViewingServiceOrder] = useState<ManagedServiceOrder | null>(null);
   const [pendingStatusAction, setPendingStatusAction] = useState<PendingStatusAction>(null);
   const [historyServiceOrder, setHistoryServiceOrder] = useState<ManagedServiceOrder | null>(null);
   const [serviceOrderHistory, setServiceOrderHistory] = useState<ManagedServiceOrderStatusHistory[]>([]);
@@ -483,6 +533,120 @@ export function DataTable({
     });
   }, [createdDateRange, serviceDateRange, serviceOrders, statusFilter]);
 
+  const openServiceOrderHistory = async (serviceOrder: ManagedServiceOrder) => {
+    setHistoryServiceOrder(serviceOrder);
+    setIsHistoryLoading(true);
+
+    try {
+      const response = await fetch(`/api/service-orders/${serviceOrder.id}/history`, { cache: "no-store" });
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(payload?.error || t("serviceOrders.updateError"));
+      }
+
+      setServiceOrderHistory(payload.history ?? []);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("serviceOrders.updateError"));
+      setHistoryServiceOrder(null);
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  };
+
+  const serviceOrderDetailsSections = useMemo(() => {
+    if (!viewingServiceOrder) {
+      return [];
+    }
+
+    const itemsList = (
+      <div className="space-y-3">
+        {viewingServiceOrder.items.map((item) => (
+          <div key={item.id} className="rounded-lg border bg-muted/20 p-3">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="space-y-1">
+                <div className="font-medium">
+                  #{item.position} • {item.serviceTypeName}
+                </div>
+                <div className="text-sm text-muted-foreground">{item.serviceDescription}</div>
+              </div>
+              <div className="text-sm font-medium">
+                {item.quotedValue !== null ? formatMoney(item.quotedValue, locale) : t("common.notProvided")}
+              </div>
+            </div>
+            <div className="mt-3 grid gap-2 text-sm text-muted-foreground md:grid-cols-2">
+              <div>
+                {formatDate(item.serviceDate, locale)} • {item.plannedStartTime} - {item.plannedEndTime}
+              </div>
+              <div>{item.equipmentName}</div>
+              <div>{item.operatorName}</div>
+              <div>
+                {item.actualStartTime && item.actualEndTime
+                  ? `${item.actualStartTime} - ${item.actualEndTime}`
+                  : t("common.notProvided")}
+              </div>
+              {item.notes ? <div className="md:col-span-2">{item.notes}</div> : null}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+
+    return [
+      {
+        title: t("serviceOrders.detailsOperational"),
+        fields: [
+          { label: t("serviceOrders.originType"), value: getOriginLabel(viewingServiceOrder.originType, t) },
+          {
+            label: t("serviceOrders.sourceBudget"),
+            value: viewingServiceOrder.sourceBudgetNumber ?? t("common.notProvided"),
+          },
+          { label: t("serviceOrders.client"), value: viewingServiceOrder.clientName },
+          {
+            label: t("serviceOrders.createdAt"),
+            value: new Date(viewingServiceOrder.createdAt).toLocaleString(locale),
+          },
+        ],
+      },
+      {
+        title: t("serviceOrders.detailsExecution"),
+        fields: [
+          { label: t("serviceOrders.schedule"), value: buildServiceOrderScheduleSummary(viewingServiceOrder, locale, t) },
+          { label: t("serviceOrders.detailsPlannedWindow"), value: buildPlannedTimeSummary(viewingServiceOrder, t) },
+          {
+            label: t("serviceOrders.detailsCompletedAt"),
+            value: viewingServiceOrder.completedAt
+              ? new Date(viewingServiceOrder.completedAt).toLocaleString(locale)
+              : t("common.notProvided"),
+          },
+          {
+            label: t("serviceOrders.detailsCancelledAt"),
+            value: viewingServiceOrder.cancelledAt
+              ? new Date(viewingServiceOrder.cancelledAt).toLocaleString(locale)
+              : t("common.notProvided"),
+          },
+        ],
+      },
+      {
+        title: t("serviceOrders.detailsLocation"),
+        fields: [
+          { label: t("serviceOrders.servicePostalCode"), value: viewingServiceOrder.servicePostalCode },
+          { label: t("serviceOrders.serviceCity"), value: `${viewingServiceOrder.serviceCity} - ${viewingServiceOrder.serviceState}` },
+          { label: t("serviceOrders.serviceStreet"), value: buildServiceOrderAddressSummary(viewingServiceOrder), fullWidth: true },
+        ],
+      },
+      {
+        title: t("serviceOrders.itemsSectionTitle"),
+        fields: [
+          { label: t("serviceOrders.itemsLabel"), value: itemsList, fullWidth: true },
+          ...(viewingServiceOrder.notes
+            ? [{ label: t("serviceOrders.notes"), value: viewingServiceOrder.notes, fullWidth: true }]
+            : []),
+        ],
+      },
+    ];
+  }, [locale, t, viewingServiceOrder]);
+
   const columns = useMemo<ColumnDef<ManagedServiceOrder>[]>(() => {
     const nextColumns: ColumnDef<ManagedServiceOrder>[] = [];
 
@@ -519,7 +683,13 @@ export function DataTable({
       enableHiding: false,
       cell: ({ row }) => (
         <div className="space-y-1">
-          <div className="font-medium">{row.original.number}</div>
+          <button
+            type="button"
+            className="font-medium transition-colors hover:text-primary"
+            onClick={() => setViewingServiceOrder(row.original)}
+          >
+            {row.original.number}
+          </button>
           {row.original.sourceBudgetNumber ? (
             <div className="text-xs text-muted-foreground">
               {t("serviceOrders.fromBudget", { number: row.original.sourceBudgetNumber })}
@@ -597,6 +767,10 @@ export function DataTable({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem className="cursor-pointer" onClick={() => setViewingServiceOrder(serviceOrder)}>
+                <Eye className="mr-2 size-4" />
+                {t("common.details")}
+              </DropdownMenuItem>
               {canUpdate && serviceOrder.status !== "completed" && serviceOrder.status !== "cancelled" ? (
                 <DropdownMenuItem className="cursor-pointer" onClick={() => setEditingServiceOrder(serviceOrder)}>
                   <Pencil className="mr-2 size-4" />
@@ -605,26 +779,7 @@ export function DataTable({
               ) : null}
               <DropdownMenuItem
                 className="cursor-pointer"
-                onClick={async () => {
-                  setHistoryServiceOrder(serviceOrder);
-                  setIsHistoryLoading(true);
-
-                  try {
-                    const response = await fetch(`/api/service-orders/${serviceOrder.id}/history`, { cache: "no-store" });
-                    const payload = await response.json().catch(() => null);
-
-                    if (!response.ok) {
-                      throw new Error(payload?.error || t("serviceOrders.updateError"));
-                    }
-
-                    setServiceOrderHistory(payload.history ?? []);
-                  } catch (error) {
-                    toast.error(error instanceof Error ? error.message : t("serviceOrders.updateError"));
-                    setHistoryServiceOrder(null);
-                  } finally {
-                    setIsHistoryLoading(false);
-                  }
-                }}
+                onClick={() => void openServiceOrderHistory(serviceOrder)}
               >
                 <Clock3 className="mr-2 size-4" />
                 {t("serviceOrders.viewHistory")}
@@ -666,7 +821,7 @@ export function DataTable({
     });
 
     return nextColumns;
-  }, [canSelectRows, canUpdate, isMutating, locale, t]);
+  }, [canSelectRows, canUpdate, isMutating, locale, openServiceOrderHistory, t]);
 
   const table = useReactTable({
     data: filteredServiceOrders,
@@ -1002,6 +1157,86 @@ export function DataTable({
           />
         </>
       ) : null}
+
+      <EntityDetailsDialog
+        open={Boolean(viewingServiceOrder)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setViewingServiceOrder(null);
+          }
+        }}
+        title={viewingServiceOrder?.number ?? ""}
+        description={t("serviceOrders.detailsDescription")}
+        subtitle={viewingServiceOrder ? `${viewingServiceOrder.clientName} • ${buildServiceOrderScheduleSummary(viewingServiceOrder, locale, t)}` : null}
+        badges={viewingServiceOrder ? [
+          <Badge
+            key="status"
+            variant="secondary"
+            className={getStatusBadgeClass(viewingServiceOrder.status)}
+          >
+            {getStatusLabel(viewingServiceOrder.status, t)}
+          </Badge>,
+          <Badge key="origin" variant="outline">
+            {getOriginLabel(viewingServiceOrder.originType, t)}
+          </Badge>,
+        ] : []}
+        highlights={viewingServiceOrder ? [
+          {
+            label: t("serviceOrders.schedule"),
+            value: buildServiceOrderScheduleSummary(viewingServiceOrder, locale, t),
+            helper: buildPlannedTimeSummary(viewingServiceOrder, t),
+          },
+          {
+            label: t("serviceOrders.itemsLabel"),
+            value: t("serviceOrders.itemsCountSummary", { count: viewingServiceOrder.itemCount }),
+            helper: viewingServiceOrder.sourceBudgetNumber
+              ? t("serviceOrders.fromBudget", { number: viewingServiceOrder.sourceBudgetNumber })
+              : t("serviceOrders.originManual"),
+          },
+          {
+            label: t("serviceOrders.detailsLocation"),
+            value: `${viewingServiceOrder.serviceCity} - ${viewingServiceOrder.serviceState}`,
+            helper: viewingServiceOrder.serviceDistrict,
+          },
+          {
+            label: t("serviceOrders.quotedValue"),
+            value: viewingServiceOrder.items.some((item) => item.quotedValue !== null)
+              ? formatMoney(
+                viewingServiceOrder.items.reduce((total, item) => total + Number(item.quotedValue ?? 0), 0),
+                locale,
+              )
+              : t("common.notProvided"),
+            helper: getStatusLabel(viewingServiceOrder.status, t),
+          },
+        ] : []}
+        sections={serviceOrderDetailsSections}
+        footer={viewingServiceOrder ? (
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              className="cursor-pointer"
+              onClick={() => void openServiceOrderHistory(viewingServiceOrder)}
+            >
+              <Clock3 className="mr-2 size-4" />
+              {t("serviceOrders.viewHistory")}
+            </Button>
+            {canUpdate && viewingServiceOrder.status !== "completed" && viewingServiceOrder.status !== "cancelled" ? (
+              <Button
+                type="button"
+                className="cursor-pointer"
+                onClick={() => {
+                  setEditingServiceOrder(viewingServiceOrder);
+                  setViewingServiceOrder(null);
+                }}
+              >
+                <Pencil className="mr-2 size-4" />
+                {t("serviceOrders.editServiceOrder")}
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+      />
 
       <StatusHistoryDialog
         open={Boolean(historyServiceOrder)}
