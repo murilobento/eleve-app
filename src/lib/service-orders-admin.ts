@@ -27,6 +27,8 @@ const statusReasonSchema = z
   .transform((value) => (value && value.length > 0 ? value : undefined));
 
 const MAX_SERVICE_ORDER_ITEMS = 50;
+const LAST_ALLOWED_START_TIME = "16:00";
+const LAST_ALLOWED_END_TIME = "17:00";
 
 const relationIdSchema = (label: string) => z.string().uuid(`Select a valid ${label}.`);
 
@@ -119,6 +121,22 @@ const serviceOrderItemSchema = z.object({
       code: z.ZodIssueCode.custom,
       path: ["plannedEndTime"],
       message: "Planned end time must be later than planned start time.",
+    });
+  }
+
+  if (value.plannedStartTime > LAST_ALLOWED_START_TIME) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["plannedStartTime"],
+      message: "Planned start time must be no later than 16:00.",
+    });
+  }
+
+  if (value.plannedEndTime > LAST_ALLOWED_END_TIME) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["plannedEndTime"],
+      message: "Planned end time must be no later than 17:00.",
     });
   }
 

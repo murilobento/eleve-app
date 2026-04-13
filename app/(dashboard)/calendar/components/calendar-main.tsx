@@ -164,7 +164,7 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
     )
     const totalMinutes = Math.max(60, timelineEndMinutes - timelineStartMinutes)
     const hourSlots = Array.from(
-      { length: Math.ceil(totalMinutes / 60) + 1 },
+      { length: Math.ceil(totalMinutes / 60) },
       (_, index) => timelineStartMinutes + index * 60
     )
 
@@ -331,7 +331,7 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
               >
                 <div className="grid grid-cols-[64px_minmax(0,1fr)]">
                   <div className="border-r bg-muted/10">
-                    {dayTimeline.hourSlots.slice(0, -1).map((slot) => (
+                    {dayTimeline.hourSlots.map((slot) => (
                       <div
                         key={slot}
                         className="border-b px-2.5 pt-1.5 text-right text-xs font-medium text-muted-foreground"
@@ -340,13 +340,10 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
                         {formatHourLabel(slot)}
                       </div>
                     ))}
-                    <div className="px-2.5 pt-1.5 text-right text-xs font-medium text-muted-foreground">
-                      {formatHourLabel(dayTimeline.hourSlots[dayTimeline.hourSlots.length - 1])}
-                    </div>
                   </div>
 
                   <div className="relative">
-                    {dayTimeline.hourSlots.slice(0, -1).map((slot) => (
+                    {dayTimeline.hourSlots.map((slot) => (
                       <div
                         key={slot}
                         className="border-b border-dashed"

@@ -900,7 +900,7 @@ export function ServiceOrderFormDialog({
                         <FormItem>
                           <FormLabel>{t("serviceOrders.plannedStartTime")}</FormLabel>
                           <FormControl>
-                            <Input {...itemField} type="time" disabled={isSubmitting} />
+                            <Input {...itemField} type="time" max="16:00" disabled={isSubmitting} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -913,7 +913,7 @@ export function ServiceOrderFormDialog({
                         <FormItem>
                           <FormLabel>{t("serviceOrders.plannedEndTime")}</FormLabel>
                           <FormControl>
-                            <Input {...itemField} type="time" disabled={isSubmitting} />
+                            <Input {...itemField} type="time" max="17:00" disabled={isSubmitting} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
