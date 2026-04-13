@@ -1318,6 +1318,7 @@ const messages: Record<AppLocale, any> = {
       exportDailyPdf: "Exportar PDF do dia",
       exportDailyPng: "Exportar PNG do dia",
       noEventsForDay: "Nenhuma ordem de serviço programada para esta data.",
+      noRecordsToExport: "Não há registros para exportar nesta data.",
       confirmDelete: "Excluir {name}? Esta ação não pode ser desfeita.",
       confirmDeleteFallback: "Excluir este evento? Esta ação não pode ser desfeita.",
       quickActions: {
@@ -2666,6 +2667,7 @@ const messages: Record<AppLocale, any> = {
       exportDailyPdf: "Export day PDF",
       exportDailyPng: "Export day PNG",
       noEventsForDay: "No service orders scheduled for this date.",
+      noRecordsToExport: "There are no records to export for this date.",
       confirmDelete: "Delete {name}? This action cannot be undone.",
       confirmDeleteFallback: "Delete this event? This action cannot be undone.",
       quickActions: {

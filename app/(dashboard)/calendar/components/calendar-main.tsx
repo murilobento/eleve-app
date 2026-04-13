@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { toast } from "sonner"
 import {
   ChevronLeft,
   ChevronRight,
@@ -479,12 +480,22 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
   }
 
   const handleExportDailyPdf = () => {
+    if (dayEvents.length === 0) {
+      toast.error(t("calendar.noRecordsToExport"))
+      return
+    }
+
     const date = formatAgendaDateKey(currentDate)
     const targetUrl = `/api/service-orders/daily-pdf?date=${encodeURIComponent(date)}`
     window.open(targetUrl, "_blank", "noopener,noreferrer")
   }
 
   const handleExportDailyPng = () => {
+    if (dayEvents.length === 0) {
+      toast.error(t("calendar.noRecordsToExport"))
+      return
+    }
+
     const date = formatAgendaDateKey(currentDate)
     const targetUrl = `/api/service-orders/daily-png?date=${encodeURIComponent(date)}`
     window.open(targetUrl, "_blank", "noopener,noreferrer")

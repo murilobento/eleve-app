@@ -17,6 +17,8 @@ function buildFilename(date: string) {
   return `agenda-servicos-${date}.png`;
 }
 
+const EMPTY_EXPORT_ERROR = "There are no records to export for this date.";
+
 export async function GET(request: Request) {
   try {
     const permission = await requirePermission(request, "service-orders.read");
@@ -37,9 +39,15 @@ export async function GET(request: Request) {
       getCompany(),
     ]);
 
+    const entries = listServiceAgendaEntriesForDate(serviceOrders, date);
+
+    if (entries.length === 0) {
+      return NextResponse.json({ error: EMPTY_EXPORT_ERROR }, { status: 400 });
+    }
+
     const png = await renderServiceAgendaPng({
       date,
-      entries: listServiceAgendaEntriesForDate(serviceOrders, date),
+      entries,
       company,
     });
 
