@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { SearchableCombobox } from "@/components/searchable-combobox";
@@ -44,6 +44,7 @@ import {
   createServiceOrderSchema,
   type CreateServiceOrderInput,
   type ManagedServiceOrder,
+  serviceOrderItemSchema,
   type ServiceOrderItemInput,
   type UpdateServiceOrderInput,
   updateServiceOrderSchema,
@@ -52,6 +53,7 @@ import type { ManagedServiceType } from "@/lib/service-types-admin";
 import { useFormValidationToast } from "@/hooks/use-form-validation-toast";
 import { formatPostalCode } from "@/lib/utils";
 import { useI18n } from "@/i18n/provider";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 type ServiceOrderFormDialogProps = {
   mode: "create" | "edit";
@@ -72,6 +74,7 @@ type PostalCodeLookupResponse = {
 };
 
 type ServiceAddressMode = "inherit" | "manual";
+type ItemDraftErrors = Partial<Record<keyof ServiceOrderItemInput, string>>;
 
 function createEmptyItem(): ServiceOrderItemInput {
   return {
@@ -156,6 +159,9 @@ export function ServiceOrderFormDialog({
   const [pendingAddressClient, setPendingAddressClient] = useState<ManagedClient | null>(null);
   const [pendingRetroactiveSubmit, setPendingRetroactiveSubmit] = useState<CreateServiceOrderInput | UpdateServiceOrderInput | null>(null);
   const [serviceAddressMode, setServiceAddressMode] = useState<ServiceAddressMode>("inherit");
+  const [itemDraft, setItemDraft] = useState<ServiceOrderItemInput>(createEmptyItem());
+  const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
+  const [itemDraftErrors, setItemDraftErrors] = useState<ItemDraftErrors>({});
 
   const form = useForm<CreateServiceOrderInput | UpdateServiceOrderInput>({
     resolver: zodResolver(schema),
@@ -175,7 +181,7 @@ export function ServiceOrderFormDialog({
       serviceState: "",
       serviceCountry: "Brasil",
       notes: "",
-      items: [createEmptyItem()],
+      items: [],
     },
   });
   const { formClassName, handleInvalidSubmit } = useFormValidationToast({
@@ -184,10 +190,11 @@ export function ServiceOrderFormDialog({
     fallback: t("serviceOrders.validationToastFallback"),
   });
 
-  const { fields, append, remove, replace } = useFieldArray({
+  const { fields, append, move, remove, replace, update } = useFieldArray({
     control: form.control,
     name: "items",
   });
+  const watchedItems = form.watch("items") ?? [];
 
   const watchedOriginType = form.watch("originType");
   const watchedSourceBudgetId = form.watch("sourceBudgetId");
@@ -228,6 +235,113 @@ export function ServiceOrderFormDialog({
     () => clientsById.get(watchedClientId ?? "") ?? null,
     [clientsById, watchedClientId],
   );
+  const serviceTypesById = useMemo(
+    () => new Map(serviceTypes.map((serviceType) => [serviceType.id, serviceType])),
+    [serviceTypes],
+  );
+  const equipmentById = useMemo(
+    () => new Map(equipment.map((equipmentOption) => [equipmentOption.id, equipmentOption])),
+    [equipment],
+  );
+  const operatorsById = useMemo(
+    () => new Map(operators.map((operator) => [operator.id, operator])),
+    [operators],
+  );
+
+  const clearItemDraftFieldError = (fieldName: keyof ServiceOrderItemInput) => {
+    setItemDraftErrors((current) => {
+      if (!current[fieldName]) {
+        return current;
+      }
+
+      const next = { ...current };
+      delete next[fieldName];
+      return next;
+    });
+  };
+
+  const updateItemDraftField = <K extends keyof ServiceOrderItemInput>(
+    fieldName: K,
+    value: ServiceOrderItemInput[K],
+  ) => {
+    setItemDraft((current) => ({ ...current, [fieldName]: value }));
+    clearItemDraftFieldError(fieldName);
+  };
+
+  const resetItemDraft = () => {
+    setItemDraft(createEmptyItem());
+    setEditingItemIndex(null);
+    setItemDraftErrors({});
+  };
+
+  const validateItemDraft = () => {
+    const parsed = serviceOrderItemSchema.safeParse(itemDraft);
+
+    if (parsed.success) {
+      setItemDraftErrors({});
+      return parsed.data;
+    }
+
+    const nextErrors: ItemDraftErrors = {};
+
+    parsed.error.issues.forEach((issue) => {
+      const fieldName = issue.path[0];
+
+      if (typeof fieldName !== "string") {
+        return;
+      }
+
+      if (nextErrors[fieldName as keyof ServiceOrderItemInput]) {
+        return;
+      }
+
+      nextErrors[fieldName as keyof ServiceOrderItemInput] = issue.message;
+    });
+
+    setItemDraftErrors(nextErrors);
+    return null;
+  };
+
+  const handleSaveItemDraft = () => {
+    const parsedItem = validateItemDraft();
+
+    if (!parsedItem) {
+      return;
+    }
+
+    if (editingItemIndex === null) {
+      append(parsedItem);
+    } else {
+      update(editingItemIndex, parsedItem);
+    }
+
+    resetItemDraft();
+  };
+
+  const handleEditItem = (index: number) => {
+    const item = form.getValues(`items.${index}`);
+
+    if (!item) {
+      return;
+    }
+
+    setItemDraft({
+      sourceBudgetItemId: item.sourceBudgetItemId ?? undefined,
+      serviceTypeId: item.serviceTypeId,
+      equipmentId: item.equipmentId,
+      operatorId: item.operatorId,
+      serviceDescription: item.serviceDescription,
+      serviceDate: item.serviceDate,
+      plannedStartTime: item.plannedStartTime,
+      plannedEndTime: item.plannedEndTime,
+      actualStartTime: item.actualStartTime ?? undefined,
+      actualEndTime: item.actualEndTime ?? undefined,
+      quotedValue: item.quotedValue ?? undefined,
+      notes: item.notes ?? "",
+    });
+    setEditingItemIndex(index);
+    setItemDraftErrors({});
+  };
 
   const copyAddressFromClient = (client: ManagedClient) => {
     form.setValue("servicePostalCode", formatPostalCode(client.postalCode), { shouldDirty: true, shouldValidate: true });
@@ -307,6 +421,9 @@ export function ServiceOrderFormDialog({
     setPendingRetroactiveSubmit(null);
     setServiceAddressMode("inherit");
     lastLookedUpServicePostalCodeRef.current = null;
+    setItemDraft(createEmptyItem());
+    setEditingItemIndex(null);
+    setItemDraftErrors({});
   }, [open]);
 
   useEffect(() => {
@@ -363,6 +480,9 @@ export function ServiceOrderFormDialog({
       lastLookedUpServicePostalCodeRef.current =
         sameAddressAsClient ? normalizePostalCode(serviceOrder.servicePostalCode) : null;
       lastHydratedBudgetIdRef.current = serviceOrder.sourceBudgetId;
+      setItemDraft(createEmptyItem());
+      setEditingItemIndex(null);
+      setItemDraftErrors({});
       return;
     }
 
@@ -379,12 +499,15 @@ export function ServiceOrderFormDialog({
       serviceState: "",
       serviceCountry: "Brasil",
       notes: "",
-      items: [createEmptyItem()],
+      items: [],
     });
     setPendingAddressClient(null);
     setPendingRetroactiveSubmit(null);
     setServiceAddressMode("inherit");
     lastLookedUpServicePostalCodeRef.current = null;
+    setItemDraft(createEmptyItem());
+    setEditingItemIndex(null);
+    setItemDraftErrors({});
   }, [clientsById, form, open, serviceOrder]);
 
   useEffect(() => {
@@ -407,6 +530,9 @@ export function ServiceOrderFormDialog({
     setServiceAddressMode("inherit");
     lastLookedUpServicePostalCodeRef.current = normalizePostalCode(budget.servicePostalCode);
     lastHydratedBudgetIdRef.current = watchedSourceBudgetId;
+    setItemDraft(createEmptyItem());
+    setEditingItemIndex(null);
+    setItemDraftErrors({});
   }, [approvedBudgetsById, form, open, replace, watchedOriginType, watchedSourceBudgetId]);
 
   useEffect(() => {
@@ -505,6 +631,9 @@ export function ServiceOrderFormDialog({
     setPendingRetroactiveSubmit(null);
     setServiceAddressMode("inherit");
     lastLookedUpServicePostalCodeRef.current = null;
+    setItemDraft(createEmptyItem());
+    setEditingItemIndex(null);
+    setItemDraftErrors({});
     onOpenChange(false);
   }
 
@@ -519,6 +648,9 @@ export function ServiceOrderFormDialog({
     setPendingRetroactiveSubmit(null);
     setServiceAddressMode("inherit");
     lastLookedUpServicePostalCodeRef.current = null;
+    setItemDraft(createEmptyItem());
+    setEditingItemIndex(null);
+    setItemDraftErrors({});
     onOpenChange(false);
   }
 
@@ -757,233 +889,320 @@ export function ServiceOrderFormDialog({
                   <h3 className="font-medium">{t("serviceOrders.itemsSectionTitle")}</h3>
                   <p className="text-sm text-muted-foreground">{t("serviceOrders.itemsSectionDescription")}</p>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="cursor-pointer"
-                  onClick={() => append(createEmptyItem())}
-                  disabled={isSubmitting}
-                >
-                  <Plus className="mr-2 size-4" />
-                  {t("serviceOrders.addItem")}
-                </Button>
               </div>
 
-              {fields.map((field, index) => (
-                <div key={field.id} className="space-y-4 rounded-lg border p-4">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-medium">{t("serviceOrders.itemTitle", { index: index + 1 })}</h4>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="cursor-pointer"
-                      onClick={() => remove(index)}
-                      disabled={fields.length === 1 || isSubmitting}
+              <div className="space-y-4 rounded-lg border p-4">
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="space-y-2">
+                    <FormLabel>{t("serviceOrders.serviceType")}</FormLabel>
+                    <Select
+                      value={itemDraft.serviceTypeId}
+                      onValueChange={(value) => updateItemDraftField("serviceTypeId", value)}
+                      disabled={isSubmitting}
                     >
-                      <Trash2 className="size-4" />
-                    </Button>
+                      <SelectTrigger className="cursor-pointer">
+                        <SelectValue placeholder={t("serviceOrders.selectServiceType")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {serviceTypes.map((serviceType) => (
+                          <SelectItem key={serviceType.id} value={serviceType.id}>
+                            {serviceType.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {itemDraftErrors.serviceTypeId ? <p className="text-sm text-destructive">{itemDraftErrors.serviceTypeId}</p> : null}
                   </div>
-
-                  <div className="grid gap-4 md:grid-cols-3">
-                    <FormField
-                      control={form.control}
-                      name={`items.${index}.serviceTypeId`}
-                      render={({ field: itemField }) => (
-                        <FormItem>
-                          <FormLabel>{t("serviceOrders.serviceType")}</FormLabel>
-                          <Select value={itemField.value} onValueChange={itemField.onChange} disabled={isSubmitting}>
-                            <FormControl>
-                              <SelectTrigger className="cursor-pointer">
-                                <SelectValue placeholder={t("serviceOrders.selectServiceType")} />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {serviceTypes.map((serviceType) => (
-                                <SelectItem key={serviceType.id} value={serviceType.id}>
-                                  {serviceType.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name={`items.${index}.equipmentId`}
-                      render={({ field: itemField }) => (
-                        <FormItem>
-                          <FormLabel>{t("serviceOrders.equipment")}</FormLabel>
-                          <Select value={itemField.value} onValueChange={itemField.onChange} disabled={isSubmitting}>
-                            <FormControl>
-                              <SelectTrigger className="cursor-pointer">
-                                <SelectValue placeholder={t("serviceOrders.selectEquipment")} />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {equipment.map((equipmentOption) => (
-                                <SelectItem key={equipmentOption.id} value={equipmentOption.id}>
-                                  {equipmentOption.name} • {equipmentOption.brand} {equipmentOption.model}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name={`items.${index}.operatorId`}
-                      render={({ field: itemField }) => (
-                        <FormItem>
-                          <FormLabel>{t("serviceOrders.operator")}</FormLabel>
-                          <Select value={itemField.value} onValueChange={itemField.onChange} disabled={isSubmitting}>
-                            <FormControl>
-                              <SelectTrigger className="cursor-pointer">
-                                <SelectValue placeholder={t("serviceOrders.selectOperator")} />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {operators.map((operator) => (
-                                <SelectItem key={operator.id} value={operator.id}>
-                                  {operator.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                  <div className="space-y-2">
+                    <FormLabel>{t("serviceOrders.equipment")}</FormLabel>
+                    <Select
+                      value={itemDraft.equipmentId}
+                      onValueChange={(value) => updateItemDraftField("equipmentId", value)}
+                      disabled={isSubmitting}
+                    >
+                      <SelectTrigger className="cursor-pointer">
+                        <SelectValue placeholder={t("serviceOrders.selectEquipment")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {equipment.map((equipmentOption) => (
+                          <SelectItem key={equipmentOption.id} value={equipmentOption.id}>
+                            {equipmentOption.name} • {equipmentOption.brand} {equipmentOption.model}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {itemDraftErrors.equipmentId ? <p className="text-sm text-destructive">{itemDraftErrors.equipmentId}</p> : null}
                   </div>
-
-                  <FormField
-                    control={form.control}
-                    name={`items.${index}.serviceDescription`}
-                    render={({ field: itemField }) => (
-                      <FormItem>
-                        <FormLabel>{t("serviceOrders.serviceDescription")}</FormLabel>
-                        <FormControl>
-                          <Textarea {...itemField} disabled={isSubmitting} rows={2} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="grid gap-4 md:grid-cols-4">
-                    <FormField
-                      control={form.control}
-                      name={`items.${index}.serviceDate`}
-                      render={({ field: itemField }) => (
-                        <FormItem>
-                          <FormLabel>{t("serviceOrders.serviceDate")}</FormLabel>
-                          <FormControl>
-                            <DatePickerInput
-                              value={parseDateString(itemField.value)}
-                              onChange={(date) => itemField.onChange(formatDateString(date))}
-                              placeholder={t("serviceOrders.selectDate")}
-                              disabled={isSubmitting}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name={`items.${index}.plannedStartTime`}
-                      render={({ field: itemField }) => (
-                        <FormItem>
-                          <FormLabel>{t("serviceOrders.plannedStartTime")}</FormLabel>
-                          <FormControl>
-                            <Input {...itemField} type="time" max="16:00" disabled={isSubmitting} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name={`items.${index}.plannedEndTime`}
-                      render={({ field: itemField }) => (
-                        <FormItem>
-                          <FormLabel>{t("serviceOrders.plannedEndTime")}</FormLabel>
-                          <FormControl>
-                            <Input {...itemField} type="time" max="17:00" disabled={isSubmitting} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name={`items.${index}.quotedValue`}
-                      render={({ field: itemField }) => (
-                        <FormItem>
-                          <FormLabel>{t("serviceOrders.quotedValue")}</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...itemField}
-                              type="number"
-                              step="0.01"
-                              value={itemField.value ?? ""}
-                              disabled={isSubmitting}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                  <div className="space-y-2">
+                    <FormLabel>{t("serviceOrders.operator")}</FormLabel>
+                    <Select
+                      value={itemDraft.operatorId}
+                      onValueChange={(value) => updateItemDraftField("operatorId", value)}
+                      disabled={isSubmitting}
+                    >
+                      <SelectTrigger className="cursor-pointer">
+                        <SelectValue placeholder={t("serviceOrders.selectOperator")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {operators.map((operator) => (
+                          <SelectItem key={operator.id} value={operator.id}>
+                            {operator.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {itemDraftErrors.operatorId ? <p className="text-sm text-destructive">{itemDraftErrors.operatorId}</p> : null}
                   </div>
-
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <FormField
-                      control={form.control}
-                      name={`items.${index}.actualStartTime`}
-                      render={({ field: itemField }) => (
-                        <FormItem>
-                          <FormLabel>{t("serviceOrders.actualStartTime")}</FormLabel>
-                          <FormControl>
-                            <Input {...itemField} type="time" value={itemField.value ?? ""} disabled={isSubmitting} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name={`items.${index}.actualEndTime`}
-                      render={({ field: itemField }) => (
-                        <FormItem>
-                          <FormLabel>{t("serviceOrders.actualEndTime")}</FormLabel>
-                          <FormControl>
-                            <Input {...itemField} type="time" value={itemField.value ?? ""} disabled={isSubmitting} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <FormField
-                    control={form.control}
-                    name={`items.${index}.notes`}
-                    render={({ field: itemField }) => (
-                      <FormItem>
-                        <FormLabel>{t("serviceOrders.itemNotes")}</FormLabel>
-                        <FormControl>
-                          <Textarea {...itemField} value={itemField.value ?? ""} disabled={isSubmitting} rows={2} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
                 </div>
-              ))}
+
+                <div className="space-y-2">
+                  <FormLabel>{t("serviceOrders.serviceDescription")}</FormLabel>
+                  <Textarea
+                    value={itemDraft.serviceDescription}
+                    onChange={(event) => updateItemDraftField("serviceDescription", event.target.value)}
+                    disabled={isSubmitting}
+                    rows={2}
+                  />
+                  {itemDraftErrors.serviceDescription ? <p className="text-sm text-destructive">{itemDraftErrors.serviceDescription}</p> : null}
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-4">
+                  <div className="space-y-2">
+                    <FormLabel>{t("serviceOrders.serviceDate")}</FormLabel>
+                    <DatePickerInput
+                      value={parseDateString(itemDraft.serviceDate)}
+                      onChange={(date) => updateItemDraftField("serviceDate", formatDateString(date))}
+                      placeholder={t("serviceOrders.selectDate")}
+                      disabled={isSubmitting}
+                    />
+                    {itemDraftErrors.serviceDate ? <p className="text-sm text-destructive">{itemDraftErrors.serviceDate}</p> : null}
+                  </div>
+                  <div className="space-y-2">
+                    <FormLabel>{t("serviceOrders.plannedStartTime")}</FormLabel>
+                    <Input
+                      value={itemDraft.plannedStartTime}
+                      onChange={(event) => updateItemDraftField("plannedStartTime", event.target.value)}
+                      type="time"
+                      max="16:00"
+                      disabled={isSubmitting}
+                    />
+                    {itemDraftErrors.plannedStartTime ? <p className="text-sm text-destructive">{itemDraftErrors.plannedStartTime}</p> : null}
+                  </div>
+                  <div className="space-y-2">
+                    <FormLabel>{t("serviceOrders.plannedEndTime")}</FormLabel>
+                    <Input
+                      value={itemDraft.plannedEndTime}
+                      onChange={(event) => updateItemDraftField("plannedEndTime", event.target.value)}
+                      type="time"
+                      max="17:00"
+                      disabled={isSubmitting}
+                    />
+                    {itemDraftErrors.plannedEndTime ? <p className="text-sm text-destructive">{itemDraftErrors.plannedEndTime}</p> : null}
+                  </div>
+                  <div className="space-y-2">
+                    <FormLabel>{t("serviceOrders.quotedValue")}</FormLabel>
+                    <Input
+                      value={itemDraft.quotedValue ?? ""}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        updateItemDraftField("quotedValue", value ? Number(value) : undefined);
+                      }}
+                      type="number"
+                      step="0.01"
+                      disabled={isSubmitting}
+                    />
+                    {itemDraftErrors.quotedValue ? <p className="text-sm text-destructive">{itemDraftErrors.quotedValue}</p> : null}
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <FormLabel>{t("serviceOrders.actualStartTime")}</FormLabel>
+                    <Input
+                      value={itemDraft.actualStartTime ?? ""}
+                      onChange={(event) => updateItemDraftField("actualStartTime", event.target.value || undefined)}
+                      type="time"
+                      disabled={isSubmitting}
+                    />
+                    {itemDraftErrors.actualStartTime ? <p className="text-sm text-destructive">{itemDraftErrors.actualStartTime}</p> : null}
+                  </div>
+                  <div className="space-y-2">
+                    <FormLabel>{t("serviceOrders.actualEndTime")}</FormLabel>
+                    <Input
+                      value={itemDraft.actualEndTime ?? ""}
+                      onChange={(event) => updateItemDraftField("actualEndTime", event.target.value || undefined)}
+                      type="time"
+                      disabled={isSubmitting}
+                    />
+                    {itemDraftErrors.actualEndTime ? <p className="text-sm text-destructive">{itemDraftErrors.actualEndTime}</p> : null}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <FormLabel>{t("serviceOrders.itemNotes")}</FormLabel>
+                  <Textarea
+                    value={itemDraft.notes ?? ""}
+                    onChange={(event) => updateItemDraftField("notes", event.target.value)}
+                    disabled={isSubmitting}
+                    rows={2}
+                  />
+                  {itemDraftErrors.notes ? <p className="text-sm text-destructive">{itemDraftErrors.notes}</p> : null}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button type="button" className="cursor-pointer" onClick={handleSaveItemDraft} disabled={isSubmitting}>
+                    <Plus className="mr-2 size-4" />
+                    {editingItemIndex === null ? t("serviceOrders.addItem") : t("common.saveChanges")}
+                  </Button>
+                  {editingItemIndex !== null ? (
+                    <Button type="button" variant="outline" className="cursor-pointer" onClick={resetItemDraft} disabled={isSubmitting}>
+                      {t("common.cancel")}
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+
+              {form.formState.errors.items?.message ? (
+                <p className="text-sm text-destructive">{form.formState.errors.items.message}</p>
+              ) : null}
+
+              <div className="rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>#</TableHead>
+                      <TableHead>{t("serviceOrders.serviceType")}</TableHead>
+                      <TableHead>{t("serviceOrders.serviceDescription")}</TableHead>
+                      <TableHead>{t("serviceOrders.serviceDate")}</TableHead>
+                      <TableHead>{t("serviceOrders.plannedStartTime")} / {t("serviceOrders.plannedEndTime")}</TableHead>
+                      <TableHead>{t("serviceOrders.equipment")}</TableHead>
+                      <TableHead>{t("serviceOrders.operator")}</TableHead>
+                      <TableHead>{t("serviceOrders.actions")}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {fields.length ? fields.map((field, index) => {
+                      const item = watchedItems[index];
+                      const serviceTypeName = serviceTypesById.get(item?.serviceTypeId ?? "")?.name ?? "-";
+                      const equipmentName = equipmentById.get(item?.equipmentId ?? "")?.name ?? "-";
+                      const operatorName = operatorsById.get(item?.operatorId ?? "")?.name ?? "-";
+
+                      return (
+                        <TableRow key={field.id}>
+                          <TableCell>{index + 1}</TableCell>
+                          <TableCell>{serviceTypeName}</TableCell>
+                          <TableCell className="max-w-[280px] truncate normal-case">{item?.serviceDescription || "-"}</TableCell>
+                          <TableCell>{item?.serviceDate || "-"}</TableCell>
+                          <TableCell>{item?.plannedStartTime || "--:--"} - {item?.plannedEndTime || "--:--"}</TableCell>
+                          <TableCell>{equipmentName}</TableCell>
+                          <TableCell>{operatorName}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="cursor-pointer"
+                                onClick={() => handleEditItem(index)}
+                                disabled={isSubmitting}
+                              >
+                                {t("common.edit")}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="cursor-pointer"
+                                onClick={() => {
+                                  if (index === 0) {
+                                    return;
+                                  }
+
+                                  move(index, index - 1);
+                                  setEditingItemIndex((current) => {
+                                    if (current === null) {
+                                      return current;
+                                    }
+                                    if (current === index) {
+                                      return index - 1;
+                                    }
+                                    if (current === index - 1) {
+                                      return index;
+                                    }
+                                    return current;
+                                  });
+                                }}
+                                disabled={index === 0 || isSubmitting}
+                              >
+                                <ArrowUp className="size-4" />
+                                <span className="sr-only">{t("serviceOrders.moveItemUp")}</span>
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="cursor-pointer"
+                                onClick={() => {
+                                  if (index === fields.length - 1) {
+                                    return;
+                                  }
+
+                                  move(index, index + 1);
+                                  setEditingItemIndex((current) => {
+                                    if (current === null) {
+                                      return current;
+                                    }
+                                    if (current === index) {
+                                      return index + 1;
+                                    }
+                                    if (current === index + 1) {
+                                      return index;
+                                    }
+                                    return current;
+                                  });
+                                }}
+                                disabled={index === fields.length - 1 || isSubmitting}
+                              >
+                                <ArrowDown className="size-4" />
+                                <span className="sr-only">{t("serviceOrders.moveItemDown")}</span>
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="cursor-pointer text-destructive hover:text-destructive"
+                                onClick={() => {
+                                  const shouldResetDraft = editingItemIndex === index;
+                                  remove(index);
+                                  if (shouldResetDraft) {
+                                    setItemDraft(createEmptyItem());
+                                    setEditingItemIndex(null);
+                                    setItemDraftErrors({});
+                                  } else {
+                                    setEditingItemIndex((current) => (
+                                      current !== null && current > index ? current - 1 : current
+                                    ));
+                                  }
+                                }}
+                                disabled={isSubmitting}
+                              >
+                                <Trash2 className="size-4" />
+                                <span className="sr-only">{t("common.delete")}</span>
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }) : (
+                      <TableRow>
+                        <TableCell colSpan={8} className="h-20 text-center normal-case text-muted-foreground">
+                          {t("serviceOrders.noItemsAdded")}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
 
             <FormField

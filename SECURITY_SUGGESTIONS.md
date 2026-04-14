@@ -147,3 +147,100 @@ Nesta rodada nao houve consolidacao do gerenciador oficial do projeto. Para audi
 2. Consolidar o gerenciador de pacotes oficial do repositorio.
 3. Se o deploy deixar de ser `single instance`, mover rate limiting para Redis ou camada equivalente.
 4. Avaliar HSTS apenas depois de confirmar dominio unico em HTTPS e politica de subdominios.
+
+## 9. Achados adicionais para correcao futura
+
+> Revisao adicional em 2026-04-11.
+> Objetivo: registrar pontos para backlog de hardening e validacao manual.
+
+### 9.1 Promocao automatica do primeiro usuario para admin
+
+**Severidade:** Alta
+
+**Evidencia:** `src/lib/auth.ts:125`
+
+O hook `databaseHooks.user.create.before` promove automaticamente o primeiro usuario criado para `admin`.
+
+**Impacto:** qualquer fluxo inesperado de bootstrap ou criacao inicial de conta pode resultar em concessao de privilegio maximo.
+
+**Correcao sugerida:** substituir a promocao automatica por bootstrap controlado via seed, script administrativo ou configuracao operacional explicitamente autorizada.
+
+### 9.2 Protecao fraca no middleware de paginas
+
+**Severidade:** Media/Alta
+
+**Evidencia:** `proxy.ts:19`, `proxy.ts:34`
+
+O `proxy` trata a pagina como autenticada apenas pela presenca do cookie `better-auth.session_token`, sem validar sessao nem permissao.
+
+**Impacto:** a camada edge pode permitir acesso inicial a paginas/estados intermediarios que depois dependem da camada cliente ou das APIs para negar acesso.
+
+**Correcao sugerida:** validar sessao real no servidor para rotas protegidas ou deixar explicito que o middleware faz apenas um gate preliminar e nao substitui autorizacao server-side.
+
+### 9.3 CSP pouco efetiva por padrao
+
+**Severidade:** Media
+
+**Evidencia:** `src/lib/security-headers.ts:5`, `src/lib/security-headers.ts:12`, `src/lib/security-headers.ts:23`
+
+Em producao, a politica padrao e `report-only`; em desenvolvimento, `off`. Alem disso, `style-src` permite `'unsafe-inline'`.
+
+**Impacto:** a aplicacao fica menos protegida contra XSS e regressa para um perfil de monitoramento em vez de bloqueio efetivo.
+
+**Correcao sugerida:** revisar dependencias do frontend, reduzir fontes inline quando possivel e planejar migracao gradual para `Content-Security-Policy` em modo `enforce`.
+
+### 9.4 Rate limit em memoria
+
+**Severidade:** Media
+
+**Evidencia:** `src/lib/auth.ts:107`, `src/lib/rate-limit.ts:30`
+
+O rate limit do Better Auth e o helper customizado usam armazenamento em memoria local.
+
+**Impacto:** em multi-instancia, restart ou ambiente serverless, o controle pode ser inconsistente e mais facil de contornar.
+
+**Correcao sugerida:** mover o armazenamento para backend compartilhado, como Redis, quando a topologia deixar de ser `single instance`.
+
+### 9.5 Dados locais expostos a XSS via localStorage
+
+**Severidade:** Media
+
+**Evidencia:** `src/lib/lockscreen.ts:2`, `app/(dashboard)/layout.tsx:79`, `app/(dashboard)/layout.tsx:80`, `app/(dashboard)/layout.tsx:110`
+
+A interface grava email do usuario, timestamps de atividade e estado de lock em `localStorage`.
+
+**Impacto:** qualquer XSS com execucao no browser consegue ler esses dados imediatamente.
+
+**Correcao sugerida:** minimizar dados persistidos no navegador, evitar gravar identificadores desnecessarios e preferir mecanismos menos expostos quando possivel.
+
+### 9.6 Logging de seguranca com metadados sensiveis
+
+**Severidade:** Media
+
+**Evidencia:** `src/lib/security-events.ts:27`
+
+Os eventos de seguranca registram `userId`, IP, `path`, `origin` e `details` arbitrarios.
+
+**Impacto:** melhora auditoria, mas exige controle de retencao, destino, acesso e cuidado para nao vazar contexto operacional em logs.
+
+**Correcao sugerida:** definir politica de retencao e acesso aos logs, revisar os campos permitidos em `details` e garantir mascaramento quando necessario.
+
+### 9.7 Endpoints amplos com potencial de overfetching
+
+**Severidade:** Media
+
+**Evidencia:** `app/api/service-orders/route.ts:29`
+
+O endpoint retorna dados principais e varias listas auxiliares no mesmo payload: `serviceOrders`, `clients`, `equipment`, `serviceTypes`, `operators` e `approvedBudgets`.
+
+**Impacto:** aumenta a superficie de exposicao de dados e dificulta aplicar minimo privilegio por caso de uso.
+
+**Correcao sugerida:** separar consultas por contexto de tela ou reduzir o payload aos dados estritamente necessarios.
+
+## 10. Validacoes manuais recomendadas
+
+1. Confirmar flags reais do cookie de sessao em runtime: `HttpOnly`, `Secure`, `SameSite`, dominio e expiracao.
+2. Testar IDOR/BOLA nas rotas `/api/*/[id]`, especialmente em usuarios, budgets, service-orders e requisicoes.
+3. Inspecionar headers HTTP reais para verificar CSP, cookies e politicas de seguranca efetivas.
+4. Validar o comportamento do `proxy` com cookie invalido, expirado ou forjado.
+5. Revisar se os payloads agregados das APIs podem ser reduzidos por endpoint e permissao.

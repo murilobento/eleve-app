@@ -102,7 +102,7 @@ const optionalDecimalFieldSchema = (label: string) =>
       .optional(),
   );
 
-const serviceOrderItemSchema = z.object({
+export const serviceOrderItemSchema = z.object({
   sourceBudgetItemId: optionalRelationIdSchema("budget item"),
   serviceTypeId: relationIdSchema("service type"),
   equipmentId: relationIdSchema("equipment"),

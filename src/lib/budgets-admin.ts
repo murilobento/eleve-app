@@ -164,7 +164,7 @@ export function calculateBudgetTotal(subtotalValue: number, manualAdjustment = 0
   return roundCurrencyValue(subtotalValue + Number(manualAdjustment || 0));
 }
 
-const budgetServiceItemSchema = z.object({
+export const budgetServiceItemSchema = z.object({
   serviceTypeId: relationIdSchema("service type"),
   equipmentId: relationIdSchema("equipment"),
   operatorId: relationIdSchema("operator"),

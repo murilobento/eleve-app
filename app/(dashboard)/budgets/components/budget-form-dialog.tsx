@@ -38,13 +38,13 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  addDurationToTime,
   calculateBudgetItemInitialValue,
   calculateBudgetItemSuggestedEndTime,
   calculateBudgetSubtotal,
   calculateBudgetTotal,
   createBudgetSchema,
   isLegacyHourlyBaseValue,
+  budgetServiceItemSchema,
   type BudgetServiceItemInput,
   type CreateBudgetInput,
   type ManagedBudget,
@@ -60,6 +60,7 @@ import { getSemanticStatusBadgeClass } from "@/lib/status-badge";
 import { useFormValidationToast } from "@/hooks/use-form-validation-toast";
 import { useI18n, useLocale } from "@/i18n/provider";
 import { cn, formatPostalCode } from "@/lib/utils";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 type BudgetFormDialogProps = {
   mode: "create" | "edit";
@@ -79,6 +80,7 @@ type ServiceAddressMode = "inherit" | "manual";
 type PostalCodeLookupResponse = {
   postalCode: PostalCodeLookupResult;
 };
+type ItemDraftErrors = Partial<Record<keyof BudgetServiceItemInput, string>>;
 
 function formatMoney(value: number, locale: string) {
   return new Intl.NumberFormat(locale, {
@@ -215,8 +217,11 @@ export function BudgetFormDialog({
   const locale = useLocale();
   const isEdit = mode === "edit";
   const schema = isEdit ? updateBudgetSchema : createBudgetSchema;
-  const [manualValueOverrides, setManualValueOverrides] = useState<boolean[]>([false]);
-  const [manualEndTimeOverrides, setManualEndTimeOverrides] = useState<boolean[]>([false]);
+  const [itemDraft, setItemDraft] = useState<BudgetServiceItemInput>(createEmptyItem());
+  const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
+  const [itemDraftErrors, setItemDraftErrors] = useState<ItemDraftErrors>({});
+  const [isDraftValueManual, setIsDraftValueManual] = useState(false);
+  const [isDraftEndTimeManual, setIsDraftEndTimeManual] = useState(false);
   const [pendingAddressClient, setPendingAddressClient] = useState<ManagedClient | null>(null);
   const [serviceAddressMode, setServiceAddressMode] = useState<ServiceAddressMode>("inherit");
   const lastLookedUpServicePostalCodeRef = useRef<string | null>(null);
@@ -238,7 +243,7 @@ export function BudgetFormDialog({
       serviceCountry: "Brasil",
       manualAdjustment: 0,
       notes: "",
-      items: [createEmptyItem()],
+      items: [],
     },
   });
   const { formClassName, handleInvalidSubmit } = useFormValidationToast({
@@ -247,7 +252,7 @@ export function BudgetFormDialog({
     fallback: t("budgets.validationToastFallback"),
   });
 
-  const { fields, append, move, remove } = useFieldArray({
+  const { fields, append, move, remove, update } = useFieldArray({
     control: form.control,
     name: "items",
   });
@@ -301,6 +306,125 @@ export function BudgetFormDialog({
     () => clientsById.get(watchedClientId ?? "") ?? null,
     [clientsById, watchedClientId],
   );
+  const equipmentById = useMemo(
+    () => new Map(equipment.map((equipmentItem) => [equipmentItem.id, equipmentItem])),
+    [equipment],
+  );
+  const operatorsById = useMemo(
+    () => new Map(operators.map((operator) => [operator.id, operator])),
+    [operators],
+  );
+  const selectedDraftServiceType = useMemo(
+    () => serviceTypesById.get(itemDraft.serviceTypeId) ?? null,
+    [itemDraft.serviceTypeId, serviceTypesById],
+  );
+  const draftEquipmentOptions = useMemo(
+    () => (
+      selectedDraftServiceType?.equipmentIds.length
+        ? equipment.filter((equipmentItem) => selectedDraftServiceType.equipmentIds.includes(equipmentItem.id))
+        : equipment
+    ),
+    [equipment, selectedDraftServiceType],
+  );
+
+  const clearItemDraftFieldError = (fieldName: keyof BudgetServiceItemInput) => {
+    setItemDraftErrors((current) => {
+      if (!current[fieldName]) {
+        return current;
+      }
+
+      const next = { ...current };
+      delete next[fieldName];
+      return next;
+    });
+  };
+
+  const updateItemDraftField = <K extends keyof BudgetServiceItemInput>(
+    fieldName: K,
+    value: BudgetServiceItemInput[K],
+  ) => {
+    setItemDraft((current) => ({ ...current, [fieldName]: value }));
+    clearItemDraftFieldError(fieldName);
+  };
+
+  const resetItemDraft = () => {
+    setItemDraft(createEmptyItem());
+    setEditingItemIndex(null);
+    setItemDraftErrors({});
+    setIsDraftValueManual(false);
+    setIsDraftEndTimeManual(false);
+  };
+
+  const validateItemDraft = () => {
+    const parsed = budgetServiceItemSchema.safeParse(itemDraft);
+
+    if (parsed.success) {
+      setItemDraftErrors({});
+      return parsed.data;
+    }
+
+    const nextErrors: ItemDraftErrors = {};
+
+    parsed.error.issues.forEach((issue) => {
+      const fieldName = issue.path[0];
+
+      if (typeof fieldName !== "string") {
+        return;
+      }
+
+      if (nextErrors[fieldName as keyof BudgetServiceItemInput]) {
+        return;
+      }
+
+      nextErrors[fieldName as keyof BudgetServiceItemInput] = issue.message;
+    });
+
+    setItemDraftErrors(nextErrors);
+    return null;
+  };
+
+  const handleSaveItemDraft = () => {
+    const parsedItem = validateItemDraft();
+
+    if (!parsedItem) {
+      return;
+    }
+
+    if (editingItemIndex === null) {
+      append(parsedItem);
+    } else {
+      update(editingItemIndex, parsedItem);
+    }
+
+    resetItemDraft();
+  };
+
+  const handleEditItem = (index: number) => {
+    const item = form.getValues(`items.${index}`);
+
+    if (!item) {
+      return;
+    }
+
+    const serviceType = serviceTypesById.get(item.serviceTypeId) ?? null;
+    const suggestedValue = calculateBudgetItemInitialValue(serviceType);
+    const suggestedEndTime = calculateBudgetItemSuggestedEndTime(serviceType, item.startTime);
+
+    setItemDraft({
+      serviceTypeId: item.serviceTypeId,
+      equipmentId: item.equipmentId,
+      operatorId: item.operatorId,
+      serviceDescription: item.serviceDescription,
+      serviceDate: item.serviceDate,
+      startTime: item.startTime,
+      endTime: item.endTime,
+      initialValue: Number(item.initialValue || 0),
+    });
+    setEditingItemIndex(index);
+    setItemDraftErrors({});
+    setIsDraftValueManual(Boolean(serviceType && Number(item.initialValue) !== suggestedValue));
+    setIsDraftEndTimeManual(Boolean(item.endTime && suggestedEndTime && item.endTime !== suggestedEndTime));
+  };
 
   const subtotalValue = useMemo(
     () =>
@@ -363,22 +487,6 @@ export function BudgetFormDialog({
     setPendingAddressClient(null);
   };
 
-  const setManualValueOverride = (index: number, value: boolean) => {
-    setManualValueOverrides((current) => {
-      const next = [...current];
-      next[index] = value;
-      return next;
-    });
-  };
-
-  const setManualEndTimeOverride = (index: number, value: boolean) => {
-    setManualEndTimeOverrides((current) => {
-      const next = [...current];
-      next[index] = value;
-      return next;
-    });
-  };
-
   useEffect(() => {
     if (open) {
       return;
@@ -386,6 +494,11 @@ export function BudgetFormDialog({
 
     setPendingAddressClient(null);
     lastLookedUpServicePostalCodeRef.current = null;
+    setItemDraft(createEmptyItem());
+    setEditingItemIndex(null);
+    setItemDraftErrors({});
+    setIsDraftValueManual(false);
+    setIsDraftEndTimeManual(false);
   }, [open]);
 
   useEffect(() => {
@@ -414,7 +527,7 @@ export function BudgetFormDialog({
             initialValue: normalizedInitialValue,
           };
         })
-      : [createEmptyItem()];
+      : [];
 
     form.reset({
       clientId: budget?.clientId ?? "",
@@ -451,78 +564,12 @@ export function BudgetFormDialog({
     lastLookedUpServicePostalCodeRef.current =
       initialAddressMode === "manual" ? normalizePostalCode(budget?.servicePostalCode) || null : null;
 
-    setManualValueOverrides(
-      nextItems.map((item) => {
-        const serviceType = serviceTypesById.get(item.serviceTypeId) ?? null;
-        const suggestedValue = calculateBudgetItemInitialValue(serviceType);
-        return serviceType ? Number(item.initialValue) !== suggestedValue : false;
-      }),
-    );
-
-    setManualEndTimeOverrides(
-      nextItems.map((item) => {
-        const serviceType = serviceTypesById.get(item.serviceTypeId) ?? null;
-        const suggestedEndTime = calculateBudgetItemSuggestedEndTime(serviceType, item.startTime);
-        return Boolean(item.endTime && suggestedEndTime && item.endTime !== suggestedEndTime);
-      }),
-    );
+    setItemDraft(createEmptyItem());
+    setEditingItemIndex(null);
+    setItemDraftErrors({});
+    setIsDraftValueManual(false);
+    setIsDraftEndTimeManual(false);
   }, [budget, clientsById, form, open, serviceTypesById]);
-
-  useEffect(() => {
-    if (manualValueOverrides.length === fields.length && manualEndTimeOverrides.length === fields.length) {
-      return;
-    }
-
-    setManualValueOverrides((current) => Array.from({ length: fields.length }, (_, index) => current[index] ?? false));
-    setManualEndTimeOverrides((current) => Array.from({ length: fields.length }, (_, index) => current[index] ?? false));
-  }, [fields.length, manualEndTimeOverrides.length, manualValueOverrides.length]);
-
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    watchedItems.forEach((item, index) => {
-      const serviceType = serviceTypesById.get(item?.serviceTypeId ?? "") ?? null;
-      const valuePath = `items.${index}.initialValue` as const;
-      const endTimePath = `items.${index}.endTime` as const;
-
-      if (serviceType && !manualValueOverrides[index]) {
-        const suggestedValue = calculateBudgetItemInitialValue(serviceType);
-
-        if (suggestedValue > 0 && Number(item?.initialValue || 0) !== suggestedValue) {
-          form.setValue(valuePath, suggestedValue, {
-            shouldDirty: false,
-            shouldValidate: true,
-          });
-        }
-      }
-
-      if (!serviceType || serviceType.billingUnit !== "hour" || !serviceType.minimumHours || !item?.startTime) {
-        form.clearErrors(endTimePath);
-        return;
-      }
-
-      const suggestedEndTime = addDurationToTime(item.startTime, serviceType.minimumHours);
-
-      if (!suggestedEndTime) {
-        form.setError(endTimePath, {
-          type: "manual",
-          message: t("budgets.endTimeOverflow"),
-        });
-        return;
-      }
-
-      form.clearErrors(endTimePath);
-
-      if (!manualEndTimeOverrides[index] && item.endTime !== suggestedEndTime) {
-        form.setValue(endTimePath, suggestedEndTime, {
-          shouldDirty: false,
-          shouldValidate: true,
-        });
-      }
-    });
-  }, [form, manualEndTimeOverrides, manualValueOverrides, open, serviceTypesById, t, watchedItems]);
 
   useEffect(() => {
     if (!open || serviceAddressMode !== "manual") {
@@ -604,6 +651,47 @@ export function BudgetFormDialog({
     };
   }, [form, open, serviceAddressMode, t, watchedServicePostalCode]);
 
+  useEffect(() => {
+    const serviceType = serviceTypesById.get(itemDraft.serviceTypeId) ?? null;
+
+    if (!serviceType) {
+      return;
+    }
+
+    if (!isDraftValueManual) {
+      const suggestedValue = calculateBudgetItemInitialValue(serviceType);
+
+      if (suggestedValue > 0 && Number(itemDraft.initialValue || 0) !== suggestedValue) {
+        setItemDraft((current) => ({ ...current, initialValue: suggestedValue }));
+      }
+    }
+
+    if (!isDraftEndTimeManual) {
+      const suggestedEndTime = calculateBudgetItemSuggestedEndTime(serviceType, itemDraft.startTime);
+
+      if (suggestedEndTime && itemDraft.endTime !== suggestedEndTime) {
+        setItemDraft((current) => ({ ...current, endTime: suggestedEndTime }));
+      }
+    }
+
+    if (
+      serviceType.equipmentIds.length
+      && itemDraft.equipmentId
+      && !serviceType.equipmentIds.includes(itemDraft.equipmentId)
+    ) {
+      setItemDraft((current) => ({ ...current, equipmentId: "" }));
+    }
+  }, [
+    isDraftEndTimeManual,
+    isDraftValueManual,
+    itemDraft.equipmentId,
+    itemDraft.endTime,
+    itemDraft.initialValue,
+    itemDraft.serviceTypeId,
+    itemDraft.startTime,
+    serviceTypesById,
+  ]);
+
   async function handleSubmit(values: CreateBudgetInput | UpdateBudgetInput) {
     await onSubmit(values);
     form.reset({
@@ -618,10 +706,13 @@ export function BudgetFormDialog({
       serviceCountry: "Brasil",
       manualAdjustment: 0,
       notes: "",
-      items: [createEmptyItem()],
+      items: [],
     });
-    setManualValueOverrides([false]);
-    setManualEndTimeOverrides([false]);
+    setItemDraft(createEmptyItem());
+    setEditingItemIndex(null);
+    setItemDraftErrors({});
+    setIsDraftValueManual(false);
+    setIsDraftEndTimeManual(false);
     setPendingAddressClient(null);
     setServiceAddressMode("inherit");
     lastLookedUpServicePostalCodeRef.current = null;
@@ -836,358 +927,306 @@ export function BudgetFormDialog({
               </div>
 
               <section className="space-y-4 rounded-xl border bg-card p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="space-y-1">
-                    <h3 className="text-sm font-semibold">{t("budgets.itemsSectionTitle")}</h3>
-                    <p className="text-sm text-muted-foreground">{t("budgets.itemsSectionDescription")}</p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="cursor-pointer"
-                    onClick={() => {
-                      append(createEmptyItem());
-                      setManualValueOverrides((current) => [...current, false]);
-                      setManualEndTimeOverrides((current) => [...current, false]);
-                    }}
-                  >
-                    <Plus className="mr-2 size-4" />
-                    {t("budgets.addServiceItem")}
-                  </Button>
+                <div className="space-y-1">
+                  <h3 className="text-sm font-semibold">{t("budgets.itemsSectionTitle")}</h3>
+                  <p className="text-sm text-muted-foreground">{t("budgets.itemsSectionDescription")}</p>
                 </div>
 
-                <div className="space-y-4">
-                  {fields.map((field, index) => {
-                    const item = watchedItems[index];
-                    const selectedServiceType = serviceTypesById.get(item?.serviceTypeId ?? "") ?? null;
-                    const equipmentOptions =
-                      selectedServiceType?.equipmentIds.length
-                        ? equipment.filter((equipmentItem) => selectedServiceType.equipmentIds.includes(equipmentItem.id))
-                        : equipment;
-                    const serviceTypeCaption = buildServiceTypeCaption(selectedServiceType, locale, t);
+                <div className="space-y-4 rounded-xl border bg-muted/10 p-4">
+                  <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
+                    <div className="space-y-2">
+                      <FormLabel>{t("budgets.serviceType")}</FormLabel>
+                      <Select
+                        value={itemDraft.serviceTypeId}
+                        onValueChange={(value) => {
+                          updateItemDraftField("serviceTypeId", value);
+                          setIsDraftValueManual(false);
+                          setIsDraftEndTimeManual(false);
+                        }}
+                      >
+                        <SelectTrigger className="w-full cursor-pointer">
+                          <SelectValue placeholder={t("budgets.selectServiceType")} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {serviceTypes.map((serviceType) => (
+                            <SelectItem key={serviceType.id} value={serviceType.id}>
+                              {serviceType.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {itemDraftErrors.serviceTypeId ? <p className="text-sm text-destructive">{itemDraftErrors.serviceTypeId}</p> : null}
+                      {selectedDraftServiceType ? (
+                        <p className="text-xs text-muted-foreground">{buildServiceTypeCaption(selectedDraftServiceType, locale, t)}</p>
+                      ) : null}
+                    </div>
 
-                    return (
-                      <div key={field.id} className="rounded-xl border bg-muted/10 p-4">
-                        <div className="flex flex-wrap items-start justify-between gap-3 border-b pb-4">
-                          <div className="space-y-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h4 className="text-sm font-semibold">
-                                {t("budgets.serviceItemTitle", { index: index + 1 })}
-                              </h4>
-                              {selectedServiceType ? (
-                                <Badge variant="outline" className="rounded-full px-2 py-0.5 text-xs">
-                                  {selectedServiceType.name}
-                                </Badge>
-                              ) : null}
-                            </div>
-                            <p className="text-sm text-muted-foreground">
-                              {serviceTypeCaption || t("budgets.serviceItemPlaceholderCaption")}
-                            </p>
-                          </div>
+                    <div className="space-y-2">
+                      <FormLabel>{t("budgets.equipment")}</FormLabel>
+                      <Select
+                        value={itemDraft.equipmentId}
+                        onValueChange={(value) => updateItemDraftField("equipmentId", value)}
+                      >
+                        <SelectTrigger className="w-full cursor-pointer">
+                          <SelectValue placeholder={t("budgets.selectEquipment")} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {draftEquipmentOptions.map((equipmentItem) => (
+                            <SelectItem key={equipmentItem.id} value={equipmentItem.id}>
+                              {equipmentItem.name} • {equipmentItem.brand} • {equipmentItem.model}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {itemDraftErrors.equipmentId ? <p className="text-sm text-destructive">{itemDraftErrors.equipmentId}</p> : null}
+                    </div>
 
-                          <div className="flex items-center gap-1">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="cursor-pointer"
-                              onClick={() => {
-                                if (index === 0) {
-                                  return;
-                                }
+                    <div className="space-y-2">
+                      <FormLabel>{t("budgets.operator")}</FormLabel>
+                      <Select
+                        value={itemDraft.operatorId}
+                        onValueChange={(value) => updateItemDraftField("operatorId", value)}
+                      >
+                        <SelectTrigger className="w-full cursor-pointer">
+                          <SelectValue placeholder={t("budgets.selectOperator")} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {operators.map((operator) => (
+                            <SelectItem key={operator.id} value={operator.id}>
+                              {operator.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {itemDraftErrors.operatorId ? <p className="text-sm text-destructive">{itemDraftErrors.operatorId}</p> : null}
+                    </div>
 
-                                move(index, index - 1);
-                                setManualValueOverrides((current) => {
-                                  const next = [...current];
-                                  [next[index - 1], next[index]] = [next[index], next[index - 1]];
-                                  return next;
-                                });
-                                setManualEndTimeOverrides((current) => {
-                                  const next = [...current];
-                                  [next[index - 1], next[index]] = [next[index], next[index - 1]];
-                                  return next;
-                                });
-                              }}
-                              disabled={index === 0 || isSubmitting}
-                            >
-                              <ArrowUp className="size-4" />
-                              <span className="sr-only">{t("budgets.moveServiceUp")}</span>
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="cursor-pointer"
-                              onClick={() => {
-                                if (index === fields.length - 1) {
-                                  return;
-                                }
+                    <div className="space-y-2">
+                      <FormLabel>{t("budgets.serviceDate")}</FormLabel>
+                      <DatePickerInput
+                        value={parseDateString(itemDraft.serviceDate)}
+                        onChange={(date) => updateItemDraftField("serviceDate", formatDateString(date))}
+                        placeholder={t("budgets.selectDate")}
+                        disabledDays={minServiceDate ? { before: minServiceDate } : undefined}
+                      />
+                      {itemDraftErrors.serviceDate ? <p className="text-sm text-destructive">{itemDraftErrors.serviceDate}</p> : null}
+                    </div>
+                  </div>
 
-                                move(index, index + 1);
-                                setManualValueOverrides((current) => {
-                                  const next = [...current];
-                                  [next[index], next[index + 1]] = [next[index + 1], next[index]];
-                                  return next;
-                                });
-                                setManualEndTimeOverrides((current) => {
-                                  const next = [...current];
-                                  [next[index], next[index + 1]] = [next[index + 1], next[index]];
-                                  return next;
-                                });
-                              }}
-                              disabled={index === fields.length - 1 || isSubmitting}
-                            >
-                              <ArrowDown className="size-4" />
-                              <span className="sr-only">{t("budgets.moveServiceDown")}</span>
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="cursor-pointer text-destructive hover:text-destructive"
-                              onClick={() => {
-                                if (fields.length === 1) {
-                                  return;
-                                }
+                  <div className="space-y-2">
+                    <FormLabel>{t("budgets.serviceDescription")}</FormLabel>
+                    <Input
+                      value={itemDraft.serviceDescription}
+                      onChange={(event) => updateItemDraftField("serviceDescription", event.target.value)}
+                      placeholder={t("budgets.serviceDescriptionPlaceholder")}
+                    />
+                    {itemDraftErrors.serviceDescription ? <p className="text-sm text-destructive">{itemDraftErrors.serviceDescription}</p> : null}
+                  </div>
 
-                                remove(index);
-                                setManualValueOverrides((current) => current.filter((_, currentIndex) => currentIndex !== index));
-                                setManualEndTimeOverrides((current) => current.filter((_, currentIndex) => currentIndex !== index));
-                              }}
-                              disabled={fields.length === 1 || isSubmitting}
-                            >
-                              <Trash2 className="size-4" />
-                              <span className="sr-only">{t("budgets.removeServiceItem")}</span>
-                            </Button>
-                          </div>
-                        </div>
+                  <div className="grid gap-3 lg:grid-cols-3">
+                    <div className="space-y-2">
+                      <FormLabel>{t("budgets.startTime")}</FormLabel>
+                      <Input
+                        type="time"
+                        value={itemDraft.startTime}
+                        onChange={(event) => {
+                          updateItemDraftField("startTime", event.target.value);
+                          setIsDraftEndTimeManual(false);
+                        }}
+                      />
+                      {itemDraftErrors.startTime ? <p className="text-sm text-destructive">{itemDraftErrors.startTime}</p> : null}
+                    </div>
 
-                        <div className="mt-4 space-y-4">
-                          <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
-                            <FormField
-                              control={form.control}
-                              name={`items.${index}.serviceTypeId`}
-                              render={({ field: itemField }) => (
-                                <FormItem>
-                                  <FormLabel>{t("budgets.serviceType")}</FormLabel>
-                                  <Select
-                                    onValueChange={(value) => {
-                                      itemField.onChange(value);
-                                      const serviceType = serviceTypesById.get(value) ?? null;
-                                      const equipmentPath = `items.${index}.equipmentId` as const;
-                                      const initialValuePath = `items.${index}.initialValue` as const;
-                                      const endTimePath = `items.${index}.endTime` as const;
-                                      const currentEquipmentId = form.getValues(equipmentPath);
+                    <div className="space-y-2">
+                      <FormLabel>{t("budgets.endTime")}</FormLabel>
+                      <Input
+                        type="time"
+                        value={itemDraft.endTime}
+                        onChange={(event) => {
+                          updateItemDraftField("endTime", event.target.value);
+                          setIsDraftEndTimeManual(true);
+                        }}
+                      />
+                      {itemDraftErrors.endTime ? <p className="text-sm text-destructive">{itemDraftErrors.endTime}</p> : null}
+                    </div>
 
-                                      setManualValueOverride(index, false);
-                                      setManualEndTimeOverride(index, false);
+                    <div className="space-y-2">
+                      <FormLabel>{t("budgets.initialValue")}</FormLabel>
+                      <Input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        inputMode="decimal"
+                        placeholder="0,00"
+                        value={itemDraft.initialValue === 0 ? "" : itemDraft.initialValue}
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          updateItemDraftField("initialValue", value ? Number(value) : 0);
+                          setIsDraftValueManual(Boolean(value));
+                        }}
+                      />
+                      {itemDraftErrors.initialValue ? <p className="text-sm text-destructive">{itemDraftErrors.initialValue}</p> : null}
+                    </div>
+                  </div>
 
-                                      if (
-                                        serviceType?.equipmentIds.length &&
-                                        currentEquipmentId &&
-                                        !serviceType.equipmentIds.includes(currentEquipmentId)
-                                      ) {
-                                        form.setValue(equipmentPath, "", { shouldDirty: true, shouldValidate: true });
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button type="button" className="cursor-pointer" onClick={handleSaveItemDraft} disabled={isSubmitting}>
+                      <Plus className="mr-2 size-4" />
+                      {editingItemIndex === null ? t("budgets.addServiceItem") : t("common.saveChanges")}
+                    </Button>
+                    {editingItemIndex !== null ? (
+                      <Button type="button" variant="outline" className="cursor-pointer" onClick={resetItemDraft} disabled={isSubmitting}>
+                        {t("common.cancel")}
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+
+                {form.formState.errors.items?.message ? (
+                  <p className="text-sm text-destructive">{form.formState.errors.items.message}</p>
+                ) : null}
+
+                <div className="rounded-xl border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>#</TableHead>
+                        <TableHead>{t("budgets.serviceType")}</TableHead>
+                        <TableHead>{t("budgets.serviceDescription")}</TableHead>
+                        <TableHead>{t("budgets.serviceDate")}</TableHead>
+                        <TableHead>{t("budgets.startTime")} / {t("budgets.endTime")}</TableHead>
+                        <TableHead>{t("budgets.equipment")}</TableHead>
+                        <TableHead>{t("budgets.operator")}</TableHead>
+                        <TableHead>{t("budgets.initialValue")}</TableHead>
+                        <TableHead>{t("budgets.actions")}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {fields.length ? fields.map((field, index) => {
+                        const item = watchedItems[index];
+                        const serviceType = serviceTypesById.get(item?.serviceTypeId ?? "") ?? null;
+                        const equipmentItem = equipmentById.get(item?.equipmentId ?? "");
+                        const operator = operatorsById.get(item?.operatorId ?? "");
+
+                        return (
+                          <TableRow key={field.id}>
+                            <TableCell>{index + 1}</TableCell>
+                            <TableCell>{serviceType?.name ?? "-"}</TableCell>
+                            <TableCell className="max-w-[280px] truncate normal-case">{item?.serviceDescription || "-"}</TableCell>
+                            <TableCell>{item?.serviceDate || "-"}</TableCell>
+                            <TableCell>{item?.startTime || "--:--"} - {item?.endTime || "--:--"}</TableCell>
+                            <TableCell>{equipmentItem?.name ?? "-"}</TableCell>
+                            <TableCell>{operator?.name ?? "-"}</TableCell>
+                            <TableCell>{formatMoney(Number(item?.initialValue || 0), locale)}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center justify-end gap-1">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="cursor-pointer"
+                                  onClick={() => handleEditItem(index)}
+                                  disabled={isSubmitting}
+                                >
+                                  {t("common.edit")}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="cursor-pointer"
+                                  onClick={() => {
+                                    if (index === 0) {
+                                      return;
+                                    }
+
+                                    move(index, index - 1);
+                                    setEditingItemIndex((current) => {
+                                      if (current === null) {
+                                        return current;
                                       }
-
-                                      if (serviceType) {
-                                        form.setValue(initialValuePath, calculateBudgetItemInitialValue(serviceType), {
-                                          shouldDirty: true,
-                                          shouldValidate: true,
-                                        });
-
-                                        const currentStartTime = form.getValues(`items.${index}.startTime` as const);
-                                        const suggestedEndTime = calculateBudgetItemSuggestedEndTime(serviceType, currentStartTime);
-
-                                        if (suggestedEndTime) {
-                                          form.setValue(endTimePath, suggestedEndTime, {
-                                            shouldDirty: false,
-                                            shouldValidate: true,
-                                          });
-                                        }
+                                      if (current === index) {
+                                        return index - 1;
                                       }
-                                    }}
-                                    value={itemField.value}
-                                  >
-                                    <FormControl>
-                                      <SelectTrigger className="w-full cursor-pointer">
-                                        <SelectValue placeholder={t("budgets.selectServiceType")} />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      {serviceTypes.map((serviceType) => (
-                                        <SelectItem key={serviceType.id} value={serviceType.id}>
-                                          {serviceType.name}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
+                                      if (current === index - 1) {
+                                        return index;
+                                      }
+                                      return current;
+                                    });
+                                  }}
+                                  disabled={index === 0 || isSubmitting}
+                                >
+                                  <ArrowUp className="size-4" />
+                                  <span className="sr-only">{t("budgets.moveServiceUp")}</span>
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="cursor-pointer"
+                                  onClick={() => {
+                                    if (index === fields.length - 1) {
+                                      return;
+                                    }
 
-                            <FormField
-                              control={form.control}
-                              name={`items.${index}.equipmentId`}
-                              render={({ field: itemField }) => (
-                                <FormItem>
-                                  <FormLabel>{t("budgets.equipment")}</FormLabel>
-                                  <Select onValueChange={itemField.onChange} value={itemField.value}>
-                                    <FormControl>
-                                      <SelectTrigger className="w-full cursor-pointer">
-                                        <SelectValue placeholder={t("budgets.selectEquipment")} />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      {equipmentOptions.map((equipmentItem) => (
-                                        <SelectItem key={equipmentItem.id} value={equipmentItem.id}>
-                                          {equipmentItem.name} • {equipmentItem.brand} • {equipmentItem.model}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
+                                    move(index, index + 1);
+                                    setEditingItemIndex((current) => {
+                                      if (current === null) {
+                                        return current;
+                                      }
+                                      if (current === index) {
+                                        return index + 1;
+                                      }
+                                      if (current === index + 1) {
+                                        return index;
+                                      }
+                                      return current;
+                                    });
+                                  }}
+                                  disabled={index === fields.length - 1 || isSubmitting}
+                                >
+                                  <ArrowDown className="size-4" />
+                                  <span className="sr-only">{t("budgets.moveServiceDown")}</span>
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="cursor-pointer text-destructive hover:text-destructive"
+                                  onClick={() => {
+                                    const shouldResetDraft = editingItemIndex === index;
+                                    remove(index);
 
-                            <FormField
-                              control={form.control}
-                              name={`items.${index}.operatorId`}
-                              render={({ field: itemField }) => (
-                                <FormItem>
-                                  <FormLabel>{t("budgets.operator")}</FormLabel>
-                                  <Select onValueChange={itemField.onChange} value={itemField.value}>
-                                    <FormControl>
-                                      <SelectTrigger className="w-full cursor-pointer">
-                                        <SelectValue placeholder={t("budgets.selectOperator")} />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      {operators.map((operator) => (
-                                        <SelectItem key={operator.id} value={operator.id}>
-                                          {operator.name}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-
-                            <FormField
-                              control={form.control}
-                              name={`items.${index}.serviceDate`}
-                              render={({ field: itemField }) => (
-                                <FormItem>
-                                  <FormLabel>{t("budgets.serviceDate")}</FormLabel>
-                                  <FormControl>
-                                    <DatePickerInput
-                                      value={parseDateString(itemField.value)}
-                                      onChange={(date) => itemField.onChange(formatDateString(date))}
-                                      placeholder={t("budgets.selectDate")}
-                                      disabledDays={minServiceDate ? { before: minServiceDate } : undefined}
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </div>
-
-                          <FormField
-                            control={form.control}
-                            name={`items.${index}.serviceDescription`}
-                            render={({ field: itemField }) => (
-                              <FormItem>
-                                <FormLabel>{t("budgets.serviceDescription")}</FormLabel>
-                                <FormControl>
-                                  <Input
-                                    {...itemField}
-                                    value={itemField.value ?? ""}
-                                    placeholder={t("budgets.serviceDescriptionPlaceholder")}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-
-                          <div className="grid gap-3 lg:grid-cols-3">
-                            <FormField
-                              control={form.control}
-                              name={`items.${index}.startTime`}
-                              render={({ field: itemField }) => (
-                                <FormItem>
-                                  <FormLabel>{t("budgets.startTime")}</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      type="time"
-                                      {...itemField}
-                                      onChange={(event) => {
-                                        itemField.onChange(event);
-                                        setManualEndTimeOverride(index, false);
-                                      }}
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-
-                            <FormField
-                              control={form.control}
-                              name={`items.${index}.endTime`}
-                              render={({ field: itemField }) => (
-                                <FormItem>
-                                  <FormLabel>{t("budgets.endTime")}</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      type="time"
-                                      {...itemField}
-                                      onChange={(event) => {
-                                        itemField.onChange(event);
-                                        setManualEndTimeOverride(index, true);
-                                      }}
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-
-                            <FormField
-                              control={form.control}
-                              name={`items.${index}.initialValue`}
-                              render={({ field: itemField }) => (
-                                <FormItem>
-                                  <FormLabel>{t("budgets.initialValue")}</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      type="number"
-                                      min="0.01"
-                                      step="0.01"
-                                      inputMode="decimal"
-                                      placeholder="0,00"
-                                      {...itemField}
-                                      value={itemField.value === 0 ? "" : itemField.value ?? ""}
-                                      onChange={(event) => {
-                                        itemField.onChange(event);
-                                        setManualValueOverride(index, true);
-                                      }}
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                                    if (shouldResetDraft) {
+                                      setItemDraft(createEmptyItem());
+                                      setEditingItemIndex(null);
+                                      setItemDraftErrors({});
+                                      setIsDraftValueManual(false);
+                                      setIsDraftEndTimeManual(false);
+                                    } else {
+                                      setEditingItemIndex((current) => (
+                                        current !== null && current > index ? current - 1 : current
+                                      ));
+                                    }
+                                  }}
+                                  disabled={isSubmitting}
+                                >
+                                  <Trash2 className="size-4" />
+                                  <span className="sr-only">{t("budgets.removeServiceItem")}</span>
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      }) : (
+                        <TableRow>
+                          <TableCell colSpan={9} className="h-20 text-center normal-case text-muted-foreground">
+                            {t("budgets.noItemsAdded")}
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
                 </div>
               </section>
 
