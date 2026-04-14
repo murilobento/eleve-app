@@ -7,12 +7,12 @@ import {
   ChevronRight,
   Calendar as CalendarIcon,
   Clock,
-  Info,
   FileDown,
   MapPin,
   Truck,
   Menu,
-  UserCog
+  UserCog,
+  Wrench
 } from "lucide-react"
 import { format, addDays, subDays, isToday, isSameDay } from "date-fns"
 
@@ -31,13 +31,14 @@ import { cn, getAppUrl } from "@/lib/utils"
 import { useI18n, useLocale } from "@/i18n/provider"
 import { getDateFnsLocale } from "@/lib/date-locale"
 import { formatAgendaDateKey } from "@/lib/service-agenda"
-import { useIsMobile } from "@/hooks/use-mobile"
 import { type CalendarEvent } from "../types"
 
 const HOUR_ROW_HEIGHT = 60
-const TIMELINE_VERTICAL_PADDING = 12
 const DEFAULT_TIMELINE_START_MINUTES = 7 * 60
 const DEFAULT_TIMELINE_END_MINUTES = 17 * 60
+const STACKED_CARD_GAP = 8
+const STACKED_ROW_PADDING = 10
+const STACKED_CARD_MIN_HEIGHT = 72
 
 function parseTimeToMinutes(value?: string) {
   if (!value) {
@@ -111,12 +112,28 @@ interface CalendarMainProps {
   onEventClick?: (event: CalendarEvent) => void
 }
 
+type ParsedDayEvent = {
+  event: CalendarEvent
+  startTime?: string
+  endTime?: string
+  startMinutes: number
+  endMinutes: number
+}
+
+type DayTimeline = {
+  earliestStart: number
+  latestEnd: number
+  timelineStartMinutes: number
+  timelineEndMinutes: number
+  hourSlots: number[]
+  eventsByHourSlot: Map<number, ParsedDayEvent[]>
+}
+
 export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, onEventClick }: CalendarMainProps) {
   const { t } = useI18n()
   const locale = useLocale()
   const { canRead, canUpdate } = useResourcePermissions("service-orders")
   const dateLocale = getDateFnsLocale(locale)
-  const isMobile = useIsMobile()
   const calendarEvents = events ?? []
 
   const [currentDate, setCurrentDate] = useState(selectedDate || new Date())
@@ -136,25 +153,25 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
     [calendarEvents, currentDate]
   )
 
-  const dayTimeline = useMemo(() => {
-    const parsedEvents = dayEvents.map((event) => {
+  const dayTimeline = useMemo<DayTimeline | null>(() => {
+    const parsedEvents: ParsedDayEvent[] = dayEvents.map((event) => {
       const { startTime, endTime, startMinutes, endMinutes } = getEventTimeRange(event)
 
       return {
         event,
         startTime,
         endTime,
-        startMinutes,
-        endMinutes,
+        startMinutes: startMinutes as number,
+        endMinutes: endMinutes as number,
       }
-    }).filter((item) => item.startMinutes !== null && item.endMinutes !== null)
+    }).filter((item) => Number.isFinite(item.startMinutes) && Number.isFinite(item.endMinutes))
 
     if (parsedEvents.length === 0) {
       return null
     }
 
-    const earliestStart = Math.min(...parsedEvents.map((item) => item.startMinutes as number))
-    const latestEnd = Math.max(...parsedEvents.map((item) => item.endMinutes as number))
+    const earliestStart = Math.min(...parsedEvents.map((item) => item.startMinutes))
+    const latestEnd = Math.max(...parsedEvents.map((item) => item.endMinutes))
     const timelineStartMinutes = Math.max(
       0,
       Math.min(DEFAULT_TIMELINE_START_MINUTES, Math.floor(earliestStart / 60) * 60)
@@ -169,69 +186,39 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
       (_, index) => timelineStartMinutes + index * 60
     )
 
-    const stackedEvents: Array<(typeof parsedEvents)[number] & {
-      columnIndex: number
-      groupIndex: number
-      groupColumns: number
-    }> = []
-    const groupColumnCounts = new Map<number, number>()
-    const activeEvents: Array<{
-      endMinutes: number
-      columnIndex: number
-      groupIndex: number
-    }> = []
-    let currentGroupIndex = -1
+    const eventsByHourSlot = new Map<number, ParsedDayEvent[]>()
 
     for (const item of parsedEvents) {
-      for (let index = activeEvents.length - 1; index >= 0; index -= 1) {
-        if (activeEvents[index].endMinutes <= (item.startMinutes as number)) {
-          activeEvents.splice(index, 1)
-        }
-      }
-
-      if (activeEvents.length === 0) {
-        currentGroupIndex += 1
-      }
-
-      const usedColumns = new Set(activeEvents.map((activeEvent) => activeEvent.columnIndex))
-      let columnIndex = 0
-
-      while (usedColumns.has(columnIndex)) {
-        columnIndex += 1
-      }
-
-      activeEvents.push({
-        endMinutes: item.endMinutes as number,
-        columnIndex,
-        groupIndex: currentGroupIndex,
-      })
-
-      groupColumnCounts.set(
-        currentGroupIndex,
-        Math.max(groupColumnCounts.get(currentGroupIndex) ?? 0, activeEvents.length)
-      )
-
-      stackedEvents.push({
-        ...item,
-        columnIndex,
-        groupIndex: currentGroupIndex,
-        groupColumns: 1,
-      })
+      const slotStart = Math.floor(item.startMinutes / 60) * 60
+      const slotEvents = eventsByHourSlot.get(slotStart) ?? []
+      slotEvents.push(item)
+      eventsByHourSlot.set(slotStart, slotEvents)
     }
 
-    const resolvedEvents = stackedEvents.map((item) => ({
-      ...item,
-      groupColumns: groupColumnCounts.get(item.groupIndex) ?? 1,
-    }))
+    for (const [slot, slotEvents] of eventsByHourSlot.entries()) {
+      eventsByHourSlot.set(
+        slot,
+        slotEvents.sort((left, right) => {
+          if (left.startMinutes !== right.startMinutes) {
+            return left.startMinutes - right.startMinutes
+          }
+
+          if (left.endMinutes !== right.endMinutes) {
+            return left.endMinutes - right.endMinutes
+          }
+
+          return left.event.title.localeCompare(right.event.title)
+        })
+      )
+    }
 
     return {
       earliestStart,
       latestEnd,
       timelineStartMinutes,
       timelineEndMinutes,
-      totalMinutes,
       hourSlots,
-      events: resolvedEvents,
+      eventsByHourSlot,
     }
   }, [dayEvents])
 
@@ -290,6 +277,58 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
     }
   }
 
+  const renderTimelineEventCard = (item: ParsedDayEvent) => {
+    const timeRange = formatTimeRange(item.startTime, item.endTime)
+
+    return (
+      <button
+        key={item.event.id}
+        type="button"
+        className={cn(
+          "w-full rounded-md border px-3 py-2 text-left shadow-sm transition-shadow hover:shadow-md",
+          item.event.color
+        )}
+        onClick={() => handleEventClick(item.event)}
+      >
+        <div className="flex min-w-0 items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 items-center gap-2 text-[11px] font-semibold uppercase">
+              <Wrench className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">
+                {item.event.serviceOrderNumber ?? item.event.equipmentName ?? item.event.title}
+              </span>
+            </div>
+            <div className="mt-1 flex min-w-0 items-center gap-2 text-[11px] uppercase opacity-90">
+              <Truck className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">{item.event.equipmentName ?? item.event.title}</span>
+            </div>
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] uppercase opacity-90">
+              <div className="flex items-center gap-1">
+                <Clock className="h-3 w-3 shrink-0" />
+                <span>{timeRange || formatTimeLabel(item.startTime)}</span>
+              </div>
+              {item.event.operatorName ? (
+                <div className="flex min-w-0 items-center gap-1">
+                  <UserCog className="h-3 w-3 shrink-0" />
+                  <span className="truncate">{item.event.operatorName}</span>
+                </div>
+              ) : null}
+            </div>
+          </div>
+          <Badge
+            variant="secondary"
+            className={cn(
+              "shrink-0 border-transparent px-1.5 py-0 text-[10px]",
+              item.event.color
+            )}
+          >
+            {getEventStatusLabel(item.event.status) ?? getEventTypeLabel(item.event.type)}
+          </Badge>
+        </div>
+      </button>
+    )
+  }
+
   const renderDayView = () => {
     const isCurrentDayToday = isToday(currentDate)
     const weekdayLabel = capitalizeText(format(currentDate, "EEEE", { locale: dateLocale }))
@@ -324,135 +363,53 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
             </div>
 
             {dayTimeline ? (
-              <div
-                className="relative overflow-x-auto"
-                style={{
-                  minHeight: `${dayTimeline.totalMinutes / 60 * HOUR_ROW_HEIGHT + TIMELINE_VERTICAL_PADDING * 2}px`,
-                }}
-              >
-                <div className="grid grid-cols-[64px_minmax(0,1fr)]">
-                  <div className="border-r bg-muted/10">
-                    {dayTimeline.hourSlots.map((slot) => (
+              <div className="grid grid-cols-[64px_minmax(0,1fr)]">
+                <div className="border-r bg-muted/10">
+                  {dayTimeline.hourSlots.map((slot) => {
+                    const slotEvents = dayTimeline.eventsByHourSlot.get(slot) ?? []
+                    const rowHeight = Math.max(
+                      HOUR_ROW_HEIGHT,
+                      STACKED_ROW_PADDING * 2
+                        + slotEvents.length * STACKED_CARD_MIN_HEIGHT
+                        + Math.max(0, slotEvents.length - 1) * STACKED_CARD_GAP
+                    )
+
+                    return (
                       <div
                         key={slot}
                         className="border-b px-2.5 pt-1.5 text-right text-xs font-medium text-muted-foreground"
-                        style={{ height: `${HOUR_ROW_HEIGHT}px` }}
+                        style={{ height: `${rowHeight}px` }}
                       >
                         {formatHourLabel(slot)}
                       </div>
-                    ))}
-                  </div>
+                    )
+                  })}
+                </div>
 
-                  <div className="relative">
-                    {dayTimeline.hourSlots.map((slot) => (
+                <div>
+                  {dayTimeline.hourSlots.map((slot) => {
+                    const slotEvents = dayTimeline.eventsByHourSlot.get(slot) ?? []
+                    const rowHeight = Math.max(
+                      HOUR_ROW_HEIGHT,
+                      STACKED_ROW_PADDING * 2
+                        + slotEvents.length * STACKED_CARD_MIN_HEIGHT
+                        + Math.max(0, slotEvents.length - 1) * STACKED_CARD_GAP
+                    )
+
+                    return (
                       <div
                         key={slot}
-                        className="border-b border-dashed"
-                        style={{ height: `${HOUR_ROW_HEIGHT}px` }}
-                      />
-                    ))}
-
-                    {dayTimeline.events.map(({ event, startTime, endTime, startMinutes, endMinutes, columnIndex, groupColumns }) => {
-                      const top = ((startMinutes as number) - dayTimeline.timelineStartMinutes) / 60 * HOUR_ROW_HEIGHT + TIMELINE_VERTICAL_PADDING
-                      const eventDurationMinutes = Math.max(15, (endMinutes as number) - (startMinutes as number))
-                      const maxHeightForSlot = (eventDurationMinutes / 60) * HOUR_ROW_HEIGHT - 6
-                      const height = Math.max(28, Math.min(34, maxHeightForSlot))
-                      const timeRange = formatTimeRange(startTime, endTime)
-                      const horizontalGap = 6
-                      const horizontalPadding = 10
-                      const width = `calc((100% - ${horizontalPadding * 2}px - ${(groupColumns - 1) * horizontalGap}px) / ${groupColumns})`
-                      const left = `calc(${horizontalPadding}px + ${columnIndex} * (${width} + ${horizontalGap}px))`
-
-                      if (isMobile) {
-                        return (
-                          <button
-                            key={event.id}
-                            type="button"
-                            className={cn(
-                              "absolute right-3 flex items-center justify-between gap-2 rounded-md border px-2 py-1 text-left shadow-sm transition-shadow hover:shadow-md",
-                              event.color
-                            )}
-                            style={{
-                              top: `${top + 2}px`,
-                              left,
-                              width,
-                              height: `${height}px`,
-                            }}
-                            onClick={() => handleEventClick(event)}
-                            aria-label={t("calendar.eventDetails")}
-                          >
-                            <div className="flex min-w-0 items-center gap-1.5 text-[10px] uppercase">
-                              <Truck className="h-3 w-3 shrink-0" />
-                              <span className="truncate font-semibold">
-                                {event.equipmentName || event.title}
-                              </span>
-                            </div>
-                            <div className="flex shrink-0 items-center gap-1">
-                              <Badge
-                                variant="secondary"
-                                className={cn(
-                                  "border-transparent px-1.5 py-0 text-[9px]",
-                                  event.color
-                                )}
-                              >
-                                {getEventStatusLabel(event.status) ?? getEventTypeLabel(event.type)}
-                              </Badge>
-                              <Info className="size-3 shrink-0" />
-                            </div>
-                          </button>
-                        )
-                      }
-
-                      return (
-                        <button
-                          key={event.id}
-                          type="button"
-                          className={cn(
-                            "absolute right-3 flex items-center rounded-md border px-2 py-1 text-left shadow-sm transition-shadow hover:shadow-md",
-                            event.color
-                          )}
-                          style={{
-                            top: `${top + 2}px`,
-                            left,
-                            width,
-                            height: `${height}px`,
-                          }}
-                          onClick={() => handleEventClick(event)}
-                        >
-                          <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
-                            <div className="flex min-w-0 flex-1 items-center gap-2 text-[11px] uppercase">
-                              <Truck className="h-3.5 w-3.5 shrink-0" />
-                              <span className="truncate font-semibold">
-                                {event.equipmentName || event.title}
-                              </span>
-                              {event.clientName ? (
-                                <span className="truncate opacity-90">{event.clientName}</span>
-                              ) : null}
-                              <div className="flex shrink-0 items-center gap-1 opacity-90">
-                                <Clock className="h-3 w-3 shrink-0" />
-                                <span>{timeRange || formatTimeLabel(startTime)}</span>
-                              </div>
-                              {event.operatorName ? (
-                                <div className="flex min-w-0 items-center gap-1 opacity-90">
-                                  <UserCog className="h-3 w-3 shrink-0" />
-                                  <span className="truncate">{event.operatorName}</span>
-                                </div>
-                              ) : null}
-                            </div>
-                            <Badge
-                              variant="secondary"
-                              className={cn(
-                                "shrink-0 border-transparent px-1.5 py-0 text-[10px]",
-                                event.color
-                              )}
-                            >
-                              {getEventStatusLabel(event.status) ?? getEventTypeLabel(event.type)}
-                            </Badge>
+                        className="border-b border-dashed px-3"
+                        style={{ minHeight: `${rowHeight}px` }}
+                      >
+                        {slotEvents.length > 0 ? (
+                          <div className="py-2 space-y-2">
+                            {slotEvents.map((item) => renderTimelineEventCard(item))}
                           </div>
-                        </button>
-                      )
-                    })}
-                  </div>
+                        ) : null}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             ) : (
@@ -465,6 +422,7 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
       </div>
     )
   }
+
   const currentPeriodLabel = format(currentDate, "PPP", { locale: dateLocale })
   const canEditSelectedEvent = canUpdate
     && selectedEvent?.status !== "completed"
@@ -477,6 +435,15 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
 
     const targetUrl = `${getAppUrl("/service-orders", locale)}?edit=${encodeURIComponent(selectedEvent.serviceOrderId)}`
     window.location.assign(targetUrl)
+  }
+
+  const handleOpenSelectedServiceOrderPdf = () => {
+    if (!selectedEvent?.serviceOrderId) {
+      toast.error(t("serviceOrders.errors.notFound"))
+      return
+    }
+
+    window.open(`/api/service-orders/${selectedEvent.serviceOrderId}/pdf`, "_blank", "noopener,noreferrer")
   }
 
   const handleExportDailyPdf = () => {
@@ -503,10 +470,8 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
       <div className="flex flex-col flex-wrap gap-3 border-b p-4 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-4 flex-wrap">
-          {/* Mobile Menu Button */}
           <Button
             variant="outline"
             size="sm"
@@ -559,12 +524,10 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
         </div>
       </div>
 
-      {/* Calendar Content */}
       {renderDayView()}
 
-      {/* Event Detail Dialog */}
       <Dialog open={showEventDialog} onOpenChange={setShowEventDialog}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="flex max-h-[calc(100vh-2rem)] max-w-2xl flex-col overflow-hidden">
           <DialogHeader>
             <DialogTitle>
               {selectedEvent?.serviceOrderNumber
@@ -576,84 +539,95 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
             </DialogDescription>
           </DialogHeader>
           {selectedEvent && (
-            <div className="space-y-6">
-              <div className="grid gap-3 rounded-xl border bg-muted/20 p-4 md:grid-cols-2">
-                <div>
-                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    {t("serviceOrders.number")}
+            <div className="flex min-h-0 flex-1 flex-col">
+              <div className="min-h-0 flex-1 space-y-6 overflow-y-auto pr-1">
+                <div className="grid gap-3 rounded-xl border bg-muted/20 p-4 md:grid-cols-2">
+                  <div>
+                    <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      {t("serviceOrders.number")}
+                    </div>
+                    <div className="mt-1 font-medium uppercase">{selectedEvent.serviceOrderNumber ?? "-"}</div>
                   </div>
-                  <div className="mt-1 font-medium uppercase">{selectedEvent.serviceOrderNumber ?? "-"}</div>
+                  <div>
+                    <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      {t("serviceOrders.status")}
+                    </div>
+                    <div className="mt-1 uppercase">
+                      <Badge variant="secondary" className={cn(selectedEvent.color)}>
+                        {getEventStatusLabel(selectedEvent.status) ?? getEventTypeLabel(selectedEvent.type)}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      {t("serviceOrders.client")}
+                    </div>
+                    <div className="mt-1 font-medium uppercase">{selectedEvent.clientName ?? "-"}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      {t("serviceOrders.serviceDescription")}
+                    </div>
+                    <div className="mt-1 font-medium uppercase">{selectedEvent.title}</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    {t("serviceOrders.status")}
-                  </div>
-                  <div className="mt-1 uppercase">
-                    <Badge variant="secondary" className={cn(selectedEvent.color)}>
-                      {getEventStatusLabel(selectedEvent.status) ?? getEventTypeLabel(selectedEvent.type)}
-                    </Badge>
-                  </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Card>
+                    <CardContent className="space-y-4 px-4 py-4">
+                      <div className="text-sm font-medium">{t("calendar.eventDetails")}</div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <CalendarIcon className="w-4 h-4 text-muted-foreground" />
+                        <span className="uppercase">{format(selectedEvent.date, "PPPP", { locale: dateLocale })}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Clock className="w-4 h-4 text-muted-foreground" />
+                        <span className="uppercase">{formatTimeRange(selectedEvent.startTime, selectedEvent.endTime) || selectedEvent.time}</span>
+                      </div>
+                      <div className="flex items-start gap-2 text-sm">
+                        <MapPin className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                        <span className="uppercase">{selectedEvent.address ?? selectedEvent.location}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardContent className="space-y-4 px-4 py-4">
+                      <div className="text-sm font-medium">Recursos alocados</div>
+                      <div className="text-sm">
+                        <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          {t("serviceOrders.equipment")}
+                        </div>
+                        <div className="mt-1 font-medium uppercase">{selectedEvent.equipmentName ?? "-"}</div>
+                      </div>
+                      <div className="text-sm">
+                        <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          {t("serviceOrders.operator")}
+                        </div>
+                        <div className="mt-1 font-medium uppercase">{selectedEvent.operatorName ?? "-"}</div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
-                <div>
-                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    {t("serviceOrders.client")}
+
+                {selectedEvent.description ? (
+                  <div className="rounded-xl border p-4">
+                    <div className="text-sm font-medium">{t("serviceOrders.notes")}</div>
+                    <p className="mt-2 text-sm text-muted-foreground uppercase">{selectedEvent.description}</p>
                   </div>
-                  <div className="mt-1 font-medium uppercase">{selectedEvent.clientName ?? "-"}</div>
-                </div>
-                <div>
-                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    {t("serviceOrders.serviceDescription")}
-                  </div>
-                  <div className="mt-1 font-medium uppercase">{selectedEvent.title}</div>
-                </div>
+                ) : null}
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <Card>
-                  <CardContent className="space-y-4 px-4 py-4">
-                    <div className="text-sm font-medium">{t("calendar.eventDetails")}</div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <CalendarIcon className="w-4 h-4 text-muted-foreground" />
-                      <span className="uppercase">{format(selectedEvent.date, 'PPPP', { locale: dateLocale })}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Clock className="w-4 h-4 text-muted-foreground" />
-                      <span className="uppercase">{formatTimeRange(selectedEvent.startTime, selectedEvent.endTime) || selectedEvent.time}</span>
-                    </div>
-                    <div className="flex items-start gap-2 text-sm">
-                      <MapPin className="mt-0.5 h-4 w-4 text-muted-foreground" />
-                      <span className="uppercase">{selectedEvent.address ?? selectedEvent.location}</span>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="space-y-4 px-4 py-4">
-                    <div className="text-sm font-medium">Recursos alocados</div>
-                    <div className="text-sm">
-                      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        {t("serviceOrders.equipment")}
-                      </div>
-                      <div className="mt-1 font-medium uppercase">{selectedEvent.equipmentName ?? "-"}</div>
-                    </div>
-                    <div className="text-sm">
-                      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        {t("serviceOrders.operator")}
-                      </div>
-                      <div className="mt-1 font-medium uppercase">{selectedEvent.operatorName ?? "-"}</div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {selectedEvent.description ? (
-                <div className="rounded-xl border p-4">
-                  <div className="text-sm font-medium">{t("serviceOrders.notes")}</div>
-                  <p className="mt-2 text-sm text-muted-foreground uppercase">{selectedEvent.description}</p>
-                </div>
-              ) : null}
-
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex shrink-0 justify-end gap-2 border-t pt-4">
+                <Button
+                  variant="outline"
+                  className="cursor-pointer"
+                  onClick={handleOpenSelectedServiceOrderPdf}
+                  disabled={!selectedEvent?.serviceOrderId}
+                >
+                  <FileDown className="mr-2 size-4" />
+                  {t("serviceOrders.downloadPdf")}
+                </Button>
                 {canEditSelectedEvent ? (
                   <Button
                     className="cursor-pointer"

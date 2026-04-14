@@ -27,11 +27,11 @@ const TABLE_WIDTH = CONTENT_WIDTH;
 
 const COLUMN_WIDTHS = {
   time: 118,
-  os: 110,
-  operator: 164,
-  equipment: 212,
-  description: 286,
-  location: 528,
+  os: 96,
+  operator: 146,
+  equipment: 184,
+  status: 140,
+  description: 222,
 };
 
 let canvasModulePromise: Promise<CanvasModule> | null = null;
@@ -99,15 +99,17 @@ function getColumnPositions() {
   const x4 = x3 + COLUMN_WIDTHS.os;
   const x5 = x4 + COLUMN_WIDTHS.operator;
   const x6 = x5 + COLUMN_WIDTHS.equipment;
-  const x7 = x6 + COLUMN_WIDTHS.description;
+  const x7 = x6 + COLUMN_WIDTHS.status;
+  const x8 = x7 + COLUMN_WIDTHS.description;
 
   return {
     time: x2,
     os: x3,
     operator: x4,
     equipment: x5,
-    description: x6,
-    location: x7,
+    status: x6,
+    description: x7,
+    location: x8,
   };
 }
 
@@ -268,6 +270,7 @@ export async function renderServiceAgendaPng(payload: ServiceAgendaPngPayload) {
     ["OS", columns.os + 10],
     ["Operador", columns.operator + 10],
     ["Equipamento", columns.equipment + 10],
+    ["Status", columns.status + 10],
     ["Descrição", columns.description + 10],
     ["Local", columns.location + 10],
   ] as const;
@@ -298,6 +301,7 @@ export async function renderServiceAgendaPng(payload: ServiceAgendaPngPayload) {
         columns.os,
         columns.operator,
         columns.equipment,
+        columns.status,
         columns.description,
         columns.location,
       ]) {
@@ -311,6 +315,7 @@ export async function renderServiceAgendaPng(payload: ServiceAgendaPngPayload) {
       drawText(context, entry.serviceOrderNumber, columns.os + 8, cursorY + 22, "bold 15px Arial");
       drawText(context, truncateText(context, entry.operatorName || "-", COLUMN_WIDTHS.operator - 14, "15px Arial"), columns.operator + 8, cursorY + 22, "15px Arial");
       drawText(context, truncateText(context, entry.equipmentName || "-", COLUMN_WIDTHS.equipment - 14, "15px Arial"), columns.equipment + 8, cursorY + 22, "15px Arial");
+      drawText(context, truncateText(context, getStatusLabel(entry.status), COLUMN_WIDTHS.status - 14, "15px Arial"), columns.status + 8, cursorY + 22, "15px Arial");
 
       const descriptionLines = wrapText(context, entry.serviceDescription || "-", COLUMN_WIDTHS.description - 14, "14px Arial").slice(0, 2);
       for (const [index, line] of descriptionLines.entries()) {

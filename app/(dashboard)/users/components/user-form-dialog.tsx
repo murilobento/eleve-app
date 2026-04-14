@@ -115,10 +115,14 @@ export function UserFormDialog({
           </Button>
         </DialogTrigger>
       ) : null}
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent className="max-h-[calc(100vh-2rem)] overflow-hidden p-0 sm:max-w-xl">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit, handleInvalidSubmit)} className={`space-y-4 ${formClassName}`}>
-            <DialogHeader className="gap-3">
+          <form
+            onSubmit={form.handleSubmit(handleSubmit, handleInvalidSubmit)}
+            className={`flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden [&_[aria-invalid=true]]:border-input [&_[aria-invalid=true]]:ring-0 ${formClassName}`}
+          >
+            <div className="shrink-0 border-b px-6 py-5">
+              <DialogHeader className="gap-3">
               <div className="flex flex-wrap items-center gap-3 pr-8">
                 <DialogTitle>{isEdit ? t("users.editUser") : t("users.createUser")}</DialogTitle>
                 <FormField
@@ -139,8 +143,10 @@ export function UserFormDialog({
                   )}
                 />
               </div>
-            </DialogHeader>
+              </DialogHeader>
+            </div>
 
+            <div className="flex-1 space-y-4 overflow-y-auto overflow-x-hidden px-6 py-4">
             <FormField
               control={form.control}
               name="name"
@@ -228,7 +234,9 @@ export function UserFormDialog({
               )}
             />
 
-            <DialogFooter>
+            </div>
+
+            <DialogFooter className="shrink-0 border-t px-6 py-4">
               <Button type="submit" className="cursor-pointer" disabled={isSubmitting}>
                 {isSubmitting ? t("common.loading") : isEdit ? t("common.saveChanges") : t("users.createUser")}
               </Button>

@@ -252,10 +252,14 @@ export function ClientFormDialog({
           </Button>
         </DialogTrigger>
       ) : null}
-      <DialogContent className="sm:max-w-5xl">
+      <DialogContent className="max-h-[calc(100vh-2rem)] overflow-hidden p-0 sm:max-w-5xl">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit, handleInvalidSubmit)} className={`space-y-3 ${formClassName}`}>
-            <DialogHeader>
+          <form
+            onSubmit={form.handleSubmit(handleSubmit, handleInvalidSubmit)}
+            className={`flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden [&_[aria-invalid=true]]:border-input [&_[aria-invalid=true]]:ring-0 ${formClassName}`}
+          >
+            <div className="shrink-0 border-b px-6 py-5">
+              <DialogHeader>
               <div className="flex flex-wrap items-center gap-3 pr-8">
                 <DialogTitle>{isEdit ? t("clients.editClient") : t("clients.createClient")}</DialogTitle>
                 <FormField
@@ -277,8 +281,10 @@ export function ClientFormDialog({
                 />
               </div>
               <DialogDescription>{t("clients.createDescription")}</DialogDescription>
-            </DialogHeader>
+              </DialogHeader>
+            </div>
 
+            <div className="flex-1 space-y-3 overflow-y-auto overflow-x-hidden px-6 py-4">
             <div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)]">
               <FormField
                 control={form.control}
@@ -602,7 +608,9 @@ export function ClientFormDialog({
               />
             </div>
 
-            <DialogFooter>
+            </div>
+
+            <DialogFooter className="shrink-0 border-t px-6 py-4">
               <Button type="submit" className="cursor-pointer" disabled={isSubmitting}>
                 {isSubmitting ? t("common.loading") : isEdit ? t("common.saveChanges") : t("clients.createClient")}
               </Button>

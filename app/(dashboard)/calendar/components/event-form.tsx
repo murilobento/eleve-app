@@ -182,18 +182,20 @@ export function EventForm({ event, open, onOpenChange, onSave, onDelete }: Event
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <div className={cn("w-3 h-3 rounded-full", selectedEventType?.color)} />
-            {event ? t("calendar.editEvent") : t("calendar.createNewEvent")}
-          </DialogTitle>
-          <DialogDescription>
-            {event ? t("calendar.editEventHelp") : t("calendar.createEventHelp")}
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="flex max-h-[calc(100vh-2rem)] max-w-2xl flex-col overflow-hidden p-0">
+        <div className="shrink-0 border-b px-6 py-5">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div className={cn("h-3 w-3 rounded-full", selectedEventType?.color)} />
+              {event ? t("calendar.editEvent") : t("calendar.createNewEvent")}
+            </DialogTitle>
+            <DialogDescription>
+              {event ? t("calendar.editEventHelp") : t("calendar.createEventHelp")}
+            </DialogDescription>
+          </DialogHeader>
+        </div>
 
-        <div className="space-y-6 py-4">
+        <div className="flex-1 space-y-6 overflow-y-auto overflow-x-hidden px-6 py-4">
           {/* Event Title */}
           <div className="space-y-2">
             <Label htmlFor="title" className="flex items-center gap-2">
@@ -385,7 +387,7 @@ export function EventForm({ event, open, onOpenChange, onSave, onDelete }: Event
           </div>
 
           {/* Actions */}
-          <div className="flex gap-3 pt-6">
+          <div className="sticky bottom-0 -mx-6 flex gap-3 border-t bg-background px-6 pt-4">
             {((event && canUpdate) || (!event && canCreate)) ? (
               <Button onClick={handleSave} className="flex-1 cursor-pointer">
                 {event ? t("calendar.updateEvent") : t("calendar.createEvent")}

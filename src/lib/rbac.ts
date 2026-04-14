@@ -5516,7 +5516,7 @@ export async function listBudgets(): Promise<ManagedBudget[]> {
         b.cancelled_at,
         b.created_at,
         b.updated_at
-      ORDER BY b.updated_at DESC, b.number DESC
+      ORDER BY b.number DESC
     `,
   );
 
@@ -6044,7 +6044,7 @@ export async function listServiceOrders(): Promise<ManagedServiceOrder[]> {
         so.cancelled_at,
         so.created_at,
         so.updated_at
-      ORDER BY so.updated_at DESC, so.number DESC
+      ORDER BY so.number DESC
     `,
   );
 

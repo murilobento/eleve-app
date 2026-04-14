@@ -1234,12 +1234,14 @@ export default function EquipmentRequisitionsPage() {
       <Dialog open={createMaintenanceOpen || Boolean(editMaintenance)} onOpenChange={(open) => {
         if (!open) closeMaintenanceDialog();
       }}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{editMaintenance ? t("equipmentRequisitions.editMaintenance") : t("equipmentRequisitions.addMaintenance")}</DialogTitle>
-            <DialogDescription>{t("equipmentRequisitions.maintenanceFormDescription")}</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4">
+        <DialogContent className="flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden p-0 sm:max-w-2xl">
+          <div className="shrink-0 border-b px-6 py-5">
+            <DialogHeader>
+              <DialogTitle>{editMaintenance ? t("equipmentRequisitions.editMaintenance") : t("equipmentRequisitions.addMaintenance")}</DialogTitle>
+              <DialogDescription>{t("equipmentRequisitions.maintenanceFormDescription")}</DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="flex-1 space-y-4 overflow-y-auto overflow-x-hidden px-6 py-4">
             <div className="grid gap-2">
               <Label>{t("equipmentRequisitions.equipment")}</Label>
               <Select value={maintenanceForm.equipmentId} onValueChange={(value) => setMaintenanceForm((current) => ({ ...current, equipmentId: value }))}>
@@ -1279,7 +1281,7 @@ export default function EquipmentRequisitionsPage() {
               <Textarea value={maintenanceForm.notes} onChange={(event) => setMaintenanceForm((current) => ({ ...current, notes: event.target.value }))} rows={3} />
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="shrink-0 border-t px-6 py-4">
             <Button type="button" variant="outline" className="cursor-pointer" onClick={closeMaintenanceDialog}>
               {t("common.cancel")}
             </Button>
@@ -1293,12 +1295,14 @@ export default function EquipmentRequisitionsPage() {
       <Dialog open={createFuelOpen || Boolean(editFuel)} onOpenChange={(open) => {
         if (!open) closeFuelDialog();
       }}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{editFuel ? t("equipmentRequisitions.editFuel") : t("equipmentRequisitions.addFuel")}</DialogTitle>
-            <DialogDescription>{t("equipmentRequisitions.fuelFormDescription")}</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4">
+        <DialogContent className="flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden p-0 sm:max-w-2xl">
+          <div className="shrink-0 border-b px-6 py-5">
+            <DialogHeader>
+              <DialogTitle>{editFuel ? t("equipmentRequisitions.editFuel") : t("equipmentRequisitions.addFuel")}</DialogTitle>
+              <DialogDescription>{t("equipmentRequisitions.fuelFormDescription")}</DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="flex-1 space-y-4 overflow-y-auto overflow-x-hidden px-6 py-4">
             <div className="grid gap-2">
               <Label>{t("equipmentRequisitions.equipment")}</Label>
               <Select value={fuelForm.equipmentId} onValueChange={(value) => setFuelForm((current) => ({ ...current, equipmentId: value }))}>
@@ -1348,7 +1352,7 @@ export default function EquipmentRequisitionsPage() {
               <Textarea value={fuelForm.notes} onChange={(event) => setFuelForm((current) => ({ ...current, notes: event.target.value }))} rows={4} />
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="shrink-0 border-t px-6 py-4">
             <Button type="button" variant="outline" className="cursor-pointer" onClick={closeFuelDialog}>
               {t("common.cancel")}
             </Button>
@@ -1362,12 +1366,14 @@ export default function EquipmentRequisitionsPage() {
       <Dialog open={createPartsOpen || Boolean(editParts)} onOpenChange={(open) => {
         if (!open) closePartsDialog();
       }}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{editParts ? t("equipmentRequisitions.editParts") : t("equipmentRequisitions.addParts")}</DialogTitle>
-            <DialogDescription>{t("equipmentRequisitions.partsFormDescription")}</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4">
+        <DialogContent className="flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden p-0 sm:max-w-2xl">
+          <div className="shrink-0 border-b px-6 py-5">
+            <DialogHeader>
+              <DialogTitle>{editParts ? t("equipmentRequisitions.editParts") : t("equipmentRequisitions.addParts")}</DialogTitle>
+              <DialogDescription>{t("equipmentRequisitions.partsFormDescription")}</DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="flex-1 space-y-4 overflow-y-auto overflow-x-hidden px-6 py-4">
             <div className="grid gap-2">
               <Label>{t("equipmentRequisitions.equipment")}</Label>
               <Select value={partsForm.equipmentId} onValueChange={(value) => setPartsForm((current) => ({ ...current, equipmentId: value }))}>
@@ -1407,7 +1413,7 @@ export default function EquipmentRequisitionsPage() {
               <Textarea value={partsForm.notes} onChange={(event) => setPartsForm((current) => ({ ...current, notes: event.target.value }))} rows={3} />
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="shrink-0 border-t px-6 py-4">
             <Button type="button" variant="outline" className="cursor-pointer" onClick={closePartsDialog}>
               {t("common.cancel")}
             </Button>
@@ -1499,11 +1505,14 @@ export default function EquipmentRequisitionsPage() {
       <Dialog open={Boolean(statusDialog)} onOpenChange={(open) => {
         if (!open) setStatusDialog(null);
       }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{statusDialog?.status === "completed" ? t("equipmentRequisitions.complete") : statusDialog?.status === "cancelled" ? t("equipmentRequisitions.cancel") : t("equipmentRequisitions.issue")}</DialogTitle>
-            <DialogDescription>{t("equipmentRequisitions.statusDialogDescription")}</DialogDescription>
-          </DialogHeader>
+        <DialogContent className="flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden p-0 sm:max-w-md">
+          <div className="shrink-0 border-b px-6 py-5">
+            <DialogHeader>
+              <DialogTitle>{statusDialog?.status === "completed" ? t("equipmentRequisitions.complete") : statusDialog?.status === "cancelled" ? t("equipmentRequisitions.cancel") : t("equipmentRequisitions.issue")}</DialogTitle>
+              <DialogDescription>{t("equipmentRequisitions.statusDialogDescription")}</DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="flex-1 overflow-y-auto overflow-x-hidden px-6 py-4">
           {statusDialog?.status === "completed" ? (
             <div className="grid gap-4">
               <div className="grid gap-2">
@@ -1525,7 +1534,8 @@ export default function EquipmentRequisitionsPage() {
               <Textarea value={completionNotes} onChange={(event) => setCompletionNotes(event.target.value)} rows={4} />
             </div>
           ) : null}
-          <DialogFooter>
+          </div>
+          <DialogFooter className="shrink-0 border-t px-6 py-4">
             <Button type="button" variant="outline" className="cursor-pointer" onClick={() => setStatusDialog(null)}>
               {t("common.cancel")}
             </Button>

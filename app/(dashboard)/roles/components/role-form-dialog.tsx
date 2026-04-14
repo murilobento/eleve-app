@@ -165,17 +165,24 @@ export function RoleFormDialog({
           </Button>
         </DialogTrigger>
       ) : null}
-      <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>{isEdit ? t("roles.editRole") : t("roles.createRole")}</DialogTitle>
-          <DialogDescription>
-            {role?.isSystem
-              ? t("roles.systemProtected")
-              : t("roles.createDescription")}
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="max-h-[calc(100vh-2rem)] overflow-hidden p-0 sm:max-w-2xl">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit, handleInvalidSubmit)} className={`space-y-4 ${formClassName}`}>
+          <form
+            onSubmit={form.handleSubmit(handleSubmit, handleInvalidSubmit)}
+            className={`flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden [&_[aria-invalid=true]]:border-input [&_[aria-invalid=true]]:ring-0 ${formClassName}`}
+          >
+            <div className="shrink-0 border-b px-6 py-5">
+              <DialogHeader>
+                <DialogTitle>{isEdit ? t("roles.editRole") : t("roles.createRole")}</DialogTitle>
+                <DialogDescription>
+                  {role?.isSystem
+                    ? t("roles.systemProtected")
+                    : t("roles.createDescription")}
+                </DialogDescription>
+              </DialogHeader>
+            </div>
+
+            <div className="flex-1 space-y-4 overflow-y-auto overflow-x-hidden px-6 py-4">
             <FormField
               control={form.control}
               name="name"
@@ -242,7 +249,9 @@ export function RoleFormDialog({
               )}
             />
 
-            <DialogFooter>
+            </div>
+
+            <DialogFooter className="shrink-0 border-t px-6 py-4">
               <Button type="submit" className="cursor-pointer" disabled={isDisabled}>
                 {isSubmitting ? t("common.loading") : isEdit ? t("common.saveChanges") : t("roles.createRole")}
               </Button>

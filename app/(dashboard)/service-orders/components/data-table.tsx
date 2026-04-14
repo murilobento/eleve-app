@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { addDays, endOfDay, endOfMonth, startOfDay, startOfMonth, subDays, subMonths } from "date-fns";
-import { CalendarDays, CheckCircle2, Clock3, EllipsisVertical, Eye, Pencil, Play, RotateCcw, Search, Trash2, XCircle } from "lucide-react";
+import { CalendarDays, CheckCircle2, Clock3, EllipsisVertical, Eye, FileDown, Pencil, Play, RotateCcw, Search, Trash2, XCircle } from "lucide-react";
 
 import { ServiceOrderFormDialog } from "./service-order-form-dialog";
 import {
@@ -554,6 +554,10 @@ export function DataTable({
     }
   };
 
+  const openServiceOrderPdf = (serviceOrder: ManagedServiceOrder) => {
+    window.open(`/api/service-orders/${serviceOrder.id}/pdf`, "_blank", "noopener,noreferrer");
+  };
+
   const serviceOrderDetailsSections = useMemo(() => {
     if (!viewingServiceOrder) {
       return [];
@@ -777,6 +781,13 @@ export function DataTable({
                   {t("serviceOrders.editServiceOrder")}
                 </DropdownMenuItem>
               ) : null}
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={() => openServiceOrderPdf(serviceOrder)}
+              >
+                <FileDown className="mr-2 size-4" />
+                {t("serviceOrders.downloadPdf")}
+              </DropdownMenuItem>
               <DropdownMenuItem
                 className="cursor-pointer"
                 onClick={() => void openServiceOrderHistory(serviceOrder)}
@@ -1220,6 +1231,15 @@ export function DataTable({
             >
               <Clock3 className="mr-2 size-4" />
               {t("serviceOrders.viewHistory")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="cursor-pointer"
+              onClick={() => openServiceOrderPdf(viewingServiceOrder)}
+            >
+              <FileDown className="mr-2 size-4" />
+              {t("serviceOrders.downloadPdf")}
             </Button>
             {canUpdate && viewingServiceOrder.status !== "completed" && viewingServiceOrder.status !== "cancelled" ? (
               <Button

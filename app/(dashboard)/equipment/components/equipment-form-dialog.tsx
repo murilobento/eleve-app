@@ -137,10 +137,14 @@ export function EquipmentFormDialog({
           </Button>
         </DialogTrigger>
       ) : null}
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="max-h-[calc(100vh-2rem)] overflow-hidden p-0 sm:max-w-2xl">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit, handleInvalidSubmit)} className={`space-y-4 ${formClassName}`}>
-            <DialogHeader>
+          <form
+            onSubmit={form.handleSubmit(handleSubmit, handleInvalidSubmit)}
+            className={`flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden [&_[aria-invalid=true]]:border-input [&_[aria-invalid=true]]:ring-0 ${formClassName}`}
+          >
+            <div className="shrink-0 border-b px-6 py-5">
+              <DialogHeader>
               <div className="flex flex-wrap items-center gap-3 pr-8">
                 <DialogTitle>{isEdit ? t("equipment.editEquipment") : t("equipment.createEquipment")}</DialogTitle>
                 <FormField
@@ -164,8 +168,10 @@ export function EquipmentFormDialog({
               <DialogDescription>
                 {creationDisabled ? t("equipment.createBlockedNoTypes") : t("equipment.createDescription")}
               </DialogDescription>
-            </DialogHeader>
+              </DialogHeader>
+            </div>
 
+            <div className="flex-1 space-y-4 overflow-y-auto overflow-x-hidden px-6 py-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <FormField
                 control={form.control}
@@ -326,7 +332,9 @@ export function EquipmentFormDialog({
               />
             </div>
 
-            <DialogFooter>
+            </div>
+
+            <DialogFooter className="shrink-0 border-t px-6 py-4">
               <Button type="submit" className="cursor-pointer" disabled={isSubmitting || creationDisabled}>
                 {isSubmitting ? t("common.loading") : isEdit ? t("common.saveChanges") : t("equipment.createEquipment")}
               </Button>

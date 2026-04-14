@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
+import type { FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -128,6 +129,26 @@ function isSameAddressAsClient(
     && normalizeAddressValue(address.country ?? "Brasil") === normalizeAddressValue(client.country);
 }
 
+function buildAddressSummary(address: {
+  postalCode?: string | null;
+  street?: string | null;
+  number?: string | null;
+  complement?: string | null;
+  district?: string | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
+}) {
+  return [
+    [address.street, address.number].filter(Boolean).join(", "),
+    address.complement,
+    address.district,
+    address.city && address.state ? `${address.city} - ${address.state}` : address.city || address.state,
+    address.postalCode,
+    address.country,
+  ].filter(Boolean).join(" • ");
+}
+
 async function parseResponse<T>(response: Response): Promise<T> {
   const payload = await response.json().catch(() => null);
 
@@ -159,6 +180,7 @@ export function ServiceOrderFormDialog({
   const [pendingAddressClient, setPendingAddressClient] = useState<ManagedClient | null>(null);
   const [pendingRetroactiveSubmit, setPendingRetroactiveSubmit] = useState<CreateServiceOrderInput | UpdateServiceOrderInput | null>(null);
   const [serviceAddressMode, setServiceAddressMode] = useState<ServiceAddressMode>("inherit");
+  const [isServiceAddressDialogOpen, setIsServiceAddressDialogOpen] = useState(false);
   const [itemDraft, setItemDraft] = useState<ServiceOrderItemInput>(createEmptyItem());
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
   const [itemDraftErrors, setItemDraftErrors] = useState<ItemDraftErrors>({});
@@ -200,6 +222,13 @@ export function ServiceOrderFormDialog({
   const watchedSourceBudgetId = form.watch("sourceBudgetId");
   const watchedClientId = form.watch("clientId");
   const watchedServicePostalCode = form.watch("servicePostalCode");
+  const watchedServiceStreet = form.watch("serviceStreet");
+  const watchedServiceNumber = form.watch("serviceNumber");
+  const watchedServiceComplement = form.watch("serviceComplement");
+  const watchedServiceDistrict = form.watch("serviceDistrict");
+  const watchedServiceCity = form.watch("serviceCity");
+  const watchedServiceState = form.watch("serviceState");
+  const watchedServiceCountry = form.watch("serviceCountry");
 
   const clientsById = useMemo(
     () => new Map(clients.map((client) => [client.id, client])),
@@ -355,14 +384,65 @@ export function ServiceOrderFormDialog({
   };
 
   const clearServiceAddress = () => {
-    form.setValue("servicePostalCode", "", { shouldDirty: true, shouldValidate: true });
-    form.setValue("serviceStreet", "", { shouldDirty: true, shouldValidate: true });
-    form.setValue("serviceNumber", "", { shouldDirty: true, shouldValidate: true });
+    form.clearErrors([
+      "servicePostalCode",
+      "serviceStreet",
+      "serviceNumber",
+      "serviceDistrict",
+      "serviceCity",
+      "serviceState",
+      "serviceCountry",
+    ]);
+    form.setValue("servicePostalCode", "", { shouldDirty: true, shouldValidate: false });
+    form.setValue("serviceStreet", "", { shouldDirty: true, shouldValidate: false });
+    form.setValue("serviceNumber", "", { shouldDirty: true, shouldValidate: false });
     form.setValue("serviceComplement", "", { shouldDirty: true });
-    form.setValue("serviceDistrict", "", { shouldDirty: true, shouldValidate: true });
-    form.setValue("serviceCity", "", { shouldDirty: true, shouldValidate: true });
-    form.setValue("serviceState", "", { shouldDirty: true, shouldValidate: true });
-    form.setValue("serviceCountry", "Brasil", { shouldDirty: true, shouldValidate: true });
+    form.setValue("serviceDistrict", "", { shouldDirty: true, shouldValidate: false });
+    form.setValue("serviceCity", "", { shouldDirty: true, shouldValidate: false });
+    form.setValue("serviceState", "", { shouldDirty: true, shouldValidate: false });
+    form.setValue("serviceCountry", "Brasil", { shouldDirty: true, shouldValidate: false });
+  };
+
+  const openManualAddressDialog = () => {
+    setServiceAddressMode("manual");
+    setIsServiceAddressDialogOpen(true);
+  };
+
+  const handleSaveServiceAddress = async () => {
+    const isValid = await form.trigger([
+      "servicePostalCode",
+      "serviceStreet",
+      "serviceNumber",
+      "serviceDistrict",
+      "serviceCity",
+      "serviceState",
+      "serviceCountry",
+    ]);
+
+    if (!isValid) {
+      return;
+    }
+
+    setServiceAddressMode("manual");
+    setIsServiceAddressDialogOpen(false);
+  };
+
+  const handleInvalidSubmitWithAddress = (
+    errors: FieldErrors<CreateServiceOrderInput | UpdateServiceOrderInput>,
+  ) => {
+    if (
+      errors.servicePostalCode
+      || errors.serviceStreet
+      || errors.serviceNumber
+      || errors.serviceDistrict
+      || errors.serviceCity
+      || errors.serviceState
+      || errors.serviceCountry
+    ) {
+      setIsServiceAddressDialogOpen(true);
+    }
+
+    handleInvalidSubmit(errors);
   };
 
   const handleClientAddressDecision = (shouldUseClientAddress: boolean) => {
@@ -375,9 +455,12 @@ export function ServiceOrderFormDialog({
       setServiceAddressMode("inherit");
       lastLookedUpServicePostalCodeRef.current = normalizePostalCode(pendingAddressClient.postalCode);
     } else {
-      clearServiceAddress();
-      setServiceAddressMode("manual");
-      lastLookedUpServicePostalCodeRef.current = null;
+      if (serviceAddressMode !== "manual") {
+        clearServiceAddress();
+        lastLookedUpServicePostalCodeRef.current = null;
+      }
+
+      openManualAddressDialog();
     }
 
     setPendingAddressClient(null);
@@ -420,6 +503,7 @@ export function ServiceOrderFormDialog({
     setPendingAddressClient(null);
     setPendingRetroactiveSubmit(null);
     setServiceAddressMode("inherit");
+    setIsServiceAddressDialogOpen(false);
     lastLookedUpServicePostalCodeRef.current = null;
     setItemDraft(createEmptyItem());
     setEditingItemIndex(null);
@@ -477,6 +561,7 @@ export function ServiceOrderFormDialog({
       setPendingAddressClient(null);
       setPendingRetroactiveSubmit(null);
       setServiceAddressMode(sameAddressAsClient ? "inherit" : "manual");
+      setIsServiceAddressDialogOpen(false);
       lastLookedUpServicePostalCodeRef.current =
         sameAddressAsClient ? normalizePostalCode(serviceOrder.servicePostalCode) : null;
       lastHydratedBudgetIdRef.current = serviceOrder.sourceBudgetId;
@@ -504,6 +589,7 @@ export function ServiceOrderFormDialog({
     setPendingAddressClient(null);
     setPendingRetroactiveSubmit(null);
     setServiceAddressMode("inherit");
+    setIsServiceAddressDialogOpen(false);
     lastLookedUpServicePostalCodeRef.current = null;
     setItemDraft(createEmptyItem());
     setEditingItemIndex(null);
@@ -630,6 +716,7 @@ export function ServiceOrderFormDialog({
     setPendingAddressClient(null);
     setPendingRetroactiveSubmit(null);
     setServiceAddressMode("inherit");
+    setIsServiceAddressDialogOpen(false);
     lastLookedUpServicePostalCodeRef.current = null;
     setItemDraft(createEmptyItem());
     setEditingItemIndex(null);
@@ -647,6 +734,7 @@ export function ServiceOrderFormDialog({
     setPendingAddressClient(null);
     setPendingRetroactiveSubmit(null);
     setServiceAddressMode("inherit");
+    setIsServiceAddressDialogOpen(false);
     lastLookedUpServicePostalCodeRef.current = null;
     setItemDraft(createEmptyItem());
     setEditingItemIndex(null);
@@ -664,13 +752,20 @@ export function ServiceOrderFormDialog({
           </Button>
         </DialogTrigger>
       ) : null}
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-5xl">
-        <DialogHeader>
-          <DialogTitle>{isEdit ? t("serviceOrders.editServiceOrder") : t("serviceOrders.createServiceOrder")}</DialogTitle>
-          <DialogDescription>{t("serviceOrders.createDescription")}</DialogDescription>
-        </DialogHeader>
+      <DialogContent className="max-h-[calc(100vh-2rem)] overflow-hidden p-0 sm:max-w-6xl">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit, handleInvalidSubmit)} className={`space-y-6 ${formClassName}`}>
+          <form
+            onSubmit={form.handleSubmit(handleSubmit, handleInvalidSubmitWithAddress)}
+            className={`flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden [&_[aria-invalid=true]]:border-input [&_[aria-invalid=true]]:ring-0 ${formClassName}`}
+          >
+            <div className="shrink-0 border-b px-6 py-5">
+              <DialogHeader>
+                <DialogTitle>{isEdit ? t("serviceOrders.editServiceOrder") : t("serviceOrders.createServiceOrder")}</DialogTitle>
+                <DialogDescription>{t("serviceOrders.createDescription")}</DialogDescription>
+              </DialogHeader>
+            </div>
+
+            <div className="flex-1 space-y-6 overflow-y-auto overflow-x-hidden px-6 py-4">
             <div className="grid gap-4 md:grid-cols-2">
               <FormField
                 control={form.control}
@@ -763,124 +858,39 @@ export function ServiceOrderFormDialog({
                   </FormItem>
                 )}
               />
-
-              <FormField
-                control={form.control}
-                name="servicePostalCode"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("serviceOrders.servicePostalCode")}</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        value={field.value ?? ""}
-                        placeholder="00000-000"
-                        disabled={isSubmitting}
-                        onChange={(event) => {
-                          const nextValue = formatPostalCode(event.target.value);
-                          const nextPostalCode = normalizePostalCode(nextValue);
-
-                          field.onChange(nextValue);
-                          form.clearErrors("servicePostalCode");
-                          lastLookedUpServicePostalCodeRef.current = null;
-
-                          if (
-                            serviceAddressMode === "inherit"
-                            && (!selectedClient || nextPostalCode !== normalizePostalCode(selectedClient.postalCode))
-                          ) {
-                            setServiceAddressMode("manual");
-                          }
-                        }}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
             </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
-              <FormField
-                control={form.control}
-                name="serviceStreet"
-                render={({ field }) => (
-                  <FormItem className="md:col-span-2">
-                    <FormLabel>{t("serviceOrders.serviceStreet")}</FormLabel>
-                    <FormControl>
-                      <Input {...field} disabled={isSubmitting} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="serviceNumber"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("serviceOrders.serviceNumber")}</FormLabel>
-                    <FormControl>
-                      <Input {...field} disabled={isSubmitting} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-4">
-              <FormField
-                control={form.control}
-                name="serviceComplement"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("serviceOrders.serviceComplement")}</FormLabel>
-                    <FormControl>
-                      <Input {...field} value={field.value ?? ""} disabled={isSubmitting} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="serviceDistrict"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("serviceOrders.serviceDistrict")}</FormLabel>
-                    <FormControl>
-                      <Input {...field} disabled={isSubmitting} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="serviceCity"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("serviceOrders.serviceCity")}</FormLabel>
-                    <FormControl>
-                      <Input {...field} disabled={isSubmitting} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="serviceState"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("serviceOrders.serviceState")}</FormLabel>
-                    <FormControl>
-                      <Input {...field} disabled={isSubmitting} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            <div className="rounded-xl border bg-card p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="space-y-1">
+                  <div className="text-sm font-medium">{t("serviceOrders.detailsLocation")}</div>
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                    {serviceAddressMode === "inherit"
+                      ? t("serviceOrders.addressSummaryInherited")
+                      : t("serviceOrders.addressSummaryManual")}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {buildAddressSummary({
+                      postalCode: watchedServicePostalCode,
+                      street: watchedServiceStreet,
+                      number: watchedServiceNumber,
+                      complement: watchedServiceComplement,
+                      district: watchedServiceDistrict,
+                      city: watchedServiceCity,
+                      state: watchedServiceState,
+                      country: watchedServiceCountry,
+                    }) || t("serviceOrders.addressSummaryEmpty")}
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="cursor-pointer"
+                  onClick={openManualAddressDialog}
+                >
+                  {watchedServiceStreet ? t("serviceOrders.editServiceAddress") : t("serviceOrders.defineServiceAddress")}
+                </Button>
+              </div>
             </div>
 
             <div className="space-y-4">
@@ -1066,7 +1076,7 @@ export function ServiceOrderFormDialog({
                 <p className="text-sm text-destructive">{form.formState.errors.items.message}</p>
               ) : null}
 
-              <div className="rounded-lg border">
+              <div className="overflow-x-auto rounded-lg border">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -1218,8 +1228,9 @@ export function ServiceOrderFormDialog({
                 </FormItem>
               )}
             />
+            </div>
 
-            <DialogFooter>
+            <DialogFooter className="shrink-0 border-t px-6 py-4">
               <Button type="button" variant="outline" className="cursor-pointer" onClick={() => onOpenChange(false)}>
                 {t("common.cancel")}
               </Button>
@@ -1265,6 +1276,156 @@ export function ServiceOrderFormDialog({
               {t("serviceOrders.clientAddressConfirmYes")}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isServiceAddressDialogOpen} onOpenChange={setIsServiceAddressDialogOpen}>
+        <DialogContent className="flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden p-0 sm:max-w-2xl">
+          <Form {...form}>
+            <div className="shrink-0 border-b px-6 py-5">
+              <DialogHeader>
+                <DialogTitle>{t("serviceOrders.serviceAddressModalTitle")}</DialogTitle>
+                <DialogDescription>{t("serviceOrders.serviceAddressModalDescription")}</DialogDescription>
+              </DialogHeader>
+            </div>
+
+            <div className="flex-1 space-y-4 overflow-y-auto overflow-x-hidden px-6 py-4">
+              <div className="grid gap-4 md:grid-cols-3">
+                <FormField
+                  control={form.control}
+                  name="servicePostalCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("serviceOrders.servicePostalCode")}</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          value={field.value ?? ""}
+                          placeholder="00000-000"
+                          disabled={isSubmitting}
+                          onChange={(event) => {
+                            const nextValue = formatPostalCode(event.target.value);
+                            field.onChange(nextValue);
+                            form.clearErrors("servicePostalCode");
+                            lastLookedUpServicePostalCodeRef.current = null;
+                            setServiceAddressMode("manual");
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="serviceStreet"
+                  render={({ field }) => (
+                    <FormItem className="md:col-span-2">
+                      <FormLabel>{t("serviceOrders.serviceStreet")}</FormLabel>
+                      <FormControl>
+                        <Input {...field} disabled={isSubmitting} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-4">
+                <FormField
+                  control={form.control}
+                  name="serviceNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("serviceOrders.serviceNumber")}</FormLabel>
+                      <FormControl>
+                        <Input {...field} disabled={isSubmitting} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="serviceComplement"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("serviceOrders.serviceComplement")}</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value ?? ""} disabled={isSubmitting} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="serviceDistrict"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("serviceOrders.serviceDistrict")}</FormLabel>
+                      <FormControl>
+                        <Input {...field} disabled={isSubmitting} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div />
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-3">
+                <FormField
+                  control={form.control}
+                  name="serviceCity"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("serviceOrders.serviceCity")}</FormLabel>
+                      <FormControl>
+                        <Input {...field} disabled={isSubmitting} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="serviceState"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("serviceOrders.serviceState")}</FormLabel>
+                      <FormControl>
+                        <Input {...field} disabled={isSubmitting} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="serviceCountry"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("serviceOrders.serviceCountry")}</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value ?? ""} disabled={isSubmitting} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="shrink-0 border-t px-6 py-4">
+              <Button type="button" variant="outline" className="cursor-pointer" onClick={() => setIsServiceAddressDialogOpen(false)}>
+                {t("common.cancel")}
+              </Button>
+              <Button type="button" className="cursor-pointer" onClick={() => void handleSaveServiceAddress()}>
+                {t("serviceOrders.saveServiceAddress")}
+              </Button>
+            </DialogFooter>
+          </Form>
         </DialogContent>
       </Dialog>
 

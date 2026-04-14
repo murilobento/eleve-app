@@ -130,14 +130,20 @@ export function FuelFormDialog({
           </Button>
         </DialogTrigger>
       ) : null}
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+      <DialogContent className="max-h-[calc(100vh-2rem)] overflow-hidden p-0 sm:max-w-3xl">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit, handleInvalidSubmit)} className={`space-y-4 ${formClassName}`}>
-            <DialogHeader>
-              <DialogTitle>{isEdit ? t("equipmentCosts.editFuel") : t("equipmentCosts.createFuel")}</DialogTitle>
-              <DialogDescription>{t("equipmentCosts.fuelFormDescription")}</DialogDescription>
-            </DialogHeader>
+          <form
+            onSubmit={form.handleSubmit(handleSubmit, handleInvalidSubmit)}
+            className={`flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden [&_[aria-invalid=true]]:border-input [&_[aria-invalid=true]]:ring-0 ${formClassName}`}
+          >
+            <div className="shrink-0 border-b px-6 py-5">
+              <DialogHeader>
+                <DialogTitle>{isEdit ? t("equipmentCosts.editFuel") : t("equipmentCosts.createFuel")}</DialogTitle>
+                <DialogDescription>{t("equipmentCosts.fuelFormDescription")}</DialogDescription>
+              </DialogHeader>
+            </div>
 
+            <div className="flex-1 space-y-4 overflow-y-auto overflow-x-hidden px-6 py-4">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <FormField
                 control={form.control}
@@ -383,7 +389,9 @@ export function FuelFormDialog({
               )}
             />
 
-            <DialogFooter>
+            </div>
+
+            <DialogFooter className="shrink-0 border-t px-6 py-4">
               <Button type="button" variant="outline" className="cursor-pointer" onClick={() => onOpenChange(false)}>
                 {t("common.cancel")}
               </Button>

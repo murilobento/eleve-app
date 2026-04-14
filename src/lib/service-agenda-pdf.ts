@@ -259,9 +259,9 @@ const COLUMN_WIDTHS = {
   time: 58,
   os: 62,
   operator: 82,
-  equipment: 110,
-  description: 142,
-  location: 244,
+  equipment: 96,
+  status: 72,
+  description: 118,
 };
 
 function getColumnPositions() {
@@ -271,7 +271,8 @@ function getColumnPositions() {
   const x4 = x3 + COLUMN_WIDTHS.os;
   const x5 = x4 + COLUMN_WIDTHS.operator;
   const x6 = x5 + COLUMN_WIDTHS.equipment;
-  const x7 = x6 + COLUMN_WIDTHS.description;
+  const x7 = x6 + COLUMN_WIDTHS.status;
+  const x8 = x7 + COLUMN_WIDTHS.description;
 
   return {
     hour: x1,
@@ -279,8 +280,9 @@ function getColumnPositions() {
     os: x3,
     operator: x4,
     equipment: x5,
-    description: x6,
-    location: x7,
+    status: x6,
+    description: x7,
+    location: x8,
   };
 }
 
@@ -299,6 +301,7 @@ function drawTableHeader(page: PdfPageBuilder, y: number) {
     ["OS", columns.os + 4],
     ["Operador", columns.operator + 4],
     ["Equipamento", columns.equipment + 4],
+    ["Status", columns.status + 4],
     ["Descrição", columns.description + 4],
     ["Local", columns.location + 4],
   ] as const;
@@ -315,6 +318,7 @@ function drawTableGrid(page: PdfPageBuilder, y: number, height: number) {
     columns.os,
     columns.operator,
     columns.equipment,
+    columns.status,
     columns.description,
     columns.location,
   ];
@@ -337,6 +341,7 @@ function drawEntryRow(page: PdfPageBuilder, entry: ServiceAgendaEntry, y: number
   page.text(entry.serviceOrderNumber, columns.os + 4, rowTop, 7, "F2");
   page.text(truncateText(entry.operatorName || "-", COLUMN_WIDTHS.operator - 8, 7), columns.operator + 4, rowTop, 7);
   page.text(truncateText(entry.equipmentName || "-", COLUMN_WIDTHS.equipment - 8, 7), columns.equipment + 4, rowTop, 7);
+  page.text(truncateText(getStatusLabel(entry.status), COLUMN_WIDTHS.status - 8, 7), columns.status + 4, rowTop, 7);
 
   const descriptionLines = wrapText(entry.serviceDescription || "-", descriptionWidth - 8, 7).slice(0, 2);
   for (const [index, line] of descriptionLines.entries()) {
@@ -353,7 +358,7 @@ export function renderServiceAgendaPdfHtml({ date, entries, company }: ServiceAg
   const companyName = company?.tradeName || company?.appName || company?.legalName || "ELEVE";
   const lines = entries.map(
     (entry) =>
-      `${entry.plannedStartTime}-${entry.plannedEndTime} | OS ${entry.serviceOrderNumber} | ${entry.operatorName} | ${entry.equipmentName} | ${entry.serviceTypeName} | ${entry.serviceDescription}`,
+      `${entry.plannedStartTime}-${entry.plannedEndTime} | OS ${entry.serviceOrderNumber} | ${getStatusLabel(entry.status)} | ${entry.operatorName} | ${entry.equipmentName} | ${entry.serviceTypeName} | ${entry.serviceDescription}`,
   );
 
   return [
