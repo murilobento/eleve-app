@@ -1234,7 +1234,7 @@ export default function EquipmentRequisitionsPage() {
       <Dialog open={createMaintenanceOpen || Boolean(editMaintenance)} onOpenChange={(open) => {
         if (!open) closeMaintenanceDialog();
       }}>
-        <DialogContent className="flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden p-0 sm:max-w-2xl">
+        <DialogContent className="flex max-h-[calc(100svh-2rem)] flex-col overflow-hidden p-0 sm:max-w-2xl">
           <div className="shrink-0 border-b px-6 py-5">
             <DialogHeader>
               <DialogTitle>{editMaintenance ? t("equipmentRequisitions.editMaintenance") : t("equipmentRequisitions.addMaintenance")}</DialogTitle>
@@ -1295,7 +1295,7 @@ export default function EquipmentRequisitionsPage() {
       <Dialog open={createFuelOpen || Boolean(editFuel)} onOpenChange={(open) => {
         if (!open) closeFuelDialog();
       }}>
-        <DialogContent className="flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden p-0 sm:max-w-2xl">
+        <DialogContent className="flex max-h-[calc(100svh-2rem)] flex-col overflow-hidden p-0 sm:max-w-2xl">
           <div className="shrink-0 border-b px-6 py-5">
             <DialogHeader>
               <DialogTitle>{editFuel ? t("equipmentRequisitions.editFuel") : t("equipmentRequisitions.addFuel")}</DialogTitle>
@@ -1366,7 +1366,7 @@ export default function EquipmentRequisitionsPage() {
       <Dialog open={createPartsOpen || Boolean(editParts)} onOpenChange={(open) => {
         if (!open) closePartsDialog();
       }}>
-        <DialogContent className="flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden p-0 sm:max-w-2xl">
+        <DialogContent className="flex max-h-[calc(100svh-2rem)] flex-col overflow-hidden p-0 sm:max-w-2xl">
           <div className="shrink-0 border-b px-6 py-5">
             <DialogHeader>
               <DialogTitle>{editParts ? t("equipmentRequisitions.editParts") : t("equipmentRequisitions.addParts")}</DialogTitle>
@@ -1505,7 +1505,7 @@ export default function EquipmentRequisitionsPage() {
       <Dialog open={Boolean(statusDialog)} onOpenChange={(open) => {
         if (!open) setStatusDialog(null);
       }}>
-        <DialogContent className="flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden p-0 sm:max-w-md">
+        <DialogContent className="flex max-h-[calc(100svh-2rem)] flex-col overflow-hidden p-0 sm:max-w-md">
           <div className="shrink-0 border-b px-6 py-5">
             <DialogHeader>
               <DialogTitle>{statusDialog?.status === "completed" ? t("equipmentRequisitions.complete") : statusDialog?.status === "cancelled" ? t("equipmentRequisitions.cancel") : t("equipmentRequisitions.issue")}</DialogTitle>

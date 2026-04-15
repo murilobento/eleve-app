@@ -860,11 +860,11 @@ export default function SuppliersPage() {
             }
           }}
         >
-          <DialogContent className="max-h-[calc(100vh-2rem)] overflow-hidden p-0 sm:max-w-5xl">
+          <DialogContent className="max-h-[calc(100svh-2rem)] overflow-hidden p-0 sm:max-w-5xl">
             <Form {...form}>
               <form
                 onSubmit={form.handleSubmit(handleSubmit, handleInvalidSubmit)}
-                className={`flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden [&_[aria-invalid=true]]:border-input [&_[aria-invalid=true]]:ring-0 ${formClassName}`}
+                className={`flex max-h-[calc(100svh-2rem)] flex-col overflow-hidden [&_[aria-invalid=true]]:border-input [&_[aria-invalid=true]]:ring-0 ${formClassName}`}
               >
               <div className="shrink-0 border-b px-6 py-5">
                 <DialogHeader>

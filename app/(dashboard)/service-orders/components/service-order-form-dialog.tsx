@@ -752,11 +752,11 @@ export function ServiceOrderFormDialog({
           </Button>
         </DialogTrigger>
       ) : null}
-      <DialogContent className="max-h-[calc(100vh-2rem)] overflow-hidden p-0 sm:max-w-6xl">
+      <DialogContent className="max-h-[calc(100svh-2rem)] overflow-hidden p-0 sm:max-w-6xl">
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit(handleSubmit, handleInvalidSubmitWithAddress)}
-            className={`flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden [&_[aria-invalid=true]]:border-input [&_[aria-invalid=true]]:ring-0 ${formClassName}`}
+            className={`flex max-h-[calc(100svh-2rem)] flex-col overflow-hidden [&_[aria-invalid=true]]:border-input [&_[aria-invalid=true]]:ring-0 ${formClassName}`}
           >
             <div className="shrink-0 border-b px-6 py-5">
               <DialogHeader>
@@ -1280,7 +1280,7 @@ export function ServiceOrderFormDialog({
       </Dialog>
 
       <Dialog open={isServiceAddressDialogOpen} onOpenChange={setIsServiceAddressDialogOpen}>
-        <DialogContent className="flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden p-0 sm:max-w-2xl">
+        <DialogContent className="flex max-h-[calc(100svh-2rem)] flex-col overflow-hidden p-0 sm:max-w-2xl">
           <Form {...form}>
             <div className="shrink-0 border-b px-6 py-5">
               <DialogHeader>

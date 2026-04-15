@@ -527,7 +527,7 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
       {renderDayView()}
 
       <Dialog open={showEventDialog} onOpenChange={setShowEventDialog}>
-        <DialogContent className="flex max-h-[calc(100vh-2rem)] max-w-2xl flex-col overflow-hidden">
+        <DialogContent className="flex max-h-[calc(100svh-2rem)] max-w-2xl flex-col overflow-hidden">
           <DialogHeader>
             <DialogTitle>
               {selectedEvent?.serviceOrderNumber

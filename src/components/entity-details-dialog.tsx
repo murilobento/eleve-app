@@ -61,7 +61,7 @@ export function EntityDetailsDialog({
 }: EntityDetailsDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[88vh] flex-col overflow-hidden p-0 sm:max-w-5xl">
+      <DialogContent className="flex max-h-[88svh] flex-col overflow-hidden p-0 sm:max-w-5xl">
         <div className="shrink-0 border-b bg-gradient-to-r from-muted/70 via-background to-background px-5 py-4">
           <DialogHeader className="gap-2 text-left">
             <div className="flex flex-col gap-3 pr-8 lg:flex-row lg:items-start lg:justify-between">

@@ -19,6 +19,7 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
+  useSidebar,
 } from "@/components/ui/sidebar"
 
 export function NavMain({
@@ -40,11 +41,18 @@ export function NavMain({
 }) {
   const pathname = usePathname()
   const normalizedPathname = stripLocaleFromPath(pathname)
+  const { isMobile, setOpenMobile } = useSidebar()
 
   // Check if any subitem is active to determine if parent should be open
   const shouldBeOpen = (item: typeof items[0]) => {
     if (item.isActive) return true
     return item.items?.some(subItem => normalizedPathname === stripLocaleFromPath(subItem.url)) || false
+  }
+
+  const handleNavigate = () => {
+    if (isMobile) {
+      setOpenMobile(false)
+    }
   }
 
   return (
@@ -77,6 +85,7 @@ export function NavMain({
                               href={subItem.url}
                               target={(item.title === "Auth Pages" || item.title === "Errors") ? "_blank" : undefined}
                               rel={(item.title === "Auth Pages" || item.title === "Errors") ? "noopener noreferrer" : undefined}
+                              onClick={handleNavigate}
                             >
                               <span>{subItem.title}</span>
                             </Link>
@@ -88,7 +97,7 @@ export function NavMain({
                 </>
               ) : (
                 <SidebarMenuButton asChild tooltip={item.title} className="cursor-pointer" isActive={normalizedPathname === stripLocaleFromPath(item.url)}>
-                  <Link href={item.url}>
+                  <Link href={item.url} onClick={handleNavigate}>
                     {item.icon && <item.icon />}
                     <span>{item.title}</span>
                   </Link>

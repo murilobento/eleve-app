@@ -23,6 +23,7 @@ import { useSidebarConfig } from "@/hooks/use-sidebar-config"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { stripLocaleFromPath } from "@/i18n/config"
 import { useI18n } from "@/i18n/provider"
+import { canUseDocumentFullscreen } from "@/lib/fullscreen"
 import { cn } from "@/lib/utils"
 import { triggerManualLock } from "@/lib/lockscreen"
 
@@ -40,6 +41,7 @@ export function SiteHeader() {
   const normalizedPathname = stripLocaleFromPath(pathname)
   const nextNavigationMode = config.navigationMode === "sidebar" ? "topbar" : "sidebar"
   const [isFullscreen, setIsFullscreen] = React.useState(false)
+  const [supportsFullscreen, setSupportsFullscreen] = React.useState(false)
   const mainGroup = navGroups[0]
   const dashboardItem = mainGroup?.items[0]
   const groupedDropdowns = dashboardItem ? navGroups.slice(1) : navGroups
@@ -85,6 +87,14 @@ export function SiteHeader() {
   }, [companyName, normalizedPathname, t])
 
   React.useEffect(() => {
+    const supported = canUseDocumentFullscreen()
+    setSupportsFullscreen(supported)
+
+    if (!supported) {
+      setIsFullscreen(false)
+      return
+    }
+
     const updateFullscreen = () => {
       setIsFullscreen(Boolean(document.fullscreenElement))
     }
@@ -98,6 +108,10 @@ export function SiteHeader() {
   }, [])
 
   const handleToggleFullscreen = async () => {
+    if (!supportsFullscreen) {
+      return
+    }
+
     try {
       if (document.fullscreenElement) {
         await document.exitFullscreen()
@@ -226,18 +240,20 @@ export function SiteHeader() {
               <Lock className="size-4" />
               <span className="sr-only">{t("common.lockScreen")}</span>
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="cursor-pointer"
-              onClick={handleToggleFullscreen}
-              aria-label={isFullscreen ? t("common.exitFullscreen") : t("common.fullscreen")}
-              title={isFullscreen ? t("common.exitFullscreen") : t("common.fullscreen")}
-            >
-              {isFullscreen ? <Minimize className="size-4" /> : <Expand className="size-4" />}
-              <span className="sr-only">{isFullscreen ? t("common.exitFullscreen") : t("common.fullscreen")}</span>
-            </Button>
+            {!isMobile && supportsFullscreen ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="cursor-pointer"
+                onClick={handleToggleFullscreen}
+                aria-label={isFullscreen ? t("common.exitFullscreen") : t("common.fullscreen")}
+                title={isFullscreen ? t("common.exitFullscreen") : t("common.fullscreen")}
+              >
+                {isFullscreen ? <Minimize className="size-4" /> : <Expand className="size-4" />}
+                <span className="sr-only">{isFullscreen ? t("common.exitFullscreen") : t("common.fullscreen")}</span>
+              </Button>
+            ) : null}
             <ModeToggle />
           </div>
         </div>

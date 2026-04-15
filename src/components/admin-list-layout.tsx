@@ -103,7 +103,7 @@ export function AdminFiltersDialog({
       </Button>
 
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className={cn("max-h-[90vh] overflow-y-auto p-0 sm:max-w-2xl", className)}>
+        <DialogContent className={cn("max-h-[90svh] overflow-y-auto p-0 sm:max-w-2xl", className)}>
           <DialogHeader className="border-b px-6 py-5">
             <div className="flex items-start justify-between gap-3 pr-8">
               <div className="space-y-1">
