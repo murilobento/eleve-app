@@ -235,7 +235,7 @@ function Sidebar({
           <button
             type="button"
             aria-label="Close Sidebar"
-            className="text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground absolute top-3 right-3 flex size-8 items-center justify-center rounded-md transition-colors"
+            className="text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground absolute top-3 right-3 z-20 flex size-8 items-center justify-center rounded-md bg-sidebar/95 transition-colors"
             onClick={() => setOpenMobile(false)}
           >
             <XIcon className="size-4" />

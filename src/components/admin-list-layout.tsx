@@ -63,7 +63,9 @@ type AdminFiltersSectionProps = {
 export function AdminListToolbar({ children, className }: AdminListToolbarProps) {
   return (
     <div className={cn("rounded-xl border bg-card/40 p-3", className)}>
-      <div className="flex flex-wrap items-end gap-3">{children}</div>
+      <div className="flex flex-wrap items-end gap-3 [&>.ml-auto]:ml-0 [&>.ml-auto]:basis-full [&>.ml-auto]:w-full [&>.ml-auto]:flex-col [&>.ml-auto]:items-stretch [&>.ml-auto]:gap-2 [&>.ml-auto>*]:w-full [&>.ml-auto_[data-slot=button]]:w-full [&>.ml-auto_a]:w-full sm:[&>.ml-auto]:ml-auto sm:[&>.ml-auto]:basis-auto sm:[&>.ml-auto]:w-auto sm:[&>.ml-auto]:flex-row sm:[&>.ml-auto]:items-center sm:[&>.ml-auto>*]:w-auto sm:[&>.ml-auto_[data-slot=button]]:w-auto sm:[&>.ml-auto_a]:w-auto">
+        {children}
+      </div>
     </div>
   );
 }

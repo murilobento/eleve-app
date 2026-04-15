@@ -19,8 +19,8 @@ import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterv
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Calendar } from "@/components/ui/calendar"
+import { EntityDetailsDialog } from "@/components/entity-details-dialog"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { 
   DropdownMenu,
@@ -28,18 +28,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu"
-import { 
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle
-} from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import { useI18n } from "@/i18n/provider"
 import { getDateFnsLocale } from "@/lib/date-locale"
 import { type CalendarEvent } from "../types"
-import { getAvatarInitials } from "../utils"
 
 // Import data
 import eventsData from "../data/events.json"
@@ -345,59 +337,58 @@ export function CalendarMain({ eventDates = [] }: CalendarMainProps) {
         </SheetContent>
       </Sheet>
 
-      {/* Event Details Dialog */}
-      <Dialog open={showEventDialog} onOpenChange={setShowEventDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{selectedEvent?.title}</DialogTitle>
-            <DialogDescription>
-              {t("calendar.eventDetailsInfo")}
-            </DialogDescription>
-          </DialogHeader>
-          {selectedEvent && (
-            <div className="space-y-4 pt-4">
-              <div className="flex items-center space-x-2 text-sm">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                <span>{selectedEvent.time} • {selectedEvent.duration}</span>
-              </div>
-              
-              {selectedEvent.location && (
-                <div className="flex items-center space-x-2 text-sm">
-                  <MapPin className="h-4 w-4 text-muted-foreground" />
-                  <span>{selectedEvent.location}</span>
-                </div>
-              )}
-              
-              {selectedEvent.attendees.length > 0 && (
-                <div className="flex items-center space-x-2 text-sm">
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                  <div className="flex space-x-1">
-                    {selectedEvent.attendees.map((attendee, index) => (
-                      <Avatar key={index} className="h-6 w-6">
-                        <AvatarFallback className="text-xs">
-                          {getAvatarInitials(attendee)}
-                        </AvatarFallback>
-                      </Avatar>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {selectedEvent.description && (
-                <div className="text-sm text-muted-foreground">
-                  {selectedEvent.description}
-                </div>
-              )}
-
-              <div className="flex items-center space-x-2 pt-4">
-                <Badge variant="secondary" className={cn("text-white", selectedEvent.color)}>
-                  {eventTypeMap[selectedEvent.type]}
-                </Badge>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <EntityDetailsDialog
+        open={showEventDialog}
+        onOpenChange={setShowEventDialog}
+        title={selectedEvent?.title ?? t("calendar.eventDetails")}
+        description={t("calendar.eventDetailsInfo")}
+        subtitle={selectedEvent ? `${selectedEvent.time} • ${selectedEvent.duration}` : null}
+        badges={selectedEvent ? [
+          <Badge key="type" variant="secondary" className={cn("text-white", selectedEvent.color)}>
+            {eventTypeMap[selectedEvent.type]}
+          </Badge>,
+        ] : []}
+        highlights={selectedEvent ? [
+          {
+            label: t("calendar.time"),
+            value: selectedEvent.time,
+            helper: selectedEvent.duration,
+          },
+          {
+            label: t("serviceOrders.detailsLocation"),
+            value: selectedEvent.location || t("common.notProvided"),
+            helper: selectedEvent.attendees.length
+              ? t("common.selectedCount", { count: selectedEvent.attendees.length })
+              : undefined,
+          },
+        ] : []}
+        sections={selectedEvent ? [
+          {
+            title: t("calendar.eventDetails"),
+            fields: [
+              { label: t("calendar.time"), value: `${selectedEvent.time} • ${selectedEvent.duration}` },
+              { label: t("serviceOrders.detailsLocation"), value: selectedEvent.location || t("common.notProvided") },
+              {
+                label: t("calendar.eventDescription"),
+                value: selectedEvent.description || t("common.notProvided"),
+                fullWidth: true,
+              },
+            ],
+          },
+          {
+            title: t("calendar.myCalendars"),
+            fields: [
+              {
+                label: t("calendar.eventDetailsInfo"),
+                value: selectedEvent.attendees.length
+                  ? selectedEvent.attendees.join(", ")
+                  : t("common.notProvided"),
+                fullWidth: true,
+              },
+            ],
+          },
+        ] : []}
+      />
     </div>
   )
 }

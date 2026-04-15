@@ -9,24 +9,17 @@ import {
   Clock,
   FileDown,
   MapPin,
-  Truck,
   Menu,
+  Truck,
   UserCog,
-  Wrench
+  Wrench,
 } from "lucide-react"
 import { format, addDays, subDays, isToday, isSameDay } from "date-fns"
 
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { EntityDetailsDialog } from "@/components/entity-details-dialog"
 import { useResourcePermissions } from "@/hooks/use-resource-permissions"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle
-} from "@/components/ui/dialog"
 import { cn, getAppUrl } from "@/lib/utils"
 import { useI18n, useLocale } from "@/i18n/provider"
 import { getDateFnsLocale } from "@/lib/date-locale"
@@ -427,6 +420,50 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
   const canEditSelectedEvent = canUpdate
     && selectedEvent?.status !== "completed"
     && selectedEvent?.status !== "cancelled"
+  const selectedEventSchedule = selectedEvent
+    ? `${capitalizeText(format(selectedEvent.date, "PPP", { locale: dateLocale }))} • ${formatTimeRange(selectedEvent.startTime, selectedEvent.endTime) || selectedEvent.time}`
+    : null
+  const selectedEventSections = selectedEvent ? [
+    {
+      title: t("calendar.eventDetails"),
+      fields: [
+        { label: t("serviceOrders.number"), value: selectedEvent.serviceOrderNumber ?? "-" },
+        {
+          label: t("serviceOrders.status"),
+          value: getEventStatusLabel(selectedEvent.status) ?? getEventTypeLabel(selectedEvent.type),
+        },
+        { label: t("serviceOrders.client"), value: selectedEvent.clientName ?? "-" },
+        { label: t("serviceOrders.serviceDescription"), value: selectedEvent.title },
+        {
+          label: t("calendar.time"),
+          value: formatTimeRange(selectedEvent.startTime, selectedEvent.endTime) || selectedEvent.time,
+        },
+        {
+          label: t("serviceOrders.detailsLocation"),
+          value: selectedEvent.address ?? selectedEvent.location ?? "-",
+        },
+      ],
+    },
+    {
+      title: "Recursos alocados",
+      fields: [
+        { label: t("serviceOrders.equipment"), value: selectedEvent.equipmentName ?? "-" },
+        { label: t("serviceOrders.operator"), value: selectedEvent.operatorName ?? "-" },
+        { label: t("serviceOrders.serviceType"), value: selectedEvent.serviceTypeName ?? "-" },
+        { label: t("equipment.type"), value: selectedEvent.equipmentTypeName ?? "-" },
+      ],
+    },
+    {
+      title: t("serviceOrders.notes"),
+      fields: [
+        {
+          label: t("serviceOrders.notes"),
+          value: selectedEvent.description ?? t("common.notProvided"),
+          fullWidth: true,
+        },
+      ],
+    },
+  ] : []
 
   const handleOpenServiceOrderEdit = () => {
     if (!selectedEvent?.serviceOrderId || !canEditSelectedEvent) {
@@ -526,127 +563,70 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
 
       {renderDayView()}
 
-      <Dialog open={showEventDialog} onOpenChange={setShowEventDialog}>
-        <DialogContent className="flex max-h-[calc(100svh-2rem)] max-w-2xl flex-col overflow-hidden">
-          <DialogHeader>
-            <DialogTitle>
-              {selectedEvent?.serviceOrderNumber
-                ? `Ver detalhes da OS ${selectedEvent.serviceOrderNumber}`
-                : t("calendar.eventDetails")}
-            </DialogTitle>
-            <DialogDescription className="uppercase">
-              {selectedEvent?.title || t("calendar.eventDescription")}
-            </DialogDescription>
-          </DialogHeader>
-          {selectedEvent && (
-            <div className="flex min-h-0 flex-1 flex-col">
-              <div className="min-h-0 flex-1 space-y-6 overflow-y-auto pr-1">
-                <div className="grid gap-3 rounded-xl border bg-muted/20 p-4 md:grid-cols-2">
-                  <div>
-                    <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      {t("serviceOrders.number")}
-                    </div>
-                    <div className="mt-1 font-medium uppercase">{selectedEvent.serviceOrderNumber ?? "-"}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      {t("serviceOrders.status")}
-                    </div>
-                    <div className="mt-1 uppercase">
-                      <Badge variant="secondary" className={cn(selectedEvent.color)}>
-                        {getEventStatusLabel(selectedEvent.status) ?? getEventTypeLabel(selectedEvent.type)}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      {t("serviceOrders.client")}
-                    </div>
-                    <div className="mt-1 font-medium uppercase">{selectedEvent.clientName ?? "-"}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      {t("serviceOrders.serviceDescription")}
-                    </div>
-                    <div className="mt-1 font-medium uppercase">{selectedEvent.title}</div>
-                  </div>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Card>
-                    <CardContent className="space-y-4 px-4 py-4">
-                      <div className="text-sm font-medium">{t("calendar.eventDetails")}</div>
-                      <div className="flex items-center gap-2 text-sm">
-                        <CalendarIcon className="w-4 h-4 text-muted-foreground" />
-                        <span className="uppercase">{format(selectedEvent.date, "PPPP", { locale: dateLocale })}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm">
-                        <Clock className="w-4 h-4 text-muted-foreground" />
-                        <span className="uppercase">{formatTimeRange(selectedEvent.startTime, selectedEvent.endTime) || selectedEvent.time}</span>
-                      </div>
-                      <div className="flex items-start gap-2 text-sm">
-                        <MapPin className="mt-0.5 h-4 w-4 text-muted-foreground" />
-                        <span className="uppercase">{selectedEvent.address ?? selectedEvent.location}</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardContent className="space-y-4 px-4 py-4">
-                      <div className="text-sm font-medium">Recursos alocados</div>
-                      <div className="text-sm">
-                        <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                          {t("serviceOrders.equipment")}
-                        </div>
-                        <div className="mt-1 font-medium uppercase">{selectedEvent.equipmentName ?? "-"}</div>
-                      </div>
-                      <div className="text-sm">
-                        <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                          {t("serviceOrders.operator")}
-                        </div>
-                        <div className="mt-1 font-medium uppercase">{selectedEvent.operatorName ?? "-"}</div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {selectedEvent.description ? (
-                  <div className="rounded-xl border p-4">
-                    <div className="text-sm font-medium">{t("serviceOrders.notes")}</div>
-                    <p className="mt-2 text-sm text-muted-foreground uppercase">{selectedEvent.description}</p>
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="flex shrink-0 justify-end gap-2 border-t pt-4">
-                <Button
-                  variant="outline"
-                  className="cursor-pointer"
-                  onClick={handleOpenSelectedServiceOrderPdf}
-                  disabled={!selectedEvent?.serviceOrderId}
-                >
-                  <FileDown className="mr-2 size-4" />
-                  {t("serviceOrders.downloadPdf")}
-                </Button>
-                {canEditSelectedEvent ? (
-                  <Button
-                    className="cursor-pointer"
-                    onClick={handleOpenServiceOrderEdit}
-                    disabled={!selectedEvent.serviceOrderId}
-                  >
-                    {t("serviceOrders.editServiceOrder")}
-                  </Button>
-                ) : null}
-                <Button variant="outline" className="cursor-pointer" onClick={() => {
-                  setShowEventDialog(false)
-                }}>
-                  Fechar
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <EntityDetailsDialog
+        open={showEventDialog}
+        onOpenChange={setShowEventDialog}
+        title={selectedEvent?.serviceOrderNumber ?? selectedEvent?.title ?? t("calendar.eventDetails")}
+        description={t("calendar.eventDescription")}
+        subtitle={selectedEvent ? `${selectedEvent.clientName ?? "-"}${selectedEventSchedule ? ` • ${selectedEventSchedule}` : ""}` : null}
+        badges={selectedEvent ? [
+          <Badge
+            key="status"
+            variant="secondary"
+            className={cn(selectedEvent.color)}
+          >
+            {getEventStatusLabel(selectedEvent.status) ?? getEventTypeLabel(selectedEvent.type)}
+          </Badge>,
+          <Badge key="type" variant="outline">
+            {getEventTypeLabel(selectedEvent.type)}
+          </Badge>,
+        ] : []}
+        highlights={selectedEvent ? [
+          {
+            label: t("calendar.schedule"),
+            value: capitalizeText(format(selectedEvent.date, "PPPP", { locale: dateLocale })),
+            helper: formatTimeRange(selectedEvent.startTime, selectedEvent.endTime) || selectedEvent.time,
+          },
+          {
+            label: t("serviceOrders.client"),
+            value: selectedEvent.clientName ?? "-",
+            helper: selectedEvent.serviceOrderNumber ?? selectedEvent.title,
+          },
+          {
+            label: t("serviceOrders.detailsLocation"),
+            value: selectedEvent.address ?? selectedEvent.location ?? "-",
+            helper: selectedEvent.serviceTypeName ?? undefined,
+          },
+          {
+            label: "Recursos",
+            value: selectedEvent.equipmentName ?? "-",
+            helper: selectedEvent.operatorName ?? t("common.notProvided"),
+          },
+        ] : []}
+        sections={selectedEventSections}
+        footer={selectedEvent ? (
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              variant="outline"
+              className="cursor-pointer"
+              onClick={handleOpenSelectedServiceOrderPdf}
+              disabled={!selectedEvent.serviceOrderId}
+            >
+              <FileDown className="mr-2 size-4" />
+              {t("serviceOrders.downloadPdf")}
+            </Button>
+            {canEditSelectedEvent ? (
+              <Button
+                className="cursor-pointer"
+                onClick={handleOpenServiceOrderEdit}
+                disabled={!selectedEvent.serviceOrderId}
+              >
+                {t("serviceOrders.editServiceOrder")}
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+      />
     </div>
   )
 }
