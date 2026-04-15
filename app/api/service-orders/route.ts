@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { createServiceOrderSchema } from "@/lib/service-orders-admin";
+import { createManualServiceOrderSchema } from "@/lib/service-orders-admin";
 import {
   createServiceOrder,
   getServiceOrderById,
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
       return permission;
     }
 
-    const payload = createServiceOrderSchema.parse(await request.json());
+    const payload = createManualServiceOrderSchema.parse(await request.json());
     const serviceOrderId = await createServiceOrder(payload, {
       userId: permission.session.user.id,
       name: permission.session.user.name,

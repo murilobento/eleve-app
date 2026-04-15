@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { DataTable } from "./components/data-table";
-import type { ManagedBudget } from "@/lib/budgets-admin";
 import type { ManagedClient } from "@/lib/clients-admin";
 import type { EquipmentOption } from "@/lib/equipment-admin";
 import type { ManagedOperator } from "@/lib/operators-admin";
@@ -22,7 +21,6 @@ type ServiceOrdersResponse = {
   equipment: EquipmentOption[];
   serviceTypes: ManagedServiceType[];
   operators: ManagedOperator[];
-  approvedBudgets: ManagedBudget[];
 };
 
 function getLocalizedServiceOrderError(message: string, t: ReturnType<typeof useI18n>["t"]) {
@@ -61,7 +59,6 @@ export default function ServiceOrdersPage() {
   const [equipment, setEquipment] = useState<EquipmentOption[]>([]);
   const [serviceTypes, setServiceTypes] = useState<ManagedServiceType[]>([]);
   const [operators, setOperators] = useState<ManagedOperator[]>([]);
-  const [approvedBudgets, setApprovedBudgets] = useState<ManagedBudget[]>([]);
   const [loading, setLoading] = useState(true);
   const [isMutating, setIsMutating] = useState(false);
   const [openCreateDialogFromQuery, setOpenCreateDialogFromQuery] = useState(false);
@@ -104,7 +101,6 @@ export default function ServiceOrdersPage() {
       setEquipment(payload.equipment);
       setServiceTypes(payload.serviceTypes);
       setOperators(payload.operators);
-      setApprovedBudgets(payload.approvedBudgets);
     } catch (loadError) {
       toast.error(loadError instanceof Error ? loadError.message : t("serviceOrders.loadError"));
     } finally {
@@ -256,7 +252,6 @@ export default function ServiceOrdersPage() {
             equipment={equipment}
             serviceTypes={serviceTypes}
             operators={operators}
-            approvedBudgets={approvedBudgets}
             openCreateDialogFromQuery={openCreateDialogFromQuery}
             editServiceOrderIdFromQuery={editServiceOrderIdFromQuery}
             onCreateServiceOrder={handleCreateServiceOrder}

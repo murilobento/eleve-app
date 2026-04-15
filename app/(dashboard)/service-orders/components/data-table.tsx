@@ -57,7 +57,6 @@ import {
 } from "@/components/ui/select";
 import { SortableHeader } from "@/components/sortable-header";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { ManagedBudget } from "@/lib/budgets-admin";
 import type { ManagedClient } from "@/lib/clients-admin";
 import type { EquipmentOption } from "@/lib/equipment-admin";
 import type { ManagedOperator } from "@/lib/operators-admin";
@@ -78,7 +77,6 @@ type DataTableProps = {
   equipment: EquipmentOption[];
   serviceTypes: ManagedServiceType[];
   operators: ManagedOperator[];
-  approvedBudgets: ManagedBudget[];
   openCreateDialogFromQuery?: boolean;
   editServiceOrderIdFromQuery?: string | null;
   onCreateServiceOrder: (values: CreateServiceOrderInput) => Promise<void>;
@@ -461,7 +459,6 @@ export function DataTable({
   equipment,
   serviceTypes,
   operators,
-  approvedBudgets,
   openCreateDialogFromQuery = false,
   editServiceOrderIdFromQuery = null,
   onCreateServiceOrder,
@@ -1007,7 +1004,6 @@ export function DataTable({
               equipment={equipment}
               serviceTypes={serviceTypes}
               operators={operators}
-              approvedBudgets={approvedBudgets}
             />
           ) : null}
         </div>
@@ -1111,7 +1107,6 @@ export function DataTable({
             equipment={equipment}
             serviceTypes={serviceTypes}
             operators={operators}
-            approvedBudgets={approvedBudgets}
           />
 
           <StatusTransitionDialog

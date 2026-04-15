@@ -36,7 +36,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import type { ManagedBudget } from "@/lib/budgets-admin";
 import type { ManagedClient, PostalCodeLookupResult } from "@/lib/clients-admin";
 import type { EquipmentOption } from "@/lib/equipment-admin";
 import type { ManagedOperator } from "@/lib/operators-admin";
@@ -67,7 +66,6 @@ type ServiceOrderFormDialogProps = {
   equipment: EquipmentOption[];
   serviceTypes: ManagedServiceType[];
   operators: ManagedOperator[];
-  approvedBudgets: ManagedBudget[];
 };
 
 type PostalCodeLookupResponse = {
@@ -170,12 +168,10 @@ export function ServiceOrderFormDialog({
   equipment,
   serviceTypes,
   operators,
-  approvedBudgets,
 }: ServiceOrderFormDialogProps) {
   const { t } = useI18n();
   const isEdit = mode === "edit";
   const schema = isEdit ? updateServiceOrderSchema : createServiceOrderSchema;
-  const lastHydratedBudgetIdRef = useRef<string | null>(null);
   const lastLookedUpServicePostalCodeRef = useRef<string | null>(null);
   const [pendingAddressClient, setPendingAddressClient] = useState<ManagedClient | null>(null);
   const [pendingRetroactiveSubmit, setPendingRetroactiveSubmit] = useState<CreateServiceOrderInput | UpdateServiceOrderInput | null>(null);
@@ -218,8 +214,6 @@ export function ServiceOrderFormDialog({
   });
   const watchedItems = form.watch("items") ?? [];
 
-  const watchedOriginType = form.watch("originType");
-  const watchedSourceBudgetId = form.watch("sourceBudgetId");
   const watchedClientId = form.watch("clientId");
   const watchedServicePostalCode = form.watch("servicePostalCode");
   const watchedServiceStreet = form.watch("serviceStreet");
@@ -245,21 +239,6 @@ export function ServiceOrderFormDialog({
     [clients],
   );
 
-  const approvedBudgetOptions = useMemo(
-    () =>
-      approvedBudgets.map((budget) => ({
-        value: budget.id,
-        label: `${budget.number} • ${budget.clientName}`,
-        description: `${budget.itemCount} ${t("serviceOrders.itemsCountSummary", { count: budget.itemCount })}`,
-        keywords: [budget.number, budget.clientName, budget.serviceCity],
-      })),
-    [approvedBudgets, t],
-  );
-
-  const approvedBudgetsById = useMemo(
-    () => new Map(approvedBudgets.map((budget) => [budget.id, budget])),
-    [approvedBudgets],
-  );
   const selectedClient = useMemo(
     () => clientsById.get(watchedClientId ?? "") ?? null,
     [clientsById, watchedClientId],
@@ -466,35 +445,6 @@ export function ServiceOrderFormDialog({
     setPendingAddressClient(null);
   };
 
-  const applyBudgetToForm = (budget: ManagedBudget) => {
-    form.setValue("clientId", budget.clientId, { shouldDirty: true });
-    form.setValue("servicePostalCode", formatPostalCode(budget.servicePostalCode), { shouldDirty: true });
-    form.setValue("serviceStreet", budget.serviceStreet, { shouldDirty: true });
-    form.setValue("serviceNumber", budget.serviceNumber, { shouldDirty: true });
-    form.setValue("serviceComplement", budget.serviceComplement ?? "", { shouldDirty: true });
-    form.setValue("serviceDistrict", budget.serviceDistrict, { shouldDirty: true });
-    form.setValue("serviceCity", budget.serviceCity, { shouldDirty: true });
-    form.setValue("serviceState", budget.serviceState, { shouldDirty: true });
-    form.setValue("serviceCountry", budget.serviceCountry, { shouldDirty: true });
-    form.setValue("notes", budget.notes ?? "", { shouldDirty: true });
-    replace(
-      budget.items.map((item) => ({
-        sourceBudgetItemId: item.id,
-        serviceTypeId: item.serviceTypeId,
-        equipmentId: item.equipmentId,
-        operatorId: item.operatorId,
-        serviceDescription: item.serviceDescription,
-        serviceDate: item.serviceDate,
-        plannedStartTime: item.startTime,
-        plannedEndTime: item.endTime,
-        actualStartTime: undefined,
-        actualEndTime: undefined,
-        quotedValue: item.initialValue,
-        notes: "",
-      })),
-    );
-  };
-
   useEffect(() => {
     if (open) {
       return;
@@ -514,8 +464,6 @@ export function ServiceOrderFormDialog({
     if (!open) {
       return;
     }
-
-    lastHydratedBudgetIdRef.current = null;
 
     if (serviceOrder) {
       const selectedServiceOrderClient = clientsById.get(serviceOrder.clientId) ?? null;
@@ -564,7 +512,6 @@ export function ServiceOrderFormDialog({
       setIsServiceAddressDialogOpen(false);
       lastLookedUpServicePostalCodeRef.current =
         sameAddressAsClient ? normalizePostalCode(serviceOrder.servicePostalCode) : null;
-      lastHydratedBudgetIdRef.current = serviceOrder.sourceBudgetId;
       setItemDraft(createEmptyItem());
       setEditingItemIndex(null);
       setItemDraftErrors({});
@@ -597,32 +544,7 @@ export function ServiceOrderFormDialog({
   }, [clientsById, form, open, serviceOrder]);
 
   useEffect(() => {
-    if (!open || watchedOriginType !== "budget" || !watchedSourceBudgetId) {
-      return;
-    }
-
-    if (lastHydratedBudgetIdRef.current === watchedSourceBudgetId) {
-      return;
-    }
-
-    const budget = approvedBudgetsById.get(watchedSourceBudgetId);
-
-    if (!budget) {
-      return;
-    }
-
-    applyBudgetToForm(budget);
-    setPendingAddressClient(null);
-    setServiceAddressMode("inherit");
-    lastLookedUpServicePostalCodeRef.current = normalizePostalCode(budget.servicePostalCode);
-    lastHydratedBudgetIdRef.current = watchedSourceBudgetId;
-    setItemDraft(createEmptyItem());
-    setEditingItemIndex(null);
-    setItemDraftErrors({});
-  }, [approvedBudgetsById, form, open, replace, watchedOriginType, watchedSourceBudgetId]);
-
-  useEffect(() => {
-    if (!open || isEdit || watchedOriginType !== "manual" || serviceOrder) {
+    if (!open || isEdit || serviceOrder) {
       return;
     }
 
@@ -699,12 +621,10 @@ export function ServiceOrderFormDialog({
         toast.dismiss(toastId);
       }
     };
-  }, [form, isEdit, open, serviceAddressMode, serviceOrder, t, watchedOriginType, watchedServicePostalCode]);
+  }, [form, isEdit, open, serviceAddressMode, serviceOrder, t, watchedServicePostalCode]);
 
   async function handleSubmit(values: CreateServiceOrderInput | UpdateServiceOrderInput) {
-    const hasRetroactiveDate =
-      values.originType === "manual"
-      && values.items.some((item) => isDateBeforeToday(item.serviceDate));
+    const hasRetroactiveDate = values.items.some((item) => isDateBeforeToday(item.serviceDate));
 
     if (hasRetroactiveDate) {
       setPendingRetroactiveSubmit(values);
@@ -769,62 +689,6 @@ export function ServiceOrderFormDialog({
             <div className="grid gap-4 md:grid-cols-2">
               <FormField
                 control={form.control}
-                name="originType"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("serviceOrders.originType")}</FormLabel>
-                    <Select
-                      value={field.value}
-                      onValueChange={(value) => {
-                        field.onChange(value);
-                        if (value === "manual") {
-                          form.setValue("sourceBudgetId", undefined, { shouldDirty: true });
-                          lastHydratedBudgetIdRef.current = null;
-                        }
-                      }}
-                      disabled={isSubmitting}
-                    >
-                      <FormControl>
-                        <SelectTrigger className="cursor-pointer">
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="manual">{t("serviceOrders.originManual")}</SelectItem>
-                        <SelectItem value="budget">{t("serviceOrders.originBudget")}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="sourceBudgetId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("serviceOrders.sourceBudget")}</FormLabel>
-                    <FormControl>
-                      <SearchableCombobox
-                        value={field.value}
-                        onChange={field.onChange}
-                        options={approvedBudgetOptions}
-                        placeholder={t("serviceOrders.selectBudget")}
-                        searchPlaceholder={t("serviceOrders.searchBudgetPlaceholder")}
-                        emptyMessage={t("serviceOrders.noBudgetFound")}
-                        disabled={watchedOriginType !== "budget" || isSubmitting}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <FormField
-                control={form.control}
                 name="clientId"
                 render={({ field }) => (
                   <FormItem>
@@ -839,7 +703,7 @@ export function ServiceOrderFormDialog({
 
                           field.onChange(value);
 
-                          if (!isEdit && watchedOriginType === "manual") {
+                          if (!isEdit) {
                             const client = clientsById.get(value);
 
                             if (client) {

@@ -1130,7 +1130,7 @@ const messages: Record<AppLocale, any> = {
     },
     serviceOrders: {
       title: "Ordens de serviço",
-      description: "Gerencie a execução operacional dos atendimentos, com origem manual ou a partir de orçamentos aprovados.",
+      description: "Gerencie a execução operacional dos atendimentos, incluindo ordens manuais e ordens geradas automaticamente por orçamentos aprovados.",
       loadError: "Falha ao carregar ordens de serviço.",
       updateError: "Falha ao atualizar ordens de serviço.",
       searchPlaceholder: "Buscar por número, cliente, orçamento, serviço, equipamento, operador ou cidade...",
@@ -2500,7 +2500,7 @@ const messages: Record<AppLocale, any> = {
     },
     serviceOrders: {
       title: "Service Orders",
-      description: "Manage the operational execution of jobs, created manually or from approved budgets.",
+      description: "Manage operational job execution, including manual service orders and service orders generated automatically from approved budgets.",
       loadError: "Failed to load service orders.",
       updateError: "Failed to update service orders.",
       searchPlaceholder: "Search by number, client, budget, service, equipment, operator, or city...",

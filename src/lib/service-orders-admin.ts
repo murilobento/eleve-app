@@ -204,6 +204,23 @@ const baseServiceOrderSchema = z.object({
 });
 
 export const createServiceOrderSchema = baseServiceOrderSchema;
+export const createManualServiceOrderSchema = baseServiceOrderSchema.superRefine((value, ctx) => {
+  if (value.originType !== "manual") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["originType"],
+      message: "Service orders created manually must use manual origin.",
+    });
+  }
+
+  if (value.sourceBudgetId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["sourceBudgetId"],
+      message: "Manual service orders cannot be linked to a budget.",
+    });
+  }
+});
 export const updateServiceOrderSchema = baseServiceOrderSchema;
 export const updateServiceOrderStatusSchema = z.object({
   status: serviceOrderTransitionStatusSchema,
@@ -223,6 +240,7 @@ export type ServiceOrderStatus = z.infer<typeof serviceOrderStatusSchema>;
 export type ServiceOrderTransitionStatus = z.infer<typeof serviceOrderTransitionStatusSchema>;
 export type ServiceOrderItemInput = z.infer<typeof serviceOrderItemSchema>;
 export type CreateServiceOrderInput = z.infer<typeof createServiceOrderSchema>;
+export type CreateManualServiceOrderInput = z.infer<typeof createManualServiceOrderSchema>;
 export type UpdateServiceOrderInput = z.infer<typeof updateServiceOrderSchema>;
 export type UpdateServiceOrderStatusInput = z.infer<typeof updateServiceOrderStatusSchema>;
 
