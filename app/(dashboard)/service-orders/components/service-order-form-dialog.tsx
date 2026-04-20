@@ -679,93 +679,286 @@ export function ServiceOrderFormDialog({
             className={`flex max-h-[calc(100svh-2rem)] flex-col overflow-hidden [&_[aria-invalid=true]]:border-input [&_[aria-invalid=true]]:ring-0 ${formClassName}`}
           >
             <div className="shrink-0 border-b px-6 py-5">
-              <DialogHeader>
+              <DialogHeader className="gap-3">
                 <DialogTitle>{isEdit ? t("serviceOrders.editServiceOrder") : t("serviceOrders.createServiceOrder")}</DialogTitle>
-                <DialogDescription>{t("serviceOrders.createDescription")}</DialogDescription>
               </DialogHeader>
             </div>
 
-            <div className="flex-1 space-y-6 overflow-y-auto overflow-x-hidden px-6 py-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <FormField
-                control={form.control}
-                name="clientId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("serviceOrders.client")}</FormLabel>
-                    <FormControl>
-                      <SearchableCombobox
-                        value={field.value}
-                        onChange={(value) => {
-                          if (value === field.value) {
-                            return;
-                          }
-
-                          field.onChange(value);
-
-                          if (!isEdit) {
-                            const client = clientsById.get(value);
-
-                            if (client) {
-                              setPendingAddressClient(client);
-                            }
-                          }
-                        }}
-                        options={clientOptions}
-                        placeholder={t("serviceOrders.selectClient")}
-                        searchPlaceholder={t("serviceOrders.searchClientPlaceholder")}
-                        emptyMessage={t("serviceOrders.noClientFound")}
-                        disabled={isSubmitting}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="rounded-xl border bg-card p-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex-1 space-y-4 overflow-y-auto overflow-x-hidden px-6 py-4">
+            {pendingAddressClient ? (
+              <section className="space-y-3 rounded-xl border border-primary/20 bg-primary/5 p-4">
                 <div className="space-y-1">
-                  <div className="text-sm font-medium">{t("serviceOrders.detailsLocation")}</div>
-                  <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                    {serviceAddressMode === "inherit"
-                      ? t("serviceOrders.addressSummaryInherited")
-                      : t("serviceOrders.addressSummaryManual")}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    {buildAddressSummary({
-                      postalCode: watchedServicePostalCode,
-                      street: watchedServiceStreet,
-                      number: watchedServiceNumber,
-                      complement: watchedServiceComplement,
-                      district: watchedServiceDistrict,
-                      city: watchedServiceCity,
-                      state: watchedServiceState,
-                      country: watchedServiceCountry,
-                    }) || t("serviceOrders.addressSummaryEmpty")}
-                  </div>
+                  <h3 className="text-sm font-semibold">{t("serviceOrders.clientAddressConfirmTitle")}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {t("serviceOrders.clientAddressConfirmDescription", {
+                      client: pendingAddressClient.tradeName || pendingAddressClient.legalName || "",
+                    })}
+                  </p>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="cursor-pointer"
-                  onClick={openManualAddressDialog}
-                >
-                  {watchedServiceStreet ? t("serviceOrders.editServiceAddress") : t("serviceOrders.defineServiceAddress")}
-                </Button>
-              </div>
+                <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="cursor-pointer"
+                    onClick={() => handleClientAddressDecision(false)}
+                  >
+                    {t("serviceOrders.clientAddressConfirmNo")}
+                  </Button>
+                  <Button
+                    type="button"
+                    className="cursor-pointer"
+                    onClick={() => handleClientAddressDecision(true)}
+                  >
+                    {t("serviceOrders.clientAddressConfirmYes")}
+                  </Button>
+                </div>
+              </section>
+            ) : null}
+
+            {isServiceAddressDialogOpen ? (
+              <section className="space-y-4 rounded-xl border bg-card p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-semibold">{t("serviceOrders.serviceAddressModalTitle")}</h3>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="cursor-pointer self-start"
+                    onClick={() => setIsServiceAddressDialogOpen(false)}
+                  >
+                    {t("common.close")}
+                  </Button>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-3">
+                  <FormField
+                    control={form.control}
+                    name="servicePostalCode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("serviceOrders.servicePostalCode")}</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            value={field.value ?? ""}
+                            placeholder="00000-000"
+                            disabled={isSubmitting}
+                            onChange={(event) => {
+                              const nextValue = formatPostalCode(event.target.value);
+                              field.onChange(nextValue);
+                              form.clearErrors("servicePostalCode");
+                              lastLookedUpServicePostalCodeRef.current = null;
+                              setServiceAddressMode("manual");
+                            }}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="serviceStreet"
+                    render={({ field }) => (
+                      <FormItem className="md:col-span-2">
+                        <FormLabel>{t("serviceOrders.serviceStreet")}</FormLabel>
+                        <FormControl>
+                          <Input {...field} disabled={isSubmitting} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-4">
+                  <FormField
+                    control={form.control}
+                    name="serviceNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("serviceOrders.serviceNumber")}</FormLabel>
+                        <FormControl>
+                          <Input {...field} disabled={isSubmitting} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="serviceComplement"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("serviceOrders.serviceComplement")}</FormLabel>
+                        <FormControl>
+                          <Input {...field} value={field.value ?? ""} disabled={isSubmitting} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="serviceDistrict"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("serviceOrders.serviceDistrict")}</FormLabel>
+                        <FormControl>
+                          <Input {...field} disabled={isSubmitting} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div />
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-3">
+                  <FormField
+                    control={form.control}
+                    name="serviceCity"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("serviceOrders.serviceCity")}</FormLabel>
+                        <FormControl>
+                          <Input {...field} disabled={isSubmitting} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="serviceState"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("serviceOrders.serviceState")}</FormLabel>
+                        <FormControl>
+                          <Input {...field} disabled={isSubmitting} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="serviceCountry"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("serviceOrders.serviceCountry")}</FormLabel>
+                        <FormControl>
+                          <Input {...field} value={field.value ?? ""} disabled={isSubmitting} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="cursor-pointer"
+                    onClick={() => setIsServiceAddressDialogOpen(false)}
+                  >
+                    {t("common.cancel")}
+                  </Button>
+                  <Button type="button" className="cursor-pointer" onClick={() => void handleSaveServiceAddress()}>
+                    {t("serviceOrders.saveServiceAddress")}
+                  </Button>
+                </div>
+              </section>
+            ) : null}
+
+            <div className="grid gap-4 xl:grid-cols-[minmax(320px,0.9fr)_minmax(0,1.1fr)]">
+              <section className="space-y-4 rounded-xl border bg-card p-4">
+                <div className="space-y-1">
+                  <h3 className="text-sm font-semibold">{t("serviceOrders.client")}</h3>
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="clientId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("serviceOrders.client")}</FormLabel>
+                      <FormControl>
+                        <SearchableCombobox
+                          value={field.value}
+                          onChange={(value) => {
+                            if (value === field.value) {
+                              return;
+                            }
+
+                            field.onChange(value);
+
+                            if (!isEdit) {
+                              const client = clientsById.get(value);
+
+                              if (client) {
+                                setPendingAddressClient(client);
+                              }
+                            }
+                          }}
+                          options={clientOptions}
+                          placeholder={t("serviceOrders.selectClient")}
+                          searchPlaceholder={t("serviceOrders.searchClientPlaceholder")}
+                          emptyMessage={t("serviceOrders.noClientFound")}
+                          disabled={isSubmitting}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </section>
+
+              <section className="space-y-4 rounded-xl border bg-card p-4">
+                <div className="space-y-1">
+                  <h3 className="text-sm font-semibold">{t("serviceOrders.detailsLocation")}</h3>
+                </div>
+
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="space-y-1">
+                    <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                      {serviceAddressMode === "inherit"
+                        ? t("serviceOrders.addressSummaryInherited")
+                        : t("serviceOrders.addressSummaryManual")}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      {buildAddressSummary({
+                        postalCode: watchedServicePostalCode,
+                        street: watchedServiceStreet,
+                        number: watchedServiceNumber,
+                        complement: watchedServiceComplement,
+                        district: watchedServiceDistrict,
+                        city: watchedServiceCity,
+                        state: watchedServiceState,
+                        country: watchedServiceCountry,
+                      }) || t("serviceOrders.addressSummaryEmpty")}
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="cursor-pointer"
+                    onClick={openManualAddressDialog}
+                  >
+                    {watchedServiceStreet ? t("serviceOrders.editServiceAddress") : t("serviceOrders.defineServiceAddress")}
+                  </Button>
+                </div>
+              </section>
             </div>
 
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-medium">{t("serviceOrders.itemsSectionTitle")}</h3>
-                  <p className="text-sm text-muted-foreground">{t("serviceOrders.itemsSectionDescription")}</p>
-                </div>
+            <section className="space-y-4 rounded-xl border bg-card p-4">
+              <div className="space-y-1">
+                <h3 className="text-sm font-semibold">{t("serviceOrders.itemsSectionTitle")}</h3>
               </div>
 
-              <div className="space-y-4 rounded-lg border p-4">
+              <div className="space-y-4 rounded-xl border bg-muted/10 p-4">
                 <div className="grid gap-4 md:grid-cols-3">
                   <div className="space-y-2">
                     <FormLabel>{t("serviceOrders.serviceType")}</FormLabel>
@@ -1077,7 +1270,7 @@ export function ServiceOrderFormDialog({
                   </TableBody>
                 </Table>
               </div>
-            </div>
+            </section>
 
             <FormField
               control={form.control}
@@ -1106,192 +1299,6 @@ export function ServiceOrderFormDialog({
         </Form>
       </DialogContent>
 
-      <Dialog
-        open={Boolean(pendingAddressClient)}
-        onOpenChange={(nextOpen) => {
-          if (!nextOpen) {
-            setPendingAddressClient(null);
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{t("serviceOrders.clientAddressConfirmTitle")}</DialogTitle>
-            <DialogDescription>
-              {t("serviceOrders.clientAddressConfirmDescription", {
-                client: pendingAddressClient?.tradeName || pendingAddressClient?.legalName || "",
-              })}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              className="cursor-pointer"
-              onClick={() => handleClientAddressDecision(false)}
-            >
-              {t("serviceOrders.clientAddressConfirmNo")}
-            </Button>
-            <Button
-              type="button"
-              className="cursor-pointer"
-              onClick={() => handleClientAddressDecision(true)}
-            >
-              {t("serviceOrders.clientAddressConfirmYes")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isServiceAddressDialogOpen} onOpenChange={setIsServiceAddressDialogOpen}>
-        <DialogContent className="flex max-h-[calc(100svh-2rem)] flex-col overflow-hidden p-0 sm:max-w-2xl">
-          <Form {...form}>
-            <div className="shrink-0 border-b px-6 py-5">
-              <DialogHeader>
-                <DialogTitle>{t("serviceOrders.serviceAddressModalTitle")}</DialogTitle>
-                <DialogDescription>{t("serviceOrders.serviceAddressModalDescription")}</DialogDescription>
-              </DialogHeader>
-            </div>
-
-            <div className="flex-1 space-y-4 overflow-y-auto overflow-x-hidden px-6 py-4">
-              <div className="grid gap-4 md:grid-cols-3">
-                <FormField
-                  control={form.control}
-                  name="servicePostalCode"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("serviceOrders.servicePostalCode")}</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          value={field.value ?? ""}
-                          placeholder="00000-000"
-                          disabled={isSubmitting}
-                          onChange={(event) => {
-                            const nextValue = formatPostalCode(event.target.value);
-                            field.onChange(nextValue);
-                            form.clearErrors("servicePostalCode");
-                            lastLookedUpServicePostalCodeRef.current = null;
-                            setServiceAddressMode("manual");
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="serviceStreet"
-                  render={({ field }) => (
-                    <FormItem className="md:col-span-2">
-                      <FormLabel>{t("serviceOrders.serviceStreet")}</FormLabel>
-                      <FormControl>
-                        <Input {...field} disabled={isSubmitting} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-4">
-                <FormField
-                  control={form.control}
-                  name="serviceNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("serviceOrders.serviceNumber")}</FormLabel>
-                      <FormControl>
-                        <Input {...field} disabled={isSubmitting} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="serviceComplement"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("serviceOrders.serviceComplement")}</FormLabel>
-                      <FormControl>
-                        <Input {...field} value={field.value ?? ""} disabled={isSubmitting} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="serviceDistrict"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("serviceOrders.serviceDistrict")}</FormLabel>
-                      <FormControl>
-                        <Input {...field} disabled={isSubmitting} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <div />
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-3">
-                <FormField
-                  control={form.control}
-                  name="serviceCity"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("serviceOrders.serviceCity")}</FormLabel>
-                      <FormControl>
-                        <Input {...field} disabled={isSubmitting} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="serviceState"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("serviceOrders.serviceState")}</FormLabel>
-                      <FormControl>
-                        <Input {...field} disabled={isSubmitting} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="serviceCountry"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("serviceOrders.serviceCountry")}</FormLabel>
-                      <FormControl>
-                        <Input {...field} value={field.value ?? ""} disabled={isSubmitting} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </div>
-
-            <DialogFooter className="shrink-0 border-t px-6 py-4">
-              <Button type="button" variant="outline" className="cursor-pointer" onClick={() => setIsServiceAddressDialogOpen(false)}>
-                {t("common.cancel")}
-              </Button>
-              <Button type="button" className="cursor-pointer" onClick={() => void handleSaveServiceAddress()}>
-                {t("serviceOrders.saveServiceAddress")}
-              </Button>
-            </DialogFooter>
-          </Form>
-        </DialogContent>
-      </Dialog>
 
       <Dialog
         open={Boolean(pendingRetroactiveSubmit)}

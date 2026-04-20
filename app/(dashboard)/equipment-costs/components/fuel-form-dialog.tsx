@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -139,7 +138,6 @@ export function FuelFormDialog({
             <div className="shrink-0 border-b px-6 py-5">
               <DialogHeader>
                 <DialogTitle>{isEdit ? t("equipmentCosts.editFuel") : t("equipmentCosts.createFuel")}</DialogTitle>
-                <DialogDescription>{t("equipmentCosts.fuelFormDescription")}</DialogDescription>
               </DialogHeader>
             </div>
 

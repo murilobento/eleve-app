@@ -95,11 +95,13 @@ export function calculateBudgetItemInitialValue(serviceType?: ServiceTypePricing
     return 0;
   }
 
+  const baseValue = Number(serviceType.baseValue ?? 0);
+
   if (serviceType.billingUnit === "hour" && serviceType.minimumHours) {
-    return roundCurrencyValue(serviceType.baseValue * serviceType.minimumHours);
+    return roundCurrencyValue(baseValue * serviceType.minimumHours);
   }
 
-  return roundCurrencyValue(serviceType.baseValue);
+  return roundCurrencyValue(baseValue);
 }
 
 export function isLegacyHourlyBaseValue(
@@ -117,7 +119,7 @@ export function isLegacyHourlyBaseValue(
     return false;
   }
 
-  return roundCurrencyValue(Number(currentValue)) === roundCurrencyValue(serviceType.baseValue);
+  return roundCurrencyValue(Number(currentValue)) === roundCurrencyValue(Number(serviceType.baseValue ?? 0));
 }
 
 export function addDurationToTime(startTime: string, durationHours?: number | null) {

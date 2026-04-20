@@ -10,7 +10,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -174,11 +173,6 @@ export function RoleFormDialog({
             <div className="shrink-0 border-b px-6 py-5">
               <DialogHeader>
                 <DialogTitle>{isEdit ? t("roles.editRole") : t("roles.createRole")}</DialogTitle>
-                <DialogDescription>
-                  {role?.isSystem
-                    ? t("roles.systemProtected")
-                    : t("roles.createDescription")}
-                </DialogDescription>
               </DialogHeader>
             </div>
 

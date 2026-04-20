@@ -30,7 +30,6 @@ export default function Page() {
       <div className="px-4 lg:px-6">
         <div className="flex flex-col gap-2">
           <h1 className="text-2xl font-bold tracking-tight">{t("dashboard.title")}</h1>
-          <p className="text-muted-foreground">{t("dashboard.description")}</p>
         </div>
       </div>
       <div className="@container/main px-4 lg:px-6 space-y-6">

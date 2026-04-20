@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -107,7 +106,6 @@ export function EquipmentTypeFormDialog({
             <div className="shrink-0 border-b px-6 py-5">
               <DialogHeader>
                 <DialogTitle>{isEdit ? t("equipmentTypes.editType") : t("equipmentTypes.createType")}</DialogTitle>
-                <DialogDescription>{t("equipmentTypes.createDescription")}</DialogDescription>
               </DialogHeader>
             </div>
 

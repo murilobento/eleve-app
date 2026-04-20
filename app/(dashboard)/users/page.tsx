@@ -157,7 +157,6 @@ export default function UsersPage() {
         <div className="flex flex-col gap-2">
           <h1 className="text-2xl font-bold tracking-tight">{t("users.title")}</h1>
           <p className="text-muted-foreground">
-            {t("users.description")}
           </p>
         </div>
       </div>

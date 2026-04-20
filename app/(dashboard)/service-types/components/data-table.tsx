@@ -141,14 +141,7 @@ export function DataTable({
       accessorKey: "name",
       header: ({ column }) => <SortableHeader column={column} title={t("serviceTypes.name")} className="-ml-3" />,
       enableHiding: false,
-      cell: ({ row }) => (
-        <div className="space-y-1">
-          <div className="font-medium">{row.original.name}</div>
-          <div className="text-sm text-muted-foreground">
-            {row.original.description || t("serviceTypes.noDescription")}
-          </div>
-        </div>
-      ),
+      cell: ({ row }) => <div className="font-medium">{row.original.name}</div>,
     });
     nextColumns.push({
       accessorKey: "billingUnit",
@@ -159,7 +152,11 @@ export function DataTable({
     nextColumns.push({
       accessorKey: "baseValue",
       header: ({ column }) => <SortableHeader column={column} title={t("serviceTypes.baseValue")} className="-ml-3" />,
-      cell: ({ row }) => <span className="text-sm font-medium">{formatMoney(row.original.baseValue, locale)}</span>,
+      cell: ({ row }) => (
+        <span className="text-sm font-medium">
+          {row.original.baseValue == null ? "-" : formatMoney(row.original.baseValue, locale)}
+        </span>
+      ),
     });
     nextColumns.push({
       accessorKey: "equipmentCount",
@@ -252,7 +249,6 @@ export function DataTable({
 
       return [
         row.original.name,
-        row.original.description ?? "",
         ...row.original.equipment.map((item) => `${item.name} ${item.brand} ${item.model}`),
       ].some((item) => item.toLowerCase().includes(value));
     },

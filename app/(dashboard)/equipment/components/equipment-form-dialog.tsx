@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -165,9 +164,6 @@ export function EquipmentFormDialog({
                   )}
                 />
               </div>
-              <DialogDescription>
-                {creationDisabled ? t("equipment.createBlockedNoTypes") : t("equipment.createDescription")}
-              </DialogDescription>
               </DialogHeader>
             </div>
 

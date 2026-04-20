@@ -168,7 +168,6 @@ export default function ClientsPage() {
       <div className="px-4 lg:px-6">
         <div className="flex flex-col gap-2">
           <h1 className="text-2xl font-bold tracking-tight">{t("clients.title")}</h1>
-          <p className="text-muted-foreground">{t("clients.description")}</p>
         </div>
       </div>
 

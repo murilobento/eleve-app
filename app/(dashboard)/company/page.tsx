@@ -7,7 +7,7 @@ import { Search } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Form,
   FormControl,
@@ -274,7 +274,6 @@ export default function CompanyPage() {
       <div className="px-4 lg:px-6">
         <div className="flex flex-col gap-2">
           <h1 className="text-2xl font-bold tracking-tight">{t("company.title")}</h1>
-          <p className="text-muted-foreground">{t("company.description")}</p>
         </div>
       </div>
 
@@ -287,7 +286,6 @@ export default function CompanyPage() {
           <Card>
             <CardHeader>
               <CardTitle>{t("company.formTitle")}</CardTitle>
-              <CardDescription>{t("company.formDescription")}</CardDescription>
             </CardHeader>
             <CardContent>
               <Form {...form}>

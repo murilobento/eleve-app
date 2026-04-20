@@ -165,7 +165,6 @@ export default function RolesPage() {
         <div className="flex flex-col gap-2">
           <h1 className="text-2xl font-bold tracking-tight">{t("roles.title")}</h1>
           <p className="text-muted-foreground">
-            {t("roles.description")}
           </p>
         </div>
       </div>

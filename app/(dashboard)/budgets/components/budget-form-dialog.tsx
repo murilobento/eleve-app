@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -152,7 +151,7 @@ function buildServiceTypeCaption(
     return "";
   }
 
-  const baseValue = formatMoney(serviceType.baseValue, locale);
+  const baseValue = formatMoney(serviceType.baseValue ?? 0, locale);
 
   if (serviceType.billingUnit === "hour" && serviceType.minimumHours) {
     return t("budgets.serviceTypeHourlyCaption", {
@@ -850,16 +849,212 @@ export function BudgetFormDialog({
                     {t(`budgets.statusOptions.${budget?.status ?? "pending"}`)}
                   </Badge>
                 </div>
-                <DialogDescription>{t("budgets.createDescription")}</DialogDescription>
               </DialogHeader>
             </div>
 
             <div className="flex-1 space-y-4 overflow-y-auto px-6 py-4">
+              {pendingAddressClient ? (
+                <section className="space-y-3 rounded-xl border border-primary/20 bg-primary/5 p-4">
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-semibold">{t("budgets.clientAddressConfirmTitle")}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {t("budgets.clientAddressConfirmDescription", {
+                        client: pendingAddressClient.tradeName || pendingAddressClient.legalName || "",
+                      })}
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="cursor-pointer"
+                      onClick={() => handleClientAddressDecision(false)}
+                    >
+                      {t("budgets.clientAddressConfirmNo")}
+                    </Button>
+                    <Button
+                      type="button"
+                      className="cursor-pointer"
+                      onClick={() => handleClientAddressDecision(true)}
+                    >
+                      {t("budgets.clientAddressConfirmYes")}
+                    </Button>
+                  </div>
+                </section>
+              ) : null}
+
+              {isServiceAddressDialogOpen ? (
+                <section className="space-y-4 rounded-xl border bg-card p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-semibold">{t("budgets.serviceAddressModalTitle")}</h3>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="cursor-pointer self-start"
+                      onClick={() => setIsServiceAddressDialogOpen(false)}
+                    >
+                      {t("common.close")}
+                    </Button>
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)_120px]">
+                    <FormField
+                      control={form.control}
+                      name="servicePostalCode"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t("budgets.servicePostalCode")}</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="00000-000"
+                              {...field}
+                              value={field.value ?? ""}
+                              onChange={(event) => {
+                                const nextValue = formatPostalCode(event.target.value);
+                                field.onChange(nextValue);
+                                form.clearErrors("servicePostalCode");
+                                lastLookedUpServicePostalCodeRef.current = null;
+                                setServiceAddressMode("manual");
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="serviceStreet"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t("budgets.serviceStreet")}</FormLabel>
+                          <FormControl>
+                            <Input placeholder={t("budgets.serviceStreetPlaceholder")} {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="serviceNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t("budgets.serviceNumber")}</FormLabel>
+                          <FormControl>
+                            <Input placeholder="123" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                    <FormField
+                      control={form.control}
+                      name="serviceComplement"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>
+                            {t("budgets.serviceComplement")}{" "}
+                            <span className="text-muted-foreground">({t("budgets.optionalField")})</span>
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              value={field.value ?? ""}
+                              placeholder={t("budgets.optionalField")}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="serviceDistrict"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t("budgets.serviceDistrict")}</FormLabel>
+                          <FormControl>
+                            <Input placeholder={t("budgets.serviceDistrictPlaceholder")} {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-[minmax(180px,1fr)_96px_minmax(120px,1fr)]">
+                    <FormField
+                      control={form.control}
+                      name="serviceCity"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t("budgets.serviceCity")}</FormLabel>
+                          <FormControl>
+                            <Input placeholder={t("budgets.serviceCityPlaceholder")} {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="serviceState"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t("budgets.serviceState")}</FormLabel>
+                          <FormControl>
+                            <Input placeholder="SP" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="serviceCountry"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t("budgets.serviceCountry")}</FormLabel>
+                          <FormControl>
+                            <Input {...field} value={field.value ?? ""} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="cursor-pointer"
+                      onClick={() => setIsServiceAddressDialogOpen(false)}
+                    >
+                      {t("common.cancel")}
+                    </Button>
+                    <Button type="button" className="cursor-pointer" onClick={() => void handleSaveServiceAddress()}>
+                      {t("budgets.saveServiceAddress")}
+                    </Button>
+                  </div>
+                </section>
+              ) : null}
+
               <div className="grid gap-4 xl:grid-cols-[minmax(320px,0.9fr)_minmax(0,1.1fr)]">
                 <section className="space-y-4 rounded-xl border bg-card p-4">
                   <div className="space-y-1">
                     <h3 className="text-sm font-semibold">{t("budgets.planningSectionTitle")}</h3>
-                    <p className="text-sm text-muted-foreground">{t("budgets.planningSectionDescription")}</p>
                   </div>
 
                   <FormField
@@ -898,7 +1093,6 @@ export function BudgetFormDialog({
                 <section className="space-y-4 rounded-xl border bg-card p-4">
                   <div className="space-y-1">
                     <h3 className="text-sm font-semibold">{t("budgets.locationSectionTitle")}</h3>
-                    <p className="text-sm text-muted-foreground">{t("budgets.locationSectionDescription")}</p>
                   </div>
 
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -936,7 +1130,6 @@ export function BudgetFormDialog({
               <section className="space-y-4 rounded-xl border bg-card p-4">
                 <div className="space-y-1">
                   <h3 className="text-sm font-semibold">{t("budgets.itemsSectionTitle")}</h3>
-                  <p className="text-sm text-muted-foreground">{t("budgets.itemsSectionDescription")}</p>
                 </div>
 
                 <div className="space-y-4 rounded-xl border bg-muted/10 p-4">
@@ -1241,7 +1434,6 @@ export function BudgetFormDialog({
                 <section className="space-y-3 rounded-xl border bg-card p-4">
                   <div className="space-y-1">
                     <h3 className="text-sm font-semibold">{t("budgets.totalsSectionTitle")}</h3>
-                    <p className="text-xs text-muted-foreground">{t("budgets.totalsSectionDescription")}</p>
                   </div>
 
                   <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_220px_minmax(0,1fr)]">
@@ -1290,7 +1482,6 @@ export function BudgetFormDialog({
                 <section className="space-y-3 rounded-xl border bg-card p-4">
                   <div className="space-y-1">
                     <h3 className="text-sm font-semibold">{t("budgets.notesSectionTitle")}</h3>
-                    <p className="text-xs text-muted-foreground">{t("budgets.notesSectionDescription")}</p>
                   </div>
 
                   <FormField
@@ -1323,202 +1514,6 @@ export function BudgetFormDialog({
         </Form>
       </DialogContent>
 
-      <Dialog
-        open={Boolean(pendingAddressClient)}
-        onOpenChange={(nextOpen) => {
-          if (!nextOpen) {
-            setPendingAddressClient(null);
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{t("budgets.clientAddressConfirmTitle")}</DialogTitle>
-            <DialogDescription>
-              {t("budgets.clientAddressConfirmDescription", {
-                client: pendingAddressClient?.tradeName || pendingAddressClient?.legalName || "",
-              })}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              className="cursor-pointer"
-              onClick={() => handleClientAddressDecision(false)}
-            >
-              {t("budgets.clientAddressConfirmNo")}
-            </Button>
-            <Button
-              type="button"
-              className="cursor-pointer"
-              onClick={() => handleClientAddressDecision(true)}
-            >
-              {t("budgets.clientAddressConfirmYes")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isServiceAddressDialogOpen} onOpenChange={setIsServiceAddressDialogOpen}>
-        <DialogContent className="flex max-h-[calc(100svh-2rem)] flex-col overflow-hidden p-0 sm:max-w-2xl">
-          <Form {...form}>
-            <div className="shrink-0 border-b px-6 py-5">
-              <DialogHeader>
-                <DialogTitle>{t("budgets.serviceAddressModalTitle")}</DialogTitle>
-                <DialogDescription>{t("budgets.serviceAddressModalDescription")}</DialogDescription>
-              </DialogHeader>
-            </div>
-
-            <div className="flex-1 space-y-4 overflow-y-auto overflow-x-hidden px-6 py-4">
-              <div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)_120px]">
-                <FormField
-                  control={form.control}
-                  name="servicePostalCode"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("budgets.servicePostalCode")}</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="00000-000"
-                          {...field}
-                          value={field.value ?? ""}
-                          onChange={(event) => {
-                            const nextValue = formatPostalCode(event.target.value);
-                            field.onChange(nextValue);
-                            form.clearErrors("servicePostalCode");
-                            lastLookedUpServicePostalCodeRef.current = null;
-                            setServiceAddressMode("manual");
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="serviceStreet"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("budgets.serviceStreet")}</FormLabel>
-                      <FormControl>
-                        <Input placeholder={t("budgets.serviceStreetPlaceholder")} {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="serviceNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("budgets.serviceNumber")}</FormLabel>
-                      <FormControl>
-                        <Input placeholder="123" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                <FormField
-                  control={form.control}
-                  name="serviceComplement"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>
-                        {t("budgets.serviceComplement")}{" "}
-                        <span className="text-muted-foreground">({t("budgets.optionalField")})</span>
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          value={field.value ?? ""}
-                          placeholder={t("budgets.optionalField")}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="serviceDistrict"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("budgets.serviceDistrict")}</FormLabel>
-                      <FormControl>
-                        <Input placeholder={t("budgets.serviceDistrictPlaceholder")} {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-[minmax(180px,1fr)_96px_minmax(120px,1fr)]">
-                <FormField
-                  control={form.control}
-                  name="serviceCity"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("budgets.serviceCity")}</FormLabel>
-                      <FormControl>
-                        <Input placeholder={t("budgets.serviceCityPlaceholder")} {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="serviceState"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("budgets.serviceState")}</FormLabel>
-                      <FormControl>
-                        <Input placeholder="SP" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="serviceCountry"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("budgets.serviceCountry")}</FormLabel>
-                      <FormControl>
-                        <Input {...field} value={field.value ?? ""} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </div>
-
-            <DialogFooter className="shrink-0 border-t px-6 py-4">
-              <Button type="button" variant="outline" className="cursor-pointer" onClick={() => setIsServiceAddressDialogOpen(false)}>
-                {t("common.cancel")}
-              </Button>
-              <Button type="button" className="cursor-pointer" onClick={() => void handleSaveServiceAddress()}>
-                {t("budgets.saveServiceAddress")}
-              </Button>
-            </DialogFooter>
-          </Form>
-        </DialogContent>
-      </Dialog>
     </Dialog>
   );
 }

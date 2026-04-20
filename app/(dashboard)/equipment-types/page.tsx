@@ -168,7 +168,6 @@ export default function EquipmentTypesPage() {
       <div className="px-4 lg:px-6">
         <div className="flex flex-col gap-2">
           <h1 className="text-2xl font-bold tracking-tight">{t("equipmentTypes.title")}</h1>
-          <p className="text-muted-foreground">{t("equipmentTypes.description")}</p>
         </div>
       </div>
 

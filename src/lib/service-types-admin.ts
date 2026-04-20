@@ -18,13 +18,6 @@ const textFieldSchema = z
   .min(2, "This field must be at least 2 characters.")
   .max(80, "This field must be at most 80 characters.");
 
-const descriptionSchema = z
-  .string()
-  .trim()
-  .max(160, "Description must be at most 160 characters.")
-  .optional()
-  .transform((value) => (value && value.length > 0 ? value : undefined));
-
 const decimalFieldSchema = (label: string) =>
   z.preprocess(
     (value) => {
@@ -50,10 +43,9 @@ const optionalDecimalFieldSchema = (label: string) => decimalFieldSchema(label).
 
 export const createServiceTypeSchema = z.object({
   name: textFieldSchema,
-  description: descriptionSchema,
   status: serviceTypeStatusSchema,
   billingUnit: serviceBillingUnitSchema,
-  baseValue: decimalFieldSchema("Base value"),
+  baseValue: optionalDecimalFieldSchema("Base value"),
   minimumHours: optionalDecimalFieldSchema("Minimum hours"),
   minimumKm: optionalDecimalFieldSchema("Minimum km"),
   equipmentIds: z.array(z.string().uuid("Select a valid equipment item.")).max(100).default([]),
@@ -79,7 +71,7 @@ export type ManagedServiceType = {
   description?: string | null;
   status: ServiceTypeStatus;
   billingUnit: ServiceBillingUnit;
-  baseValue: number;
+  baseValue: number | null;
   minimumHours: number | null;
   minimumKm: number | null;
   equipmentIds: string[];

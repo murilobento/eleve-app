@@ -1010,7 +1010,6 @@ export default function EquipmentRequisitionsPage() {
       <div className="px-4 lg:px-6">
         <div className="flex flex-col gap-2">
           <h1 className="text-2xl font-bold tracking-tight">{t("equipmentRequisitions.title")}</h1>
-          <p className="text-muted-foreground">{t("equipmentRequisitions.description")}</p>
         </div>
       </div>
 
@@ -1238,7 +1237,6 @@ export default function EquipmentRequisitionsPage() {
           <div className="shrink-0 border-b px-6 py-5">
             <DialogHeader>
               <DialogTitle>{editMaintenance ? t("equipmentRequisitions.editMaintenance") : t("equipmentRequisitions.addMaintenance")}</DialogTitle>
-              <DialogDescription>{t("equipmentRequisitions.maintenanceFormDescription")}</DialogDescription>
             </DialogHeader>
           </div>
           <div className="flex-1 space-y-4 overflow-y-auto overflow-x-hidden px-6 py-4">
@@ -1299,7 +1297,6 @@ export default function EquipmentRequisitionsPage() {
           <div className="shrink-0 border-b px-6 py-5">
             <DialogHeader>
               <DialogTitle>{editFuel ? t("equipmentRequisitions.editFuel") : t("equipmentRequisitions.addFuel")}</DialogTitle>
-              <DialogDescription>{t("equipmentRequisitions.fuelFormDescription")}</DialogDescription>
             </DialogHeader>
           </div>
           <div className="flex-1 space-y-4 overflow-y-auto overflow-x-hidden px-6 py-4">
@@ -1370,7 +1367,6 @@ export default function EquipmentRequisitionsPage() {
           <div className="shrink-0 border-b px-6 py-5">
             <DialogHeader>
               <DialogTitle>{editParts ? t("equipmentRequisitions.editParts") : t("equipmentRequisitions.addParts")}</DialogTitle>
-              <DialogDescription>{t("equipmentRequisitions.partsFormDescription")}</DialogDescription>
             </DialogHeader>
           </div>
           <div className="flex-1 space-y-4 overflow-y-auto overflow-x-hidden px-6 py-4">

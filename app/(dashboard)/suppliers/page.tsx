@@ -672,7 +672,6 @@ export default function SuppliersPage() {
       <div className="px-4 lg:px-6">
         <div className="flex flex-col gap-2">
           <h1 className="text-2xl font-bold tracking-tight">{t("suppliers.title")}</h1>
-          <p className="text-muted-foreground">{t("suppliers.description")}</p>
         </div>
       </div>
 
@@ -888,7 +887,6 @@ export default function SuppliersPage() {
                     )}
                   />
                 </div>
-                <DialogDescription>{t("suppliers.formDescription")}</DialogDescription>
                 </DialogHeader>
               </div>
 

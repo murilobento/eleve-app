@@ -281,7 +281,7 @@ type ServiceTypeRow = {
     | "freight"
     | "mobilization_demobilization"
     | "counterweight_transport";
-  base_value: string | number;
+  base_value: string | number | null;
   minimum_hours: string | number | null;
   minimum_km: string | number | null;
   created_at: string;
@@ -477,7 +477,7 @@ type ServiceOrderStatusHistoryRow = {
 type BudgetServiceTypeSnapshotRow = {
   id: string;
   billing_unit: ServiceTypeRow["billing_unit"];
-  base_value: string | number;
+  base_value: string | number | null;
   minimum_hours: string | number | null;
   minimum_km: string | number | null;
 };
@@ -885,6 +885,11 @@ async function ensureSchema() {
       created_at timestamptz NOT NULL DEFAULT now(),
       updated_at timestamptz NOT NULL DEFAULT now()
     );
+  `);
+
+  await pool.query(`
+    ALTER TABLE service_types
+    ALTER COLUMN base_value DROP NOT NULL;
   `);
 
   await pool.query(`
@@ -1904,7 +1909,7 @@ function mapServiceTypeRow(row: ServiceTypeRow): ManagedServiceType {
     description: row.description,
     status: row.status,
     billingUnit: row.billing_unit,
-    baseValue: Number(row.base_value),
+    baseValue: row.base_value == null ? null : Number(row.base_value),
     minimumHours: row.minimum_hours == null ? null : Number(row.minimum_hours),
     minimumKm: row.minimum_km == null ? null : Number(row.minimum_km),
     equipmentIds: row.equipment_ids ?? equipment.map((item) => item.id),
@@ -2339,7 +2344,7 @@ async function replaceBudgetItems(
         item.startTime,
         item.endTime,
         serviceType.billing_unit,
-        Number(serviceType.base_value),
+        Number(serviceType.base_value ?? 0),
         normalizeBudgetItemValue(serviceType.minimum_hours),
         normalizeBudgetItemValue(serviceType.minimum_km),
         item.initialValue,
@@ -5264,7 +5269,6 @@ async function assertEquipmentIdsExist(equipmentIds: string[]) {
 
 export async function createServiceType(input: {
   name: string;
-  description?: string;
   status: "active" | "inactive";
   billingUnit:
     | "hour"
@@ -5275,7 +5279,7 @@ export async function createServiceType(input: {
     | "freight"
     | "mobilization_demobilization"
     | "counterweight_transport";
-  baseValue: number;
+  baseValue?: number;
   minimumHours?: number;
   minimumKm?: number;
   equipmentIds: string[];
@@ -5302,10 +5306,10 @@ export async function createServiceType(input: {
     [
       id,
       input.name.trim(),
-      input.description?.trim() || null,
+      null,
       input.status,
       input.billingUnit,
-      input.baseValue,
+      input.baseValue ?? null,
       input.minimumHours ?? null,
       input.minimumKm ?? null,
     ],
@@ -5328,7 +5332,6 @@ export async function updateServiceType(
   serviceTypeId: string,
   input: {
     name: string;
-    description?: string;
     status: "active" | "inactive";
     billingUnit:
       | "hour"
@@ -5339,7 +5342,7 @@ export async function updateServiceType(
       | "freight"
       | "mobilization_demobilization"
       | "counterweight_transport";
-    baseValue: number;
+    baseValue?: number;
     minimumHours?: number;
     minimumKm?: number;
     equipmentIds: string[];
@@ -5380,10 +5383,10 @@ export async function updateServiceType(
     [
       serviceTypeId,
       input.name.trim(),
-      input.description?.trim() || null,
+      null,
       input.status,
       input.billingUnit,
-      input.baseValue,
+      input.baseValue ?? null,
       input.minimumHours ?? null,
       input.minimumKm ?? null,
     ],

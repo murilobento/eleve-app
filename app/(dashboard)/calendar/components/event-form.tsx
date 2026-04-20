@@ -19,7 +19,6 @@ import {
 import { 
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle 
 } from "@/components/ui/dialog"
@@ -189,9 +188,6 @@ export function EventForm({ event, open, onOpenChange, onSave, onDelete }: Event
               <div className={cn("h-3 w-3 rounded-full", selectedEventType?.color)} />
               {event ? t("calendar.editEvent") : t("calendar.createNewEvent")}
             </DialogTitle>
-            <DialogDescription>
-              {event ? t("calendar.editEventHelp") : t("calendar.createEventHelp")}
-            </DialogDescription>
           </DialogHeader>
         </div>
 

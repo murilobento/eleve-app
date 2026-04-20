@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -138,7 +137,6 @@ export function OperatorFormDialog({
                   )}
                 />
               </div>
-              <DialogDescription>{t("operators.createDescription")}</DialogDescription>
               </DialogHeader>
             </div>
 

@@ -10,7 +10,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -34,7 +33,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import type { EquipmentOption } from "@/lib/equipment-admin";
 import {
   createServiceTypeSchema,
@@ -79,6 +77,7 @@ export function ServiceTypeFormDialog({
   const { t } = useI18n();
   const isEdit = mode === "edit";
   const schema = isEdit ? updateServiceTypeSchema : createServiceTypeSchema;
+  const allEquipmentIds = equipment.map((equipmentItem) => equipmentItem.id);
 
   const form = useForm<CreateServiceTypeInput | UpdateServiceTypeInput>({
     resolver: zodResolver(schema),
@@ -86,10 +85,9 @@ export function ServiceTypeFormDialog({
     reValidateMode: "onBlur",
     defaultValues: {
       name: "",
-      description: "",
       status: "active",
       billingUnit: "hour",
-      baseValue: 0,
+      baseValue: undefined,
       minimumHours: undefined,
       minimumKm: undefined,
       equipmentIds: [],
@@ -108,10 +106,9 @@ export function ServiceTypeFormDialog({
 
     form.reset({
       name: serviceType?.name ?? "",
-      description: serviceType?.description ?? "",
       status: serviceType?.status ?? "active",
       billingUnit: serviceType?.billingUnit ?? "hour",
-      baseValue: serviceType?.baseValue ?? 0,
+      baseValue: serviceType?.baseValue ?? undefined,
       minimumHours: serviceType?.minimumHours ?? undefined,
       minimumKm: serviceType?.minimumKm ?? undefined,
       equipmentIds: serviceType?.equipmentIds ?? [],
@@ -162,7 +159,6 @@ export function ServiceTypeFormDialog({
                   )}
                 />
               </div>
-              <DialogDescription>{t("serviceTypes.createDescription")}</DialogDescription>
               </DialogHeader>
             </div>
 
@@ -182,24 +178,6 @@ export function ServiceTypeFormDialog({
                 )}
               />
             </div>
-
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>{t("serviceTypes.descriptionLabel")}</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder={t("serviceTypes.descriptionPlaceholder")}
-                      {...field}
-                      value={field.value ?? ""}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
 
             <div className="grid gap-4 md:grid-cols-2">
               <FormField
@@ -241,6 +219,8 @@ export function ServiceTypeFormDialog({
                         inputMode="decimal"
                         placeholder="0,00"
                         {...field}
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
                       />
                     </FormControl>
                     <FormMessage />
@@ -300,7 +280,27 @@ export function ServiceTypeFormDialog({
               name="equipmentIds"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t("serviceTypes.linkedEquipmentOptional")}</FormLabel>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <FormLabel>{t("serviceTypes.linkedEquipmentOptional")}</FormLabel>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="cursor-pointer self-start"
+                      disabled={equipment.length === 0 || isSubmitting}
+                      onClick={() => {
+                        const currentIds = new Set(field.value ?? []);
+                        const areAllSelected =
+                          equipment.length > 0 && allEquipmentIds.every((equipmentId) => currentIds.has(equipmentId));
+
+                        field.onChange(areAllSelected ? [] : allEquipmentIds);
+                      }}
+                    >
+                      {equipment.length > 0 && allEquipmentIds.every((equipmentId) => (field.value ?? []).includes(equipmentId))
+                        ? t("serviceTypes.clearEquipmentSelection")
+                        : t("serviceTypes.selectAllEquipment")}
+                    </Button>
+                  </div>
                   <FormControl>
                     <ScrollArea className="h-56 rounded-md border p-4">
                       <div className="space-y-3">
