@@ -19,9 +19,17 @@ import {
   X,
 } from "lucide-react";
 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useTheme } from "@/hooks/use-theme";
 import { cn, getAppUrl } from "@/lib/utils";
 import type { AppLocale } from "@/i18n/config";
+import type { PublicSiteContent } from "@/lib/public-site-admin";
 
 type LandingProps = {
   locale: AppLocale;
@@ -33,14 +41,27 @@ type FeatureCardProps = {
   img: string;
   tag: string;
   highlighted?: boolean;
+  className?: string;
 };
 
 type EquipmentCardProps = {
   name: string;
   model: string;
   capacity: string;
+  technicalInfo: string;
+  manualUrl?: string | null;
   img: string;
+  onOpenDetails?: () => void;
+  className?: string;
 };
+
+type TestimonialCard = {
+  name: string;
+  role: string;
+  text: string;
+};
+
+type PublicSiteContentResponse = PublicSiteContent;
 
 const services = [
   {
@@ -76,24 +97,32 @@ const equipment = [
     name: "Guindaste LTM 11200",
     model: "Liebherr",
     capacity: "1200 ton",
+    technicalInfo: "Guindaste telescopico de alta capacidade para operacoes de elevacao em projetos industriais e civis.",
+    manualUrl: null,
     img: "https://images.unsplash.com/photo-1541888946425-d81bb19480c5?auto=format&fit=crop&q=80&w=1200",
   },
   {
     name: "Empilhadeira Industrial",
     model: "Hyster",
     capacity: "16 ton",
+    technicalInfo: "Equipamento para movimentacao de carga paletizada em ambientes industriais com operacao continua.",
+    manualUrl: null,
     img: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&q=80&w=1200",
   },
   {
     name: "Caminhão Munck",
     model: "Volvo",
     capacity: "45 ton",
+    technicalInfo: "Veiculo com munck para operacoes de carga, descarga e apoio logistico em obras e plantas industriais.",
+    manualUrl: null,
     img: "https://images.unsplash.com/photo-1589939705384-5185137a7f0f?auto=format&fit=crop&q=80&w=1200",
   },
   {
     name: "Plataforma Elevatória",
     model: "JLG",
     capacity: "12m",
+    technicalInfo: "Plataforma para trabalhos em altura com alcance vertical e horizontal para manutencoes e montagens.",
+    manualUrl: null,
     img: "https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&q=80&w=1200",
   },
 ];
@@ -147,13 +176,65 @@ const navigationItems = [
   { label: "Contato", href: "#contato" },
 ];
 
+function EleveLogo({ className }: { className?: string }) {
+  return (
+    <svg
+      width="121"
+      height="57"
+      viewBox="0 0 121 57"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+      aria-label="Eleve"
+      role="img"
+    >
+      <path d="M20.0349 40.21L17.7729 21.4467L31.9904 19.7974L32.5396 24.3624L23.4917 25.4118L23.8275 28.1999L32.0997 27.2399L32.5891 31.2969L24.3168 32.2569L24.6526 35.045L33.7005 33.9956L34.2498 38.5607L20.0323 40.21H20.0349Z" fill="#833C6D" />
+      <path d="M53.6394 36.3162L51.3774 17.5529L65.5949 15.9036L66.1441 20.4686L57.0962 21.518L57.4319 24.3061L65.7042 23.3461L66.1935 27.4031L57.9213 28.3631L58.2571 31.1512L67.305 30.1018L67.8542 34.6669L53.6368 36.3162H53.6394Z" fill="#833C6D" />
+      <path d="M90.6043 32.0296L88.3423 13.2663L102.56 11.6169L103.109 16.182L94.061 17.2314L94.3968 20.0195L102.669 19.0595L103.158 23.1165L94.8862 24.0765L95.2219 26.8645L104.27 25.8152L104.819 30.3803L90.6017 32.0296H90.6043Z" fill="#833C6D" />
+      <path d="M37.3528 38.2029L35.0908 19.4396L40.2603 18.8396L41.9705 33.0378L51.0184 31.9885L51.5676 36.5536L37.3502 38.2029H37.3528Z" fill="#833C6D" />
+      <path d="M72.8337 15.0638L78.4535 28.7463L78.6331 28.7258L80.8457 14.1344L86.0152 13.5344L81.7749 33.0509L76.4336 33.6713L67.6616 15.6638L72.8311 15.0638H72.8337Z" fill="#833C6D" />
+      <path d="M119.167 19.5293C118.404 18.0408 117.342 16.634 116.03 15.3038C113.732 12.9778 110.663 10.8868 106.969 9.03059C101.425 6.25018 94.4618 4.00083 86.5228 2.43829C78.5863 0.875741 69.6737 0 60.2562 0C52.0542 0 44.2401 0.663826 37.1158 1.86637C31.7719 2.76765 26.8184 3.9753 22.3804 5.43827C15.7246 7.63401 10.2271 10.394 6.30701 13.6391C4.34957 15.2629 2.78259 17.0144 1.69194 18.8986C0.601296 20.7803 -0.00259459 22.8075 8.37983e-06 24.896C8.37983e-06 26.7522 0.476353 28.5624 1.34835 30.2603C2.11102 31.7488 3.17303 33.1556 4.48493 34.4858C6.78335 36.8117 9.85225 38.9028 13.5459 40.759C19.0902 43.5394 26.0532 45.7887 33.9922 47.3513C41.9287 48.9138 50.8412 49.7896 60.2588 49.7896C68.4608 49.7896 76.2749 49.1257 83.3992 47.9232C88.7431 47.0219 93.6966 45.8142 98.1346 44.3513C104.79 42.1555 110.288 39.3956 114.208 36.1505C116.165 34.5266 117.732 32.7752 118.823 30.8909C119.914 29.0092 120.518 26.982 120.515 24.8935C120.515 23.0373 120.039 21.2271 119.167 19.5293ZM116.608 28.9965C115.999 30.1837 115.119 31.3684 113.974 32.5301C111.969 34.5598 109.153 36.5079 105.665 38.2568C100.43 40.8841 93.694 43.0747 85.9605 44.5964C78.2271 46.1206 69.4941 46.9785 60.2562 46.9785C52.213 46.9785 44.5525 46.3274 37.5999 45.153C32.3862 44.2721 27.5707 43.0977 23.2914 41.6883C16.8725 39.5768 11.6665 36.9215 8.15252 34.0058C6.39291 32.5479 5.06018 31.0313 4.18038 29.5071C3.29797 27.9803 2.86067 26.4535 2.86067 24.896C2.86067 23.5097 3.20687 22.1514 3.90447 20.7931C4.51356 19.6059 5.39336 18.4212 6.53867 17.2595C8.54296 15.2297 11.3594 13.2816 14.8474 11.5327C20.0819 8.90549 26.8184 6.71486 34.5518 5.19317C42.2853 3.66892 51.0182 2.81105 60.2562 2.81105C68.2994 2.81105 75.9599 3.46211 82.9125 4.63657C88.1262 5.51742 92.9417 6.69188 97.221 8.10124C103.64 10.2127 108.846 12.868 112.36 15.7838C114.119 17.2416 115.452 18.7582 116.332 20.2825C117.214 21.8118 117.652 23.3361 117.652 24.8935C117.652 26.2799 117.306 27.6382 116.608 28.9965Z" fill="#F3E446" />
+      <path d="M5.70055 41.2336C5.32832 41.014 5.14351 40.9043 4.77389 40.6821C3.74832 42.3315 3.23553 43.1562 2.20996 44.803C3.36568 45.4949 3.94614 45.8344 5.11227 46.5008C5.28407 46.2098 5.37257 46.0642 5.54437 45.7732C4.76608 45.3289 4.37824 45.1042 3.60776 44.6472C4.44591 43.2813 4.86499 42.597 5.70055 41.2311V41.2336Z" fill="#833C6D" />
+      <path d="M12.1428 44.6704C11.8773 44.3615 11.5338 44.1266 11.1147 43.9657C10.693 43.8023 10.2765 43.7436 9.86785 43.7921C9.45918 43.8406 9.08436 43.9938 8.74597 44.2568C8.40758 44.5198 8.13687 44.8951 7.93124 45.3828C7.72821 45.8679 7.65272 46.3223 7.70999 46.7436C7.76725 47.1649 7.92864 47.5351 8.19935 47.8517C8.47005 48.1683 8.82406 48.4134 9.25875 48.5793C9.69085 48.7453 10.1177 48.804 10.5342 48.7555C10.9533 48.707 11.3281 48.5461 11.6639 48.2755C11.9997 48.0049 12.26 47.6219 12.45 47.1317C12.64 46.6389 12.7025 46.1845 12.6374 45.7632C12.5723 45.3445 12.4083 44.9819 12.1402 44.673L12.1428 44.6704ZM11.414 46.741C11.2891 47.0602 11.1329 47.3079 10.9455 47.4891C10.7581 47.6704 10.5472 47.7802 10.3182 47.821C10.0891 47.8619 9.84703 47.8364 9.59974 47.7393C9.34986 47.6423 9.15724 47.5019 9.01668 47.3181C8.87612 47.1342 8.80063 46.9121 8.79022 46.6542C8.7772 46.3964 8.83707 46.1104 8.96722 45.7938C9.09737 45.4772 9.25615 45.2296 9.44617 45.0534C9.63619 44.8747 9.84442 44.7674 10.0709 44.7266C10.2973 44.6857 10.5342 44.7113 10.7789 44.8057C11.0236 44.9002 11.2136 45.0381 11.3515 45.2219C11.4895 45.4057 11.565 45.6228 11.5806 45.8806C11.5962 46.1385 11.5416 46.4244 11.4166 46.7436L11.414 46.741Z" fill="#833C6D" />
+      <path d="M18.5617 46.9989C18.4133 46.8048 18.2259 46.6363 18.002 46.4959C17.7782 46.3555 17.5257 46.2457 17.242 46.1691C16.8099 46.0517 16.396 46.0389 15.9978 46.1283C15.5995 46.2176 15.2455 46.4117 14.9384 46.7078C14.6312 47.004 14.4021 47.4048 14.2512 47.9104C14.1002 48.4133 14.0742 48.8729 14.1705 49.284C14.2694 49.6976 14.4672 50.0474 14.7666 50.3333C15.0659 50.6193 15.4407 50.8261 15.8936 50.9487C16.219 51.038 16.521 51.0687 16.8047 51.0482C17.0884 51.0278 17.3435 50.9614 17.5726 50.8567C17.8016 50.7521 17.9968 50.6116 18.1608 50.4431C18.3248 50.2746 18.4498 50.0857 18.5357 49.8789C18.1062 49.7665 17.8927 49.7104 17.4632 49.5929C17.4034 49.7104 17.3305 49.8099 17.2394 49.8891C17.1509 49.9682 17.0468 50.0321 16.9348 50.0729C16.8203 50.1163 16.698 50.1367 16.5678 50.1393C16.4351 50.1393 16.2997 50.124 16.1565 50.0857C15.9041 50.0168 15.6958 49.8967 15.537 49.7308C15.3783 49.5623 15.2767 49.3504 15.2351 49.0951C15.1934 48.8397 15.2221 48.5461 15.3184 48.2168C15.4121 47.8951 15.5448 47.6346 15.714 47.438C15.8832 47.2414 16.0811 47.1112 16.3049 47.0448C16.5288 46.9785 16.7682 46.981 17.0233 47.05C17.1639 47.0882 17.2914 47.1419 17.4008 47.2134C17.5101 47.2848 17.6038 47.3665 17.6767 47.4636C17.7496 47.5606 17.8042 47.6653 17.8355 47.7827C17.8667 47.9002 17.8745 48.0253 17.8589 48.158C18.2832 48.2704 18.4966 48.3265 18.9209 48.4363C18.9599 48.158 18.9469 47.8976 18.8819 47.6551C18.8194 47.4151 18.7127 47.198 18.5617 47.0014V46.9989Z" fill="#833C6D" />
+      <path d="M22.3359 47.7188C21.1984 49.437 20.6179 50.2949 19.4414 51.9953C19.9021 52.1077 20.1312 52.1638 20.5945 52.2736C20.8366 51.906 21.0422 51.5868 21.2349 51.2932C21.9038 51.4515 22.388 51.5613 23.0595 51.7119C23.0986 52.0592 23.1402 52.4345 23.1897 52.8685C23.653 52.9706 23.8847 53.0217 24.3454 53.1187C24.0591 51.0813 23.9289 50.0626 23.6842 48.0277C23.1454 47.9077 22.8747 47.8439 22.3359 47.7188ZM21.693 50.5809C22.0079 50.0907 22.3203 49.5979 22.7342 48.9443L22.7732 48.9519C22.8487 49.7179 22.906 50.2975 22.9684 50.8719C22.5181 50.7724 22.1407 50.6855 21.693 50.5809Z" fill="#833C6D" />
+      <path d="M30.9309 49.9379C30.7669 49.7566 30.5664 49.6034 30.3348 49.4834C30.1031 49.3634 29.8402 49.274 29.5539 49.2204C29.1166 49.1387 28.7027 49.1591 28.3149 49.2817C27.927 49.4042 27.5913 49.6264 27.3127 49.9481C27.0316 50.2698 26.839 50.6885 26.7297 51.2042C26.6229 51.7174 26.6334 52.177 26.7661 52.5804C26.8963 52.9838 27.1227 53.3157 27.4429 53.5761C27.6954 53.7804 27.9921 53.931 28.3305 54.028C28.268 54.1685 28.2264 54.2604 28.1535 54.4161C28.3227 54.4697 28.445 54.5285 28.5179 54.5923C28.5908 54.6561 28.6168 54.7378 28.5934 54.8297C28.57 54.9268 28.4919 54.988 28.3643 55.0136C28.2342 55.0391 28.065 55.0314 27.8515 54.9906C27.8203 55.1668 27.8047 55.2561 27.7761 55.4323C28.1977 55.5114 28.5413 55.5038 28.8016 55.4119C29.0619 55.3174 29.2129 55.154 29.2545 54.9242C29.2832 54.7608 29.2519 54.6229 29.1608 54.508C29.0697 54.3931 28.9396 54.3089 28.773 54.2527C28.7938 54.2017 28.8068 54.1659 28.8251 54.1276C29.0749 54.1583 29.3092 54.1557 29.5279 54.12C29.8064 54.074 30.0563 53.9897 30.2723 53.8646C30.491 53.7395 30.6732 53.5863 30.8215 53.4025C30.9699 53.2212 31.0792 53.0221 31.1443 52.8076C30.7096 52.731 30.491 52.6927 30.0563 52.611C30.0068 52.7336 29.9417 52.8383 29.861 52.9251C29.7777 53.0119 29.684 53.0808 29.5747 53.1344C29.4654 53.1855 29.3457 53.2187 29.2155 53.2315C29.0854 53.2442 28.9474 53.2366 28.8016 53.211C28.5439 53.1625 28.3279 53.0629 28.1561 52.9072C27.9843 52.754 27.8672 52.5498 27.8047 52.2995C27.7422 52.0493 27.7448 51.7557 27.8125 51.4161C27.8776 51.0868 27.9895 50.8187 28.1405 50.6093C28.2941 50.4 28.4763 50.2519 28.6949 50.1676C28.911 50.0834 29.1478 50.0655 29.4081 50.114C29.5513 50.1396 29.6814 50.1855 29.796 50.2468C29.9105 50.3081 30.0094 50.3821 30.0901 50.474C30.1708 50.5634 30.2333 50.6655 30.2749 50.7804C30.3166 50.8953 30.3348 51.0178 30.3296 51.1532C30.7617 51.2298 30.9751 51.2681 31.4072 51.3421C31.4228 51.0612 31.389 50.8034 31.3057 50.5685C31.2224 50.3336 31.0975 50.1268 30.9335 49.9455L30.9309 49.9379Z" fill="#833C6D" />
+      <path d="M34.9034 49.5622C34.9659 49.5061 35.0388 49.4856 35.1221 49.4959C35.1949 49.5061 35.2574 49.5342 35.3121 49.5776C35.3641 49.621 35.4188 49.672 35.4735 49.7257C35.5281 49.7793 35.5932 49.8303 35.6713 49.8788C35.7494 49.9273 35.8483 49.958 35.968 49.9733C36.1893 50.0014 36.3871 49.9478 36.5641 49.8099C36.7385 49.672 36.8504 49.455 36.8947 49.1614C36.6708 49.1231 36.5563 49.1052 36.3324 49.0669C36.3168 49.1742 36.2804 49.2584 36.2205 49.3171C36.1606 49.3759 36.0852 49.4014 35.9915 49.3886C35.9212 49.3784 35.8587 49.3529 35.804 49.3095C35.7494 49.2661 35.6921 49.215 35.6322 49.1588C35.5724 49.1027 35.5047 49.0516 35.4292 49.0057C35.3537 48.9597 35.26 48.9265 35.1455 48.9112C34.9242 48.8806 34.7238 48.9316 34.5494 49.0669C34.3724 49.2022 34.2605 49.4193 34.2136 49.7154C34.4427 49.7537 34.5572 49.7716 34.7863 49.8099C34.8019 49.7001 34.8435 49.6184 34.9034 49.5622Z" fill="#833C6D" />
+      <path d="M34.7314 50.2825C33.7449 52.0876 33.2425 52.9888 32.2144 54.7812C32.6803 54.8552 32.9146 54.891 33.3805 54.9624C33.5887 54.5744 33.7683 54.2424 33.9323 53.9335C34.6091 54.0356 35.0984 54.1071 35.7804 54.2016C35.8481 54.5463 35.921 54.9139 36.0069 55.3429C36.4754 55.4067 36.7097 55.4373 37.1756 55.4986C36.7227 53.4918 36.5067 52.4884 36.0954 50.4791C35.5488 50.4025 35.2754 50.3616 34.7314 50.2825ZM34.3306 53.188C34.6013 52.6748 34.872 52.1565 35.2286 51.4723L35.2676 51.4774C35.4056 52.2357 35.5123 52.8076 35.6216 53.3744C35.1661 53.3105 34.7835 53.2544 34.3306 53.188Z" fill="#833C6D" />
+      <path d="M43.2093 51.5768C42.8709 51.3495 42.483 51.2142 42.0379 51.1683C41.5902 51.1223 41.1789 51.1759 40.8041 51.3291C40.4267 51.4823 40.1117 51.73 39.8618 52.0721C39.6093 52.4142 39.4532 52.8482 39.3881 53.3716C39.3256 53.8925 39.3751 54.3495 39.5417 54.7401C39.7083 55.1308 39.9634 55.4448 40.3069 55.6772C40.6505 55.9121 41.0514 56.0525 41.5121 56.101C41.9702 56.147 42.3919 56.0933 42.7772 55.935C43.1624 55.7767 43.48 55.524 43.7247 55.1742C43.9719 54.827 44.1177 54.3878 44.1672 53.8644C44.2166 53.341 44.1515 52.884 43.9771 52.4985C43.8027 52.1129 43.5476 51.8065 43.2093 51.5793V51.5768ZM43.0713 53.7623C43.0375 54.1019 42.9568 54.3827 42.824 54.6048C42.6939 54.827 42.5221 54.9904 42.3138 55.0899C42.1056 55.1921 41.8687 55.2278 41.6058 55.1997C41.3429 55.1716 41.1191 55.0874 40.9369 54.947C40.7547 54.8065 40.6219 54.6125 40.5412 54.3674C40.4605 54.1223 40.4397 53.8312 40.4787 53.4916C40.5178 53.1521 40.6037 52.8738 40.7364 52.6516C40.8692 52.4295 41.0384 52.2712 41.244 52.1716C41.4497 52.0721 41.6813 52.0363 41.939 52.0619C42.1967 52.0874 42.4154 52.1717 42.5976 52.3095C42.7772 52.4499 42.9099 52.6414 42.9932 52.884C43.0765 53.1265 43.1025 53.4176 43.0687 53.7572L43.0713 53.7623Z" fill="#833C6D" />
+      <path d="M51.4347 52.1463C51.0781 51.9344 50.6486 51.8119 50.141 51.7787C49.42 51.7327 49.0608 51.7072 48.3398 51.6536C48.1914 53.5787 48.1159 54.5412 47.9675 56.4689C48.7042 56.5225 49.0712 56.548 49.8078 56.5965C50.3336 56.6297 50.7944 56.5608 51.1848 56.3872C51.5752 56.2161 51.8798 55.9531 52.1011 55.6033C52.3223 55.2535 52.4446 54.8246 52.4707 54.3242C52.4967 53.8238 52.4186 53.3897 52.2364 53.0195C52.0568 52.6493 51.7887 52.3582 51.4321 52.1463H51.4347ZM51.393 54.268C51.3722 54.628 51.2993 54.9165 51.1744 55.1387C51.0494 55.3582 50.8724 55.5165 50.646 55.611C50.4195 55.7055 50.1436 55.7412 49.8208 55.7208C49.5423 55.7029 49.4044 55.6927 49.1285 55.6748C49.2144 54.4467 49.2586 53.8314 49.3445 52.6033C49.6178 52.6212 49.7532 52.6314 50.0265 52.6493C50.344 52.6697 50.6069 52.7387 50.8152 52.8587C51.026 52.9787 51.1796 53.1523 51.2759 53.3846C51.3722 53.617 51.4113 53.9106 51.3904 54.268H51.393Z" fill="#833C6D" />
+      <path d="M54.5557 56.8414C55.9614 56.8899 56.6642 56.9078 58.0672 56.9282C58.0724 56.5912 58.075 56.4227 58.0802 56.0856C57.1197 56.0729 56.6381 56.0627 55.6776 56.0346C55.6906 55.5724 55.6985 55.3427 55.7115 54.8831C56.5913 54.9086 57.0286 54.9188 57.9084 54.9316C57.9136 54.5946 57.9162 54.4261 57.9214 54.089C57.0468 54.0763 56.6095 54.0661 55.7349 54.0405C55.7479 53.581 55.7557 53.3512 55.7687 52.8916C56.7058 52.9171 57.1769 52.9273 58.114 52.9427C58.1192 52.6056 58.1218 52.4371 58.127 52.1001C56.7657 52.0797 56.0863 52.0644 54.7249 52.0159C54.6547 53.9461 54.6208 54.9112 54.5505 56.8414H54.5557Z" fill="#833C6D" />
+      <path d="M64.5511 54.347C64.5563 54.6534 64.5589 54.8091 64.5615 55.1155C65.0118 55.1104 65.2721 55.1053 65.6652 55.0976C65.6652 55.2891 65.6235 55.4602 65.5376 55.6057C65.4465 55.7589 65.3164 55.8789 65.142 55.9632C64.9676 56.05 64.7567 56.0934 64.5095 56.0959C64.2361 56.0985 63.9993 56.0398 63.7988 55.9198C63.5984 55.7998 63.4422 55.6211 63.3303 55.3862C63.221 55.1513 63.1637 54.8653 63.1611 54.5283C63.1611 54.1913 63.2132 53.9079 63.3199 53.673C63.4266 53.4381 63.5802 53.2594 63.7728 53.1343C63.968 53.0091 64.1945 52.9453 64.4548 52.9428C64.5928 52.9428 64.7203 52.9555 64.8348 52.9862C64.9494 53.0168 65.0535 53.0628 65.1446 53.124C65.2357 53.1853 65.3138 53.2594 65.3789 53.3462C65.4439 53.433 65.4934 53.5351 65.5324 53.6474C65.9697 53.6398 66.1884 53.6347 66.6283 53.6219C66.5866 53.3845 66.5033 53.1674 66.3758 52.9709C66.2482 52.7743 66.0869 52.6083 65.8916 52.4679C65.6964 52.3275 65.4752 52.2202 65.2279 52.1462C64.9806 52.0721 64.7125 52.0364 64.4262 52.0389C64.093 52.0441 63.7832 52.1028 63.4995 52.2177C63.2132 52.3326 62.9633 52.496 62.7498 52.7104C62.5338 52.9249 62.3672 53.1853 62.2475 53.4917C62.1277 53.7981 62.0679 54.1479 62.0679 54.5385C62.0679 55.0491 62.1694 55.4883 62.3724 55.8585C62.5781 56.2287 62.8644 56.5121 63.234 56.7113C63.6036 56.9104 64.0331 57.0049 64.5199 56.9998C64.9572 56.9947 65.3424 56.9053 65.6782 56.7342C66.014 56.5632 66.2717 56.3232 66.4565 56.0142C66.6413 55.7053 66.7246 55.3376 66.7142 54.9138L66.6986 54.3062C65.8422 54.3291 65.4127 54.3368 64.5563 54.3496L64.5511 54.347Z" fill="#833C6D" />
+      <path d="M73.2216 51.7554C72.7947 51.7835 72.5812 51.7962 72.1569 51.8218C72.2324 53.0396 72.2689 53.6473 72.3444 54.8651C72.3548 55.049 72.3235 55.2149 72.2454 55.363C72.1673 55.5111 72.0528 55.6311 71.8992 55.7205C71.7483 55.8098 71.5635 55.8609 71.3526 55.8737C71.1418 55.8839 70.957 55.8532 70.793 55.7792C70.6316 55.7051 70.5041 55.5979 70.4103 55.46C70.3166 55.3222 70.2646 55.1613 70.2568 54.9775C70.1969 53.7596 70.1657 53.152 70.1058 51.9341C69.6789 51.9545 69.4655 51.9647 69.0386 51.9801C69.0906 53.2337 69.1193 53.8592 69.1713 55.1128C69.1869 55.4651 69.2885 55.769 69.4785 56.0243C69.6685 56.2796 69.9288 56.4736 70.2594 56.6064C70.5899 56.7392 70.97 56.7928 71.4021 56.7698C71.8316 56.7468 72.2038 56.6524 72.5161 56.4864C72.8285 56.3205 73.068 56.0983 73.2294 55.8251C73.3907 55.5494 73.4584 55.2379 73.435 54.8856C73.3491 53.6345 73.3074 53.009 73.2216 51.7579V51.7554Z" fill="#833C6D" />
+      <path d="M75.7048 51.5718C75.8662 53.4969 75.9469 54.4594 76.1083 56.3845C76.5456 56.3488 76.7668 56.3309 77.2041 56.2926C77.0297 54.3701 76.9438 53.4075 76.7694 51.4824C76.3426 51.5207 76.1317 51.5386 75.7048 51.5718Z" fill="#833C6D" />
+      <path d="M82.1342 50.8977C82.2852 52.1028 82.3607 52.7053 82.5143 53.9104L82.47 53.9155C81.4366 52.8177 80.9264 52.2636 79.9243 51.1504C79.5521 51.1913 79.3647 51.2091 78.9924 51.2474C79.1955 53.1674 79.297 54.1274 79.5026 56.05C79.9399 56.004 80.1586 55.981 80.5959 55.9351C80.4605 54.7274 80.3928 54.1223 80.2549 52.9147L80.2913 52.9096C81.3117 54.0228 81.8297 54.5742 82.8813 55.6696C83.2587 55.6236 83.4487 55.6006 83.8261 55.5521C83.5711 53.6372 83.4461 52.6798 83.191 50.7649C82.7693 50.8185 82.5585 50.844 82.1342 50.8951V50.8977Z" fill="#833C6D" />
+      <path d="M89.7789 50.673C89.5212 50.3513 89.1932 50.124 88.7976 49.9938C88.4019 49.8636 87.9542 49.8355 87.4518 49.9147C86.736 50.0245 86.3794 50.0781 85.6636 50.1802C85.9473 52.0925 86.0879 53.0474 86.3716 54.9572C87.103 54.8525 87.4674 54.7989 88.1989 54.6866C88.7221 54.6074 89.1568 54.4389 89.5004 54.1887C89.844 53.9385 90.0834 53.6168 90.224 53.2262C90.3619 52.8355 90.388 52.3938 90.2995 51.8985C90.2136 51.4032 90.0392 50.9972 89.7815 50.6755L89.7789 50.673ZM89.2088 52.9683C89.1359 53.2108 88.998 53.4023 88.7976 53.5427C88.5971 53.6832 88.3342 53.7776 88.0141 53.8287C87.7381 53.8721 87.6002 53.8925 87.3269 53.9334C87.1395 52.7155 87.0432 52.1079 86.8557 50.89C87.1264 50.8491 87.2618 50.8287 87.5325 50.7879C87.8475 50.7394 88.1208 50.7521 88.3524 50.8236C88.5841 50.8951 88.7741 51.033 88.9199 51.2398C89.0657 51.4466 89.1698 51.7249 89.2296 52.0772C89.2895 52.4321 89.2843 52.7308 89.2114 52.9734L89.2088 52.9683Z" fill="#833C6D" />
+      <path d="M93.1812 48.8321C92.874 50.8593 92.7074 51.8729 92.3586 53.9001C92.8246 53.8159 93.0562 53.7725 93.5222 53.6857C93.5846 53.2516 93.6393 52.8789 93.6888 52.5342C94.3629 52.4065 94.8497 52.3095 95.5239 52.1742C95.7061 52.4755 95.9013 52.7997 96.1304 53.175C96.5937 53.0806 96.8253 53.032 97.2887 52.935C96.1694 51.1963 95.6176 50.3231 94.5373 48.5691C93.9959 48.6789 93.7252 48.7325 93.1812 48.8346V48.8321ZM93.8033 51.6993C93.8814 51.1274 93.9595 50.5504 94.0584 49.787L94.0974 49.7793C94.4905 50.4457 94.7872 50.9487 95.084 51.4465C94.6336 51.5384 94.2536 51.6125 93.8007 51.6993H93.8033Z" fill="#833C6D" />
+      <path d="M102.271 49.4423C102.156 49.3095 102.018 49.2048 101.857 49.1257C101.696 49.0465 101.513 48.9929 101.31 48.9597C101.11 48.9291 100.894 48.9163 100.662 48.9214C100.472 48.924 100.379 48.9265 100.189 48.9291C100.074 48.9316 99.9647 48.9291 99.8606 48.9189C99.7564 48.9087 99.6627 48.8882 99.5794 48.8627C99.4961 48.8346 99.4259 48.7938 99.3686 48.7401C99.3113 48.6865 99.2775 48.615 99.2593 48.5333C99.2384 48.4338 99.2437 48.3342 99.2879 48.2397C99.3322 48.1453 99.405 48.0635 99.5144 47.9895C99.6211 47.9155 99.7616 47.8593 99.9308 47.8184C100.183 47.7597 100.394 47.7623 100.569 47.8287C100.74 47.895 100.86 48.0176 100.928 48.1989C101.331 48.1018 101.532 48.0508 101.935 47.9512C101.857 47.6729 101.714 47.4482 101.508 47.2746C101.3 47.101 101.045 46.9887 100.74 46.935C100.436 46.884 100.1 46.8993 99.7356 46.9887C99.3764 47.0755 99.0693 47.2082 98.8142 47.3946C98.5591 47.5784 98.3769 47.7955 98.2623 48.0457C98.1504 48.2959 98.1296 48.564 98.1947 48.8474C98.2753 49.1946 98.4602 49.4448 98.7543 49.5929C99.0484 49.7435 99.4181 49.8176 99.8658 49.8125C100.097 49.8125 100.212 49.8125 100.444 49.8125C100.636 49.8125 100.803 49.8201 100.943 49.838C101.084 49.8584 101.196 49.8967 101.279 49.9504C101.362 50.0065 101.42 50.0857 101.446 50.1929C101.474 50.3052 101.461 50.415 101.409 50.5197C101.357 50.6244 101.271 50.7189 101.149 50.798C101.027 50.8797 100.876 50.941 100.694 50.9844C100.509 51.0278 100.337 51.0406 100.178 51.0227C100.019 51.0048 99.884 50.9512 99.7721 50.8669C99.6601 50.7827 99.5794 50.6627 99.53 50.5069C99.1161 50.6014 98.9105 50.6499 98.4966 50.7418C98.5825 51.0789 98.7387 51.3418 98.9625 51.5333C99.1864 51.7248 99.4649 51.8423 99.7955 51.8882C100.129 51.9342 100.498 51.9086 100.91 51.8116C101.323 51.712 101.664 51.5691 101.927 51.3827C102.19 51.1963 102.375 50.9793 102.477 50.7291C102.578 50.4814 102.594 50.2108 102.518 49.9274C102.469 49.7333 102.383 49.5699 102.271 49.4372V49.4423Z" fill="#833C6D" />
+      <path d="M107.084 44.4458C105.563 45.1352 104.798 45.4696 103.262 46.1181C103.398 46.4271 103.465 46.5828 103.601 46.8918C104.176 46.6492 104.462 46.5241 105.038 46.2764C105.696 47.7343 106.024 48.4645 106.683 49.9224C107.084 49.7488 107.284 49.6619 107.685 49.4832C107.019 48.0279 106.685 47.3028 106.016 45.8475C106.589 45.5947 106.873 45.4671 107.443 45.2092C107.3 44.9028 107.227 44.7496 107.084 44.4458Z" fill="#833C6D" />
+      <path d="M111.928 46.7461C111.733 46.3274 111.636 46.118 111.441 45.6967C112.251 45.3342 112.654 45.1503 113.459 44.7776C113.313 44.4737 113.24 44.3206 113.092 44.0167C112.29 44.3869 111.889 44.5708 111.085 44.9308C110.889 44.512 110.793 44.3027 110.598 43.884C111.462 43.4984 111.892 43.3018 112.751 42.901C112.605 42.5972 112.529 42.444 112.383 42.1401C111.137 42.7197 110.512 43.0006 109.257 43.5546C110.062 45.3163 110.465 46.1971 111.272 47.9588C112.568 47.3895 113.214 47.0959 114.5 46.4984C114.354 46.1946 114.278 46.0414 114.133 45.7376C113.253 46.1461 112.813 46.3478 111.928 46.7435V46.7461Z" fill="#833C6D" />
+      <path d="M119.469 42.8371C119.396 42.6507 119.294 42.4975 119.164 42.3775C119.037 42.2575 118.886 42.1707 118.714 42.1095C118.542 42.0507 118.355 42.015 118.149 42.0073C117.943 41.9997 117.727 42.0099 117.496 42.0431C117.306 42.0661 117.212 42.0788 117.022 42.1018C116.907 42.1171 116.798 42.1273 116.691 42.1273C116.587 42.1273 116.491 42.1197 116.402 42.1018C116.314 42.0839 116.241 42.0507 116.178 42.0048C116.116 41.9588 116.072 41.8924 116.046 41.8107C116.012 41.7137 116.009 41.6141 116.041 41.5171C116.074 41.4201 116.139 41.3282 116.238 41.2439C116.337 41.1597 116.47 41.0882 116.637 41.0269C116.881 40.9401 117.095 40.9197 117.274 40.9656C117.454 41.0116 117.589 41.1214 117.675 41.2924C118.068 41.1495 118.266 41.078 118.656 40.9324C118.547 40.6644 118.381 40.4576 118.152 40.3069C117.925 40.1563 117.654 40.0746 117.345 40.0567C117.035 40.0388 116.702 40.095 116.342 40.2227C115.991 40.3478 115.7 40.5163 115.465 40.7282C115.231 40.9401 115.072 41.1775 114.986 41.438C114.903 41.6984 114.911 41.969 115.01 42.2422C115.129 42.5767 115.343 42.8065 115.653 42.9214C115.962 43.0363 116.342 43.0695 116.79 43.0158C117.022 42.9903 117.139 42.9775 117.371 42.9495C117.563 42.9265 117.732 42.9163 117.873 42.9188C118.014 42.9239 118.131 42.9469 118.222 42.9929C118.313 43.0388 118.378 43.1129 118.414 43.215C118.456 43.3248 118.456 43.4346 118.414 43.5443C118.375 43.6541 118.297 43.7563 118.185 43.8507C118.071 43.9452 117.928 44.0243 117.751 44.0856C117.571 44.1495 117.399 44.1826 117.238 44.1801C117.076 44.1801 116.936 44.1443 116.814 44.0703C116.691 43.9988 116.598 43.889 116.532 43.7409C116.129 43.8814 115.929 43.9529 115.525 44.0907C115.65 44.415 115.835 44.6601 116.08 44.826C116.324 44.9894 116.616 45.0788 116.954 45.0865C117.293 45.0941 117.662 45.0277 118.063 44.8848C118.466 44.7392 118.792 44.5605 119.034 44.3435C119.279 44.129 119.437 43.8916 119.51 43.6337C119.583 43.3758 119.57 43.1052 119.463 42.832L119.469 42.8371Z" fill="#833C6D" />
+    </svg>
+  );
+}
+
 function smoothScroll(target: string, onDone?: () => void) {
   const element = document.querySelector(target);
   if (element) {
-    element.scrollIntoView({ behavior: "smooth", block: "start" });
+    const headerOffset = 80; // Altura do header fixo
+    const elementPosition = element.getBoundingClientRect().top;
+    const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+
+    window.scrollTo({
+      top: offsetPosition,
+      behavior: "smooth"
+    });
   }
 
-  onDone?.();
+  // Aguarda a animação terminar antes de executar o callback
+  setTimeout(() => {
+    onDone?.();
+  }, 500);
 }
 
 function LandingNavbar({ locale }: { locale: AppLocale }) {
@@ -184,11 +265,11 @@ function LandingNavbar({ locale }: { locale: AppLocale }) {
     <>
       <header className="fixed inset-x-0 top-0 z-50 border-b border-black/5 bg-white/90 backdrop-blur-md transition-colors dark:border-white/5 dark:bg-[#0A0A0A]/90">
         <div className="mx-auto flex h-18 max-w-7xl items-center justify-between px-4 md:h-20 md:px-6">
-          <a href="#inicio" className="flex flex-col">
-            <span className="text-2xl font-extrabold tracking-tighter text-black dark:text-white">Eleve</span>
-            <span className="pl-0.5 text-[11px] font-semibold uppercase tracking-[0.35em] text-[#FCD34D]">
-              Locações
-            </span>
+          <a href="#inicio" className="flex flex-col" onClick={(event) => {
+            event.preventDefault();
+            smoothScroll("#inicio");
+          }}>
+            <EleveLogo className="h-12 w-auto" />
           </a>
 
           <nav className="hidden items-center gap-8 lg:flex">
@@ -197,6 +278,10 @@ function LandingNavbar({ locale }: { locale: AppLocale }) {
                 key={item.href}
                 href={item.href}
                 className="text-sm font-semibold text-gray-600 transition-colors hover:text-black dark:text-gray-400 dark:hover:text-white"
+                onClick={(event) => {
+                  event.preventDefault();
+                  smoothScroll(item.href);
+                }}
               >
                 {item.label}
               </a>
@@ -221,6 +306,10 @@ function LandingNavbar({ locale }: { locale: AppLocale }) {
             <a
               href="#contato"
               className="inline-flex items-center gap-2 rounded-sm bg-[#FCD34D] px-5 py-3 text-sm font-bold text-gray-950 transition-colors hover:bg-[#F59E0B]"
+              onClick={(event) => {
+                event.preventDefault();
+                smoothScroll("#contato");
+              }}
             >
               <MessageCircle size={16} />
               Solicitar orçamento
@@ -288,9 +377,9 @@ function LandingNavbar({ locale }: { locale: AppLocale }) {
   );
 }
 
-function FeatureCard({ title, img, tag, highlighted }: FeatureCardProps) {
+function FeatureCard({ title, img, tag, highlighted, className }: FeatureCardProps) {
   return (
-    <article className="group relative aspect-[1.2/1] w-[88vw] max-w-[380px] shrink-0 overflow-hidden rounded-2xl bg-black shadow-2xl shadow-black/15 sm:w-[360px]">
+    <article className={cn("group relative aspect-[1.2/1] w-full overflow-hidden rounded-2xl bg-black shadow-2xl shadow-black/15", className)}>
       <img
         src={img}
         alt={title}
@@ -317,9 +406,16 @@ function FeatureCard({ title, img, tag, highlighted }: FeatureCardProps) {
   );
 }
 
-function EquipmentCard({ name, model, capacity, img }: EquipmentCardProps) {
+function EquipmentCard({ name, model, capacity, img, onOpenDetails, className }: EquipmentCardProps) {
   return (
-    <article className="group w-[88vw] max-w-[320px] shrink-0 overflow-hidden rounded-2xl border border-black/5 bg-white shadow-lg shadow-black/5 transition-transform duration-300 hover:-translate-y-1 dark:border-white/5 dark:bg-[#1A1A1A] dark:shadow-black/20 sm:w-[320px]">
+    <button
+      type="button"
+      onClick={onOpenDetails}
+      className={cn(
+        "group w-full overflow-hidden rounded-2xl border border-black/5 bg-white text-left shadow-lg shadow-black/5 transition-transform duration-300 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FCD34D] dark:border-white/5 dark:bg-[#1A1A1A] dark:shadow-black/20",
+        className,
+      )}
+    >
       <div className="relative aspect-[16/10] overflow-hidden">
         <img
           src={img}
@@ -338,25 +434,151 @@ function EquipmentCard({ name, model, capacity, img }: EquipmentCardProps) {
         </h3>
         <div className="mt-5 flex items-center justify-between border-t border-black/5 pt-4 dark:border-white/5">
           <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-gray-500 dark:text-gray-400">
-            Manual técnico
+            Ver detalhes
           </span>
           <ChevronRight size={18} className="text-amber-700 dark:text-[#FCD34D]" />
         </div>
       </div>
+    </button>
+  );
+}
+
+function TestimonialCardView({ testimonial }: { testimonial: TestimonialCard }) {
+  return (
+    <article className="h-full rounded-[1.75rem] border border-black/5 bg-white p-8 shadow-lg shadow-black/5 dark:border-white/5 dark:bg-[#1A1A1A] dark:shadow-black/20">
+      <div className="mb-6 flex items-center gap-4">
+        <div className="inline-flex h-14 w-14 items-center justify-center rounded-full border-2 border-[#FCD34D] bg-gray-100 text-lg font-black text-black dark:bg-[#0A0A0A] dark:text-white">
+          {testimonial.name.charAt(0)}
+        </div>
+        <div>
+          <p className="font-bold">{testimonial.name}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+            {testimonial.role}
+          </p>
+        </div>
+      </div>
+      <p className="text-base leading-8 text-gray-600 dark:text-gray-300">"{testimonial.text}"</p>
     </article>
+  );
+}
+
+function EquipmentDetailsModal({
+  equipment,
+  open,
+  onOpenChange,
+}: {
+  equipment: EquipmentCardProps | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  if (!equipment) {
+    return null;
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto rounded-3xl border-black/10 bg-white p-0 dark:border-white/10 dark:bg-[#121212]">
+        <div className="grid gap-0 md:grid-cols-2">
+          <div className="relative h-full min-h-64">
+            <img
+              src={equipment.img}
+              alt={equipment.name}
+              className="h-full w-full rounded-t-3xl object-cover md:rounded-l-3xl md:rounded-tr-none"
+              referrerPolicy="no-referrer"
+            />
+            <div className="absolute left-4 top-4 rounded-sm bg-[#FCD34D] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em] text-gray-950">
+              {equipment.capacity}
+            </div>
+          </div>
+          <div className="p-6 md:p-8">
+            <DialogHeader className="text-left">
+              <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-gray-500 dark:text-gray-400">
+                {equipment.model}
+              </p>
+              <DialogTitle className="text-2xl font-black tracking-[-0.03em]">{equipment.name}</DialogTitle>
+              <DialogDescription className="text-sm leading-7 text-gray-600 dark:text-gray-300">
+                {equipment.technicalInfo}
+              </DialogDescription>
+            </DialogHeader>
+
+            {equipment.manualUrl ? (
+              <a
+                href={equipment.manualUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-8 inline-flex items-center gap-2 rounded-sm bg-[#FCD34D] px-5 py-3 text-xs font-bold uppercase tracking-[0.2em] text-gray-950 transition-colors hover:bg-[#F59E0B]"
+              >
+                Download manual
+                <ArrowRight size={14} />
+              </a>
+            ) : null}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
 function Carousel({
   title,
   children,
+  autoplayMs = 5000,
 }: {
   title: string;
   children: React.ReactNode;
+  autoplayMs?: number;
 }) {
   const ref = React.useRef<HTMLDivElement>(null);
+  const [hasOverflow, setHasOverflow] = React.useState(false);
+  const [canScrollLeft, setCanScrollLeft] = React.useState(false);
+  const [canScrollRight, setCanScrollRight] = React.useState(false);
+  const [isPaused, setIsPaused] = React.useState(false);
 
-  const scroll = (direction: "left" | "right") => {
+  const updateScrollState = React.useCallback(() => {
+    const container = ref.current;
+    if (!container) {
+      return;
+    }
+
+    const overflow = container.scrollWidth - container.clientWidth > 2;
+    setHasOverflow(overflow);
+
+    if (!overflow) {
+      setCanScrollLeft(false);
+      setCanScrollRight(false);
+      return;
+    }
+
+    setCanScrollLeft(container.scrollLeft > 2);
+    setCanScrollRight(container.scrollLeft + container.clientWidth < container.scrollWidth - 2);
+  }, []);
+
+  React.useEffect(() => {
+    const container = ref.current;
+    if (!container) {
+      return;
+    }
+
+    updateScrollState();
+
+    const handleScroll = () => {
+      updateScrollState();
+    };
+
+    const handleResize = () => {
+      updateScrollState();
+    };
+
+    container.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      container.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [children, updateScrollState]);
+
+  const scroll = React.useCallback((direction: "left" | "right") => {
     const container = ref.current;
     if (!container) return;
 
@@ -365,34 +587,75 @@ function Carousel({
       left: direction === "left" ? -width : width,
       behavior: "smooth",
     });
-  };
+  }, []);
+
+  React.useEffect(() => {
+    if (!hasOverflow || isPaused) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      const container = ref.current;
+      if (!container) {
+        return;
+      }
+
+      const nearEnd = container.scrollLeft + container.clientWidth >= container.scrollWidth - 4;
+      if (nearEnd) {
+        container.scrollTo({ left: 0, behavior: "smooth" });
+        return;
+      }
+
+      scroll("right");
+    }, autoplayMs);
+
+    return () => window.clearInterval(interval);
+  }, [autoplayMs, hasOverflow, isPaused, scroll]);
 
   return (
-    <div className="relative">
-      <div className="mb-6 flex items-center justify-end gap-3">
+    <div
+      className="relative flex items-center gap-3"
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+      onFocusCapture={() => setIsPaused(true)}
+      onBlurCapture={() => setIsPaused(false)}
+    >
+      {hasOverflow ? (
         <button
           type="button"
           onClick={() => scroll("left")}
-          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white text-black transition-colors hover:bg-[#FCD34D] dark:border-white/10 dark:bg-[#1A1A1A] dark:text-white dark:hover:bg-[#FCD34D] dark:hover:text-black"
+          disabled={!canScrollLeft}
+          className={cn(
+            "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-black/10 bg-white text-black transition-colors dark:border-white/10 dark:bg-[#1A1A1A] dark:text-white",
+            canScrollLeft ? "hover:bg-[#FCD34D] dark:hover:bg-[#FCD34D] dark:hover:text-black" : "cursor-default opacity-40",
+          )}
           aria-label={`Voltar no carrossel ${title}`}
         >
           <ChevronLeft size={18} />
         </button>
-        <button
-          type="button"
-          onClick={() => scroll("right")}
-          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white text-black transition-colors hover:bg-[#FCD34D] dark:border-white/10 dark:bg-[#1A1A1A] dark:text-white dark:hover:bg-[#FCD34D] dark:hover:text-black"
-          aria-label={`Avançar no carrossel ${title}`}
-        >
-          <ChevronRight size={18} />
-        </button>
-      </div>
+      ) : null}
+
       <div
         ref={ref}
-        className="flex snap-x snap-mandatory gap-6 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex flex-1 snap-x snap-mandatory gap-6 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {children}
       </div>
+
+      {hasOverflow ? (
+        <button
+          type="button"
+          onClick={() => scroll("right")}
+          disabled={!canScrollRight}
+          className={cn(
+            "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-black/10 bg-white text-black transition-colors dark:border-white/10 dark:bg-[#1A1A1A] dark:text-white",
+            canScrollRight ? "hover:bg-[#FCD34D] dark:hover:bg-[#FCD34D] dark:hover:text-black" : "cursor-default opacity-40",
+          )}
+          aria-label={`Avancar no carrossel ${title}`}
+        >
+          <ChevronRight size={18} />
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -451,6 +714,77 @@ function BackToTop() {
 }
 
 export function SiteEleveLanding({ locale, fontClassName }: LandingProps) {
+  const [publicContent, setPublicContent] = React.useState<PublicSiteContentResponse | null>(null);
+  const [selectedEquipment, setSelectedEquipment] = React.useState<EquipmentCardProps | null>(null);
+  const [isEquipmentModalOpen, setIsEquipmentModalOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadPublicContent() {
+      try {
+        const response = await fetch("/api/public-site/content", {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const payload = await response.json().catch(() => null);
+
+        if (!response.ok || !payload) {
+          return;
+        }
+
+        setPublicContent(payload as PublicSiteContentResponse);
+      } catch {
+        // Keep static fallback content when public API is unavailable.
+      }
+    }
+
+    void loadPublicContent();
+    return () => controller.abort();
+  }, []);
+
+  const serviceCards = publicContent?.services?.length
+    ? publicContent.services.map((service, index) => ({
+        tag: service.tag,
+        title: service.title,
+        img: service.imageUrl,
+        highlighted: index === 0,
+      }))
+    : services;
+
+  const equipmentCards = publicContent?.equipment?.length
+    ? publicContent.equipment.map((item) => ({
+        name: item.name,
+        model: item.model,
+        capacity: item.capacity,
+        technicalInfo: item.technicalInfo,
+        manualUrl: item.manualUrl,
+        img: item.imageUrl,
+      }))
+    : equipment;
+
+  const testimonialCards: TestimonialCard[] = publicContent?.testimonials?.length
+    ? publicContent.testimonials.map((item) => ({
+        name: item.name,
+        role: item.role,
+        text: item.quote,
+      }))
+    : testimonials;
+
+  const companyAddress = publicContent?.company?.address?.trim() || "Av. Industrial, 1200 - Bloco A";
+  const companyEmail = publicContent?.company?.email?.trim() || "contato@eleve.com.br";
+  const companyPhone = publicContent?.company?.phone?.trim() || "(11) 4000-1234";
+  const equipmentDesktopBasisClass = equipmentCards.length <= 1
+    ? "lg:basis-full"
+    : equipmentCards.length === 2
+      ? "lg:basis-[calc(50%-0.75rem)]"
+      : equipmentCards.length === 3
+        ? "lg:basis-[calc(33.333%-1rem)]"
+        : "lg:basis-[calc(25%-1.125rem)]";
+  const equipmentTabletBasisClass = equipmentCards.length <= 1
+    ? "md:basis-full"
+    : "md:basis-[calc(50%-0.75rem)]";
+
   return (
     <div
       className={cn(
@@ -499,6 +833,10 @@ export function SiteEleveLanding({ locale, fontClassName }: LandingProps) {
                 <a
                   href="#contato"
                   className="inline-flex items-center justify-center gap-3 rounded-sm bg-[#FCD34D] px-8 py-4 text-sm font-bold uppercase tracking-[0.2em] text-gray-950 transition-colors hover:bg-[#F59E0B]"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    smoothScroll("#contato");
+                  }}
                 >
                   <MessageCircle size={18} />
                   Solicitar orçamento
@@ -550,9 +888,9 @@ export function SiteEleveLanding({ locale, fontClassName }: LandingProps) {
                 Soluções completas para movimentação, elevação e transporte de alta complexidade.
               </p>
             </div>
-            <Carousel title="serviços">
-              {services.map((service) => (
-                <div key={service.title} className="snap-start">
+            <Carousel title="serviços" autoplayMs={5000}>
+              {serviceCards.map((service) => (
+                <div key={service.title} className="w-full shrink-0 snap-start basis-[calc(100%-0.5rem)] md:basis-[calc(50%-0.75rem)] lg:basis-[calc(33.333%-1rem)]">
                   <FeatureCard {...service} />
                 </div>
               ))}
@@ -572,15 +910,25 @@ export function SiteEleveLanding({ locale, fontClassName }: LandingProps) {
               <a
                 href="#contato"
                 className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-[0.2em] text-gray-600 transition-colors hover:text-black dark:text-gray-400 dark:hover:text-white"
+                onClick={(event) => {
+                  event.preventDefault();
+                  smoothScroll("#contato");
+                }}
               >
                 Solicitar disponibilidade
                 <ArrowRight size={16} />
               </a>
             </div>
-            <Carousel title="equipamentos">
-              {equipment.map((item) => (
-                <div key={item.name} className="snap-start">
-                  <EquipmentCard {...item} />
+            <Carousel title="equipamentos" autoplayMs={5000}>
+              {equipmentCards.map((item) => (
+                <div key={item.name} className={cn("w-full shrink-0 snap-start basis-[calc(100%-0.5rem)]", equipmentTabletBasisClass, equipmentDesktopBasisClass)}>
+                  <EquipmentCard
+                    {...item}
+                    onOpenDetails={() => {
+                      setSelectedEquipment(item);
+                      setIsEquipmentModalOpen(true);
+                    }}
+                  />
                 </div>
               ))}
             </Carousel>
@@ -628,27 +976,13 @@ export function SiteEleveLanding({ locale, fontClassName }: LandingProps) {
               <p className="text-xs font-bold uppercase tracking-[0.35em] text-amber-700 dark:text-[#FCD34D]">Depoimentos</p>
               <h2 className="mt-4 text-4xl font-black tracking-[-0.04em] md:text-5xl">O que dizem nossos clientes</h2>
             </div>
-            <div className="grid gap-6 lg:grid-cols-3">
-              {testimonials.map((testimonial) => (
-                <article
-                  key={testimonial.name}
-                  className="rounded-[1.75rem] border border-black/5 bg-white p-8 shadow-lg shadow-black/5 dark:border-white/5 dark:bg-[#1A1A1A] dark:shadow-black/20"
-                >
-                  <div className="mb-6 flex items-center gap-4">
-                    <div className="inline-flex h-14 w-14 items-center justify-center rounded-full border-2 border-[#FCD34D] bg-gray-100 text-lg font-black text-black dark:bg-[#0A0A0A] dark:text-white">
-                      {testimonial.name.charAt(0)}
-                    </div>
-                    <div>
-                      <p className="font-bold">{testimonial.name}</p>
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
-                        {testimonial.role}
-                      </p>
-                    </div>
-                  </div>
-                  <p className="text-base leading-8 text-gray-600 dark:text-gray-300">"{testimonial.text}"</p>
-                </article>
+            <Carousel title="depoimentos" autoplayMs={5000}>
+              {testimonialCards.map((testimonial) => (
+                <div key={testimonial.name} className="w-full shrink-0 snap-start basis-[calc(100%-0.5rem)] md:basis-[calc(50%-0.75rem)] lg:basis-[calc(33.333%-1rem)]">
+                  <TestimonialCardView testimonial={testimonial} />
+                </div>
               ))}
-            </div>
+            </Carousel>
           </div>
         </section>
       </main>
@@ -656,9 +990,11 @@ export function SiteEleveLanding({ locale, fontClassName }: LandingProps) {
       <footer id="contato" className="border-t border-black/5 bg-white py-20 transition-colors dark:border-white/5 dark:bg-[#0A0A0A]">
         <div className="mx-auto grid max-w-7xl gap-12 px-4 md:px-6 lg:grid-cols-[1.2fr_0.9fr_0.9fr]">
           <div className="max-w-sm">
-            <a href="#inicio" className="flex flex-col">
-              <span className="text-2xl font-extrabold tracking-tighter text-black dark:text-white">Eleve</span>
-              <span className="mt-1 text-[11px] font-semibold uppercase tracking-[0.35em] text-[#FCD34D]">Locações</span>
+            <a href="#inicio" className="flex flex-col" onClick={(event) => {
+              event.preventDefault();
+              smoothScroll("#inicio");
+            }}>
+              <EleveLogo className="h-12 w-auto" />
             </a>
             <p className="mt-6 text-sm leading-7 text-gray-600 dark:text-gray-400">
               Soluções de logística e locação para construção civil, indústria e operações especiais com resposta técnica rápida.
@@ -670,6 +1006,10 @@ export function SiteEleveLanding({ locale, fontClassName }: LandingProps) {
                   href="#contato"
                   className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-black/10 bg-gray-50 text-gray-500 transition-colors hover:border-[#FCD34D] hover:text-[#F59E0B] dark:border-white/10 dark:bg-[#1A1A1A] dark:text-gray-400"
                   aria-label="Rede social"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    smoothScroll("#contato");
+                  }}
                 >
                   <Icon size={18} />
                 </a>
@@ -680,10 +1020,9 @@ export function SiteEleveLanding({ locale, fontClassName }: LandingProps) {
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.25em] text-black dark:text-white">Contato</p>
             <div className="mt-6 space-y-4 text-sm leading-7 text-gray-600 dark:text-gray-400">
-              <p>Av. Industrial, 1200 - Bloco A</p>
-              <p>São Paulo, SP - 01000-000</p>
-              <p>contato@eleve.com.br</p>
-              <p>(11) 4000-1234</p>
+              <p>{companyAddress}</p>
+              <p>{companyEmail}</p>
+              <p>{companyPhone}</p>
             </div>
           </div>
 
@@ -707,6 +1046,10 @@ export function SiteEleveLanding({ locale, fontClassName }: LandingProps) {
               <a
                 href="#servicos"
                 className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700 transition-colors hover:text-black dark:text-gray-300 dark:hover:text-white"
+                onClick={(event) => {
+                  event.preventDefault();
+                  smoothScroll("#servicos");
+                }}
               >
                 Ver serviços
                 <ArrowRight size={15} />
@@ -720,7 +1063,19 @@ export function SiteEleveLanding({ locale, fontClassName }: LandingProps) {
         </div>
       </footer>
 
+      <EquipmentDetailsModal
+        equipment={selectedEquipment}
+        open={isEquipmentModalOpen}
+        onOpenChange={(open) => {
+          setIsEquipmentModalOpen(open);
+          if (!open) {
+            setSelectedEquipment(null);
+          }
+        }}
+      />
+
       <BackToTop />
     </div>
   );
 }
+

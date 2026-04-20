@@ -74,6 +74,7 @@ export function SiteHeader() {
       "/equipment-types": t("navigation.equipmentTypes"),
       "/service-types": t("navigation.serviceTypes"),
       "/equipment": t("navigation.equipment"),
+      "/public-site": "Site publico",
       "/roles": t("navigation.roles"),
       "/users": t("navigation.users"),
       "/unauthorized": t("navigation.unauthorized"),
