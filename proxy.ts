@@ -20,8 +20,9 @@ export function proxy(request: NextRequest) {
   const isApiRoute = pathname.startsWith("/api");
   const isAuthPage = strippedPath.startsWith("/auth");
   const isLanding = strippedPath === "/landing" || strippedPath === "/";
+  const isPublicRoot = pathname === "/";
 
-  if (!isApiRoute && !pathLocale) {
+  if (!isApiRoute && !pathLocale && !isPublicRoot && !isLanding) {
     const url = request.nextUrl.clone();
     url.pathname = getLocalizedPath(strippedPath, preferredLocale);
     return withSecurityHeaders(NextResponse.redirect(url));

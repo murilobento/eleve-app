@@ -19,8 +19,8 @@ const jetBrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Dashboard",
-  description: "Operational dashboard",
+  title: "Eleve Locações",
+  description: "Locação de guindastes, empilhadeiras e transporte pesado para operações industriais e civis.",
 };
 
 export const viewport: Viewport = {
