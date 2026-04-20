@@ -46,6 +46,7 @@ import type {
   ManagedServiceOrder,
   ManagedServiceOrderItem,
   ManagedServiceOrderStatusHistory,
+  PostponeServiceOrderInput,
   ServiceOrderStatus,
   ServiceOrderItemInput,
   ServiceOrderTransitionStatus,
@@ -6424,6 +6425,94 @@ export async function updateServiceOrderStatus(
       reason,
       actor,
     });
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function postponeServiceOrder(
+  serviceOrderId: string,
+  input: PostponeServiceOrderInput,
+  actor?: StatusActorInput | null,
+) {
+  await bootstrapRbac();
+  const current = await getServiceOrderById(serviceOrderId);
+
+  if (!current) {
+    throw new Error("Service order not found.");
+  }
+
+  if (current.status !== "scheduled") {
+    throw new Error("Only scheduled service orders can be postponed.");
+  }
+
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    if (input.hasNewSchedule) {
+      await client.query(
+        `
+          UPDATE service_order_items
+          SET service_date = $2,
+              planned_start_time = $3,
+              planned_end_time = $4,
+              updated_at = now()
+          WHERE service_order_id = $1
+        `,
+        [
+          serviceOrderId,
+          input.serviceDate,
+          input.plannedStartTime,
+          input.plannedEndTime,
+        ],
+      );
+
+      await client.query(
+        `
+          UPDATE service_orders
+          SET updated_at = now()
+          WHERE id = $1
+        `,
+        [serviceOrderId],
+      );
+
+      await insertServiceOrderStatusHistory(client, {
+        serviceOrderId,
+        serviceOrderNumber: current.number,
+        previousStatus: current.status,
+        nextStatus: current.status,
+        reason: input.reason,
+        actor,
+      });
+    } else {
+      await client.query(
+        `
+          UPDATE service_orders
+          SET status = 'pending',
+              completed_at = null,
+              cancelled_at = null,
+              updated_at = now()
+          WHERE id = $1
+        `,
+        [serviceOrderId],
+      );
+
+      await insertServiceOrderStatusHistory(client, {
+        serviceOrderId,
+        serviceOrderNumber: current.number,
+        previousStatus: current.status,
+        nextStatus: "pending",
+        reason: input.reason,
+        actor,
+      });
+    }
+
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK");

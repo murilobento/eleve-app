@@ -235,6 +235,70 @@ export const updateServiceOrderStatusSchema = z.object({
   }
 });
 
+export const postponeServiceOrderSchema = z.object({
+  hasNewSchedule: z.boolean(),
+  reason: z
+    .string()
+    .trim()
+    .min(3, "Reason must be at least 3 characters.")
+    .max(1000, "Reason must be at most 1000 characters."),
+  serviceDate: serviceDateSchema.optional(),
+  plannedStartTime: timeSchema.optional(),
+  plannedEndTime: timeSchema.optional(),
+}).superRefine((value, ctx) => {
+  if (!value.hasNewSchedule) {
+    return;
+  }
+
+  if (!value.serviceDate) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["serviceDate"],
+      message: "Select a valid service date.",
+    });
+  }
+
+  if (!value.plannedStartTime) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["plannedStartTime"],
+      message: "Enter a valid time.",
+    });
+  }
+
+  if (!value.plannedEndTime) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["plannedEndTime"],
+      message: "Enter a valid time.",
+    });
+  }
+
+  if (value.plannedStartTime && value.plannedEndTime && value.plannedEndTime <= value.plannedStartTime) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["plannedEndTime"],
+      message: "Planned end time must be later than planned start time.",
+    });
+  }
+
+  if (value.plannedStartTime && value.plannedStartTime > LAST_ALLOWED_START_TIME) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["plannedStartTime"],
+      message: "Planned start time must be no later than 16:00.",
+    });
+  }
+
+  if (value.plannedEndTime && value.plannedEndTime > LAST_ALLOWED_END_TIME) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["plannedEndTime"],
+      message: "Planned end time must be no later than 17:00.",
+    });
+  }
+});
+
 export type ServiceOrderOrigin = z.infer<typeof serviceOrderOriginSchema>;
 export type ServiceOrderStatus = z.infer<typeof serviceOrderStatusSchema>;
 export type ServiceOrderTransitionStatus = z.infer<typeof serviceOrderTransitionStatusSchema>;
@@ -243,6 +307,7 @@ export type CreateServiceOrderInput = z.infer<typeof createServiceOrderSchema>;
 export type CreateManualServiceOrderInput = z.infer<typeof createManualServiceOrderSchema>;
 export type UpdateServiceOrderInput = z.infer<typeof updateServiceOrderSchema>;
 export type UpdateServiceOrderStatusInput = z.infer<typeof updateServiceOrderStatusSchema>;
+export type PostponeServiceOrderInput = z.infer<typeof postponeServiceOrderSchema>;
 
 export type ManagedServiceOrderStatusHistory = {
   id: string;

@@ -1,4 +1,4 @@
-export const IDLE_TIMEOUT_MS = 15 * 60 * 1000
+export const IDLE_TIMEOUT_MS = 45 * 60 * 1000
 export const LOCK_STORAGE_KEY = "app:lockscreen:locked-at"
 export const LOCK_USER_STORAGE_KEY = "app:lockscreen:locked-user"
 export const LAST_ACTIVITY_STORAGE_KEY = "app:lockscreen:last-active-at"

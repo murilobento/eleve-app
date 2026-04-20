@@ -16,9 +16,21 @@ import {
 } from "lucide-react"
 import { format, addDays, subDays, isToday, isSameDay } from "date-fns"
 
+import { DatePickerInput } from "@/components/date-picker-input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { EntityDetailsDialog } from "@/components/entity-details-dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { useResourcePermissions } from "@/hooks/use-resource-permissions"
 import { cn, getAppUrl } from "@/lib/utils"
 import { useI18n, useLocale } from "@/i18n/provider"
@@ -103,6 +115,7 @@ interface CalendarMainProps {
   onMenuClick?: () => void
   events?: CalendarEvent[]
   onEventClick?: (event: CalendarEvent) => void
+  onServiceOrdersChange: () => Promise<void>
 }
 
 type ParsedDayEvent = {
@@ -122,7 +135,7 @@ type DayTimeline = {
   eventsByHourSlot: Map<number, ParsedDayEvent[]>
 }
 
-export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, onEventClick }: CalendarMainProps) {
+export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, onEventClick, onServiceOrdersChange }: CalendarMainProps) {
   const { t } = useI18n()
   const locale = useLocale()
   const { canRead, canUpdate } = useResourcePermissions("service-orders")
@@ -132,6 +145,13 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
   const [currentDate, setCurrentDate] = useState(selectedDate || new Date())
   const [showEventDialog, setShowEventDialog] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
+  const [showPostponeDialog, setShowPostponeDialog] = useState(false)
+  const [hasNewSchedule, setHasNewSchedule] = useState(true)
+  const [postponeReason, setPostponeReason] = useState("")
+  const [postponeDate, setPostponeDate] = useState<Date | undefined>(undefined)
+  const [postponeStartTime, setPostponeStartTime] = useState("")
+  const [postponeEndTime, setPostponeEndTime] = useState("")
+  const [isPostponing, setIsPostponing] = useState(false)
 
   useEffect(() => {
     if (selectedDate) {
@@ -420,6 +440,9 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
   const canEditSelectedEvent = canUpdate
     && selectedEvent?.status !== "completed"
     && selectedEvent?.status !== "cancelled"
+  const canPostponeSelectedEvent = canUpdate
+    && selectedEvent?.status === "scheduled"
+    && Boolean(selectedEvent?.serviceOrderId)
   const selectedEventSchedule = selectedEvent
     ? `${capitalizeText(format(selectedEvent.date, "PPP", { locale: dateLocale }))} • ${formatTimeRange(selectedEvent.startTime, selectedEvent.endTime) || selectedEvent.time}`
     : null
@@ -481,6 +504,86 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
     }
 
     window.open(`/api/service-orders/${selectedEvent.serviceOrderId}/pdf`, "_blank", "noopener,noreferrer")
+  }
+
+  const handleOpenPostponeDialog = () => {
+    if (!selectedEvent) {
+      return
+    }
+
+    setHasNewSchedule(true)
+    setPostponeReason("")
+    setPostponeDate(selectedEvent.date)
+    setPostponeStartTime(selectedEvent.startTime ?? "")
+    setPostponeEndTime(selectedEvent.endTime ?? "")
+    setShowPostponeDialog(true)
+  }
+
+  const handleConfirmPostpone = async () => {
+    if (!selectedEvent?.serviceOrderId) {
+      return
+    }
+
+    const trimmedReason = postponeReason.trim()
+
+    if (trimmedReason.length < 3) {
+      toast.error(t("serviceOrders.postponeReasonRequired"))
+      return
+    }
+
+    if (hasNewSchedule) {
+      if (!postponeDate) {
+        toast.error(t("serviceOrders.postponeDateRequired"))
+        return
+      }
+
+      if (!postponeStartTime) {
+        toast.error(t("serviceOrders.postponeStartTimeRequired"))
+        return
+      }
+
+      if (!postponeEndTime) {
+        toast.error(t("serviceOrders.postponeEndTimeRequired"))
+        return
+      }
+    }
+
+    setIsPostponing(true)
+
+    try {
+      const response = await fetch(`/api/service-orders/${selectedEvent.serviceOrderId}/postpone`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          hasNewSchedule,
+          reason: trimmedReason,
+          serviceDate: hasNewSchedule && postponeDate ? formatAgendaDateKey(postponeDate) : undefined,
+          plannedStartTime: hasNewSchedule ? postponeStartTime : undefined,
+          plannedEndTime: hasNewSchedule ? postponeEndTime : undefined,
+        }),
+      })
+      const payload = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        throw new Error(payload?.error || t("serviceOrders.updateError"))
+      }
+
+      await onServiceOrdersChange()
+      toast.success(
+        hasNewSchedule
+          ? t("common.serviceOrderRescheduleSuccess")
+          : t("common.serviceOrderUnsetScheduleSuccess")
+      )
+      setShowPostponeDialog(false)
+      setShowEventDialog(false)
+      setSelectedEvent(null)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("serviceOrders.updateError"))
+    } finally {
+      setIsPostponing(false)
+    }
   }
 
   const handleExportDailyPdf = () => {
@@ -624,9 +727,123 @@ export function CalendarMain({ selectedDate, onDateSelect, onMenuClick, events, 
                 {t("serviceOrders.editServiceOrder")}
               </Button>
             ) : null}
+            {canPostponeSelectedEvent ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="cursor-pointer"
+                onClick={handleOpenPostponeDialog}
+              >
+                {t("serviceOrders.postponeServiceOrder")}
+              </Button>
+            ) : null}
           </div>
         ) : null}
       />
+
+      <Dialog open={showPostponeDialog} onOpenChange={setShowPostponeDialog}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>{t("serviceOrders.postponeDialogTitle")}</DialogTitle>
+            <DialogDescription>{t("serviceOrders.postponeDialogDescription")}</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>{t("serviceOrders.postponeChoiceLabel")}</Label>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Button
+                  type="button"
+                  variant={hasNewSchedule ? "default" : "outline"}
+                  className="cursor-pointer"
+                  onClick={() => setHasNewSchedule(true)}
+                >
+                  {t("serviceOrders.postponeWithNewDate")}
+                </Button>
+                <Button
+                  type="button"
+                  variant={!hasNewSchedule ? "default" : "outline"}
+                  className="cursor-pointer"
+                  onClick={() => setHasNewSchedule(false)}
+                >
+                  {t("serviceOrders.postponeWithoutNewDate")}
+                </Button>
+              </div>
+            </div>
+
+            {hasNewSchedule ? (
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-2">
+                  <Label>{t("serviceOrders.serviceDate")}</Label>
+                  <DatePickerInput
+                    value={postponeDate}
+                    onChange={setPostponeDate}
+                    placeholder={t("serviceOrders.selectDate")}
+                    disabled={isPostponing}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="postpone-start-time">{t("serviceOrders.plannedStartTime")}</Label>
+                  <Input
+                    id="postpone-start-time"
+                    type="time"
+                    value={postponeStartTime}
+                    onChange={(event) => setPostponeStartTime(event.target.value)}
+                    max="16:00"
+                    disabled={isPostponing}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="postpone-end-time">{t("serviceOrders.plannedEndTime")}</Label>
+                  <Input
+                    id="postpone-end-time"
+                    type="time"
+                    value={postponeEndTime}
+                    onChange={(event) => setPostponeEndTime(event.target.value)}
+                    max="17:00"
+                    disabled={isPostponing}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed px-3 py-3 text-sm text-muted-foreground">
+                {t("serviceOrders.postponeWithoutDateDescription")}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="postpone-reason">{t("serviceOrders.postponeReasonLabel")}</Label>
+              <Textarea
+                id="postpone-reason"
+                value={postponeReason}
+                onChange={(event) => setPostponeReason(event.target.value)}
+                placeholder={t("serviceOrders.postponeReasonPlaceholder")}
+                disabled={isPostponing}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              className="cursor-pointer"
+              onClick={() => setShowPostponeDialog(false)}
+              disabled={isPostponing}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              type="button"
+              className="cursor-pointer"
+              onClick={() => void handleConfirmPostpone()}
+              disabled={isPostponing}
+            >
+              {hasNewSchedule ? t("serviceOrders.confirmRescheduleAction") : t("serviceOrders.confirmUnsetScheduleAction")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

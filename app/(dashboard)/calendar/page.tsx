@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 
 import { Calendar } from "./components/calendar"
@@ -17,28 +17,28 @@ export default function CalendarPage() {
   const [serviceOrders, setServiceOrders] = useState<ManagedServiceOrder[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    async function loadServiceOrders() {
-      setLoading(true)
+  const loadServiceOrders = useCallback(async () => {
+    setLoading(true)
 
-      try {
-        const response = await fetch("/api/service-orders", { cache: "no-store" })
-        const payload = await response.json().catch(() => null)
+    try {
+      const response = await fetch("/api/service-orders", { cache: "no-store" })
+      const payload = await response.json().catch(() => null)
 
-        if (!response.ok) {
-          throw new Error(payload?.error || t("serviceOrders.loadError"))
-        }
-
-        setServiceOrders((payload as ServiceOrdersResponse).serviceOrders ?? [])
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : t("serviceOrders.loadError"))
-      } finally {
-        setLoading(false)
+      if (!response.ok) {
+        throw new Error(payload?.error || t("serviceOrders.loadError"))
       }
-    }
 
-    void loadServiceOrders()
+      setServiceOrders((payload as ServiceOrdersResponse).serviceOrders ?? [])
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("serviceOrders.loadError"))
+    } finally {
+      setLoading(false)
+    }
   }, [t])
+
+  useEffect(() => {
+    void loadServiceOrders()
+  }, [loadServiceOrders])
 
   const events = useMemo(() => (
     listServiceAgendaEntries(serviceOrders).map((entry, index) => ({
@@ -92,7 +92,12 @@ export default function CalendarPage() {
             {t("common.loadingServiceOrders")}
           </div>
         ) : (
-          <Calendar events={events} eventDates={eventDates} />
+          <Calendar
+            events={events}
+            eventDates={eventDates}
+            serviceOrders={serviceOrders}
+            onServiceOrdersChange={loadServiceOrders}
+          />
         )}
       </div>
     </>

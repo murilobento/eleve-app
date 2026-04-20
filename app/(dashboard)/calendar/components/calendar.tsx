@@ -7,17 +7,28 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { useResourcePermissions } from "@/hooks/use-resource-permissions"
 import { type CalendarEvent } from "../types"
 import { useCalendar } from "../use-calendar"
-import { useI18n } from "@/i18n/provider"
+import { useI18n, useLocale } from "@/i18n/provider"
+import { getAppUrl } from "@/lib/utils"
+import type { ManagedServiceOrder } from "@/lib/service-orders-admin"
 
 interface CalendarProps {
   events: CalendarEvent[]
   eventDates: Array<{ date: Date; count: number }>
+  serviceOrders: ManagedServiceOrder[]
+  onServiceOrdersChange: () => Promise<void>
 }
 
-export function Calendar({ events, eventDates }: CalendarProps) {
+export function Calendar({ events, eventDates, serviceOrders, onServiceOrdersChange }: CalendarProps) {
   const { t } = useI18n()
+  const locale = useLocale()
   const calendar = useCalendar(events)
   const { canCreate } = useResourcePermissions("service-orders")
+  const unscheduledServiceOrders = serviceOrders.filter((serviceOrder) => serviceOrder.status === "pending")
+
+  const handleOpenServiceOrder = (serviceOrderId: string) => {
+    const serviceOrdersUrl = `${getAppUrl("/service-orders", locale)}?edit=${encodeURIComponent(serviceOrderId)}`
+    window.location.assign(serviceOrdersUrl)
+  }
 
   return (
     <>
@@ -30,6 +41,8 @@ export function Calendar({ events, eventDates }: CalendarProps) {
               onDateSelect={calendar.handleDateSelect}
               onNewCalendar={calendar.handleNewCalendar}
               onNewEvent={canCreate ? calendar.handleNewEvent : undefined}
+              unscheduledServiceOrders={unscheduledServiceOrders}
+              onOpenServiceOrder={handleOpenServiceOrder}
               events={eventDates}
               className="h-full"
             />
@@ -42,6 +55,7 @@ export function Calendar({ events, eventDates }: CalendarProps) {
               onDateSelect={calendar.handleDateSelect}
               onMenuClick={() => calendar.setShowCalendarSheet(true)}
               events={calendar.events}
+              onServiceOrdersChange={onServiceOrdersChange}
             />
           </div>
         </div>
@@ -60,6 +74,8 @@ export function Calendar({ events, eventDates }: CalendarProps) {
               onDateSelect={calendar.handleDateSelect}
               onNewCalendar={calendar.handleNewCalendar}
               onNewEvent={canCreate ? calendar.handleNewEvent : undefined}
+              unscheduledServiceOrders={unscheduledServiceOrders}
+              onOpenServiceOrder={handleOpenServiceOrder}
               events={eventDates}
               className="h-full"
             />
