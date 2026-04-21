@@ -156,6 +156,7 @@ const messages: Record<AppLocale, any> = {
       commandSearch: "Busca de comandos",
       toggleMenu: "Alternar menu",
       dashboard: "Dashboard",
+      website: "Site",
     },
     auth: {
       brandAlt: "Imagem da autenticação",
@@ -163,6 +164,7 @@ const messages: Record<AppLocale, any> = {
       loginDescription: "Digite seu e-mail abaixo para acessar sua conta",
       loginButton: "Entrar",
       loginLoading: "Entrando...",
+      backToSite: "Voltar ao site",
       signupTitle: "Crie sua conta",
       signupDescription: "Preencha seus dados para criar uma nova conta",
       signupButton: "Criar conta",
@@ -1547,6 +1549,7 @@ const messages: Record<AppLocale, any> = {
       commandSearch: "Command Search",
       toggleMenu: "Toggle menu",
       dashboard: "Dashboard",
+      website: "Website",
     },
     auth: {
       brandAlt: "Authentication image",
@@ -1554,6 +1557,7 @@ const messages: Record<AppLocale, any> = {
       loginDescription: "Enter your email below to login to your account",
       loginButton: "Login",
       loginLoading: "Signing in...",
+      backToSite: "Back to website",
       signupTitle: "Create your account",
       signupDescription: "Enter your information to create a new account",
       signupButton: "Create account",

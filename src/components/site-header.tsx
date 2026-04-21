@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { ChevronDown, Expand, Lock, Minimize, PanelLeft, PanelTop } from "lucide-react"
+import { ChevronDown, Expand, Globe, Lock, Minimize, PanelLeft, PanelTop } from "lucide-react"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Logo } from "@/components/logo"
@@ -22,9 +22,9 @@ import { useCompanyDisplayName } from "@/hooks/use-company-display-name"
 import { useSidebarConfig } from "@/hooks/use-sidebar-config"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { stripLocaleFromPath } from "@/i18n/config"
-import { useI18n } from "@/i18n/provider"
+import { useI18n, useLocale } from "@/i18n/provider"
 import { canUseDocumentFullscreen } from "@/lib/fullscreen"
-import { cn } from "@/lib/utils"
+import { cn, getAppUrl } from "@/lib/utils"
 import { triggerManualLock } from "@/lib/lockscreen"
 
 export function SiteHeader() {
@@ -33,6 +33,7 @@ export function SiteHeader() {
   const pathname = usePathname()
   const isMobile = useIsMobile()
   const { t } = useI18n()
+  const locale = useLocale()
   const { displayName, isLoading } = useCompanyDisplayName()
   const { navGroups } = useAppNavigation()
   const showSidebarTrigger = config.navigationMode === "sidebar" || isMobile
@@ -229,6 +230,20 @@ export function SiteHeader() {
               </Button>
             </div>
             <LanguageSwitcher />
+            <Button
+              asChild
+              type="button"
+              variant="outline"
+              size="icon"
+              className="cursor-pointer"
+              aria-label={t("navigation.website")}
+              title={t("navigation.website")}
+            >
+              <Link href={getAppUrl("/landing", locale)}>
+                <Globe className="size-4" />
+                <span className="sr-only">{t("navigation.website")}</span>
+              </Link>
+            </Button>
             <Button
               type="button"
               variant="outline"

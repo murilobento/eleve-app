@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
@@ -149,6 +150,11 @@ export function LoginForm2({
         <Button type="submit" className="w-full cursor-pointer" disabled={loading}>
           {loading ? t("auth.loginLoading") : t("auth.loginButton")}
         </Button>
+        <div className="text-center text-sm">
+          <Link href={getAppUrl("/landing", locale)} className="underline underline-offset-4">
+            {t("auth.backToSite")}
+          </Link>
+        </div>
       </div>
     </form>
   )

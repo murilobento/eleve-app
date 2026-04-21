@@ -20,6 +20,9 @@ const EMPTY_COMPANY: UpdatePublicCompanyInput = {
   phone: "",
   email: "",
   address: "",
+  facebookUrl: "",
+  instagramUrl: "",
+  linkedinUrl: "",
 };
 
 async function parseResponse<T>(response: Response): Promise<T> {
@@ -52,6 +55,9 @@ export default function PublicSiteCompanyPage() {
             phone: payload.company.phone,
             email: payload.company.email,
             address: payload.company.address,
+            facebookUrl: payload.company.facebookUrl ?? "",
+            instagramUrl: payload.company.instagramUrl ?? "",
+            linkedinUrl: payload.company.linkedinUrl ?? "",
           }
         : EMPTY_COMPANY);
     } catch (error) {
@@ -149,6 +155,36 @@ export default function PublicSiteCompanyPage() {
                   onChange={(event) => setCompany((current) => ({ ...current, address: event.target.value }))}
                   disabled={!canUpdate || isSaving}
                 />
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-3">
+                <div className="space-y-1">
+                  <Label>Facebook</Label>
+                  <Input
+                    placeholder="https://facebook.com/sua-pagina"
+                    value={company.facebookUrl}
+                    onChange={(event) => setCompany((current) => ({ ...current, facebookUrl: event.target.value }))}
+                    disabled={!canUpdate || isSaving}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Instagram</Label>
+                  <Input
+                    placeholder="https://instagram.com/seu-perfil"
+                    value={company.instagramUrl}
+                    onChange={(event) => setCompany((current) => ({ ...current, instagramUrl: event.target.value }))}
+                    disabled={!canUpdate || isSaving}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>LinkedIn</Label>
+                  <Input
+                    placeholder="https://linkedin.com/company/sua-empresa"
+                    value={company.linkedinUrl}
+                    onChange={(event) => setCompany((current) => ({ ...current, linkedinUrl: event.target.value }))}
+                    disabled={!canUpdate || isSaving}
+                  />
+                </div>
               </div>
 
               <div className="flex justify-end">

@@ -41,6 +41,15 @@ const optionalManualUrlSchema = z
   .optional()
   .transform((value) => (value && value.length > 0 ? value : undefined));
 
+const optionalSocialUrlSchema = z
+  .string()
+  .trim()
+  .max(1000, "Social URL must be at most 1000 characters.")
+  .refine(
+    (value) => value.length === 0 || z.string().url().safeParse(value).success,
+    "Provide a valid social URL.",
+  );
+
 const displayOrderSchema = z.coerce
   .number({ invalid_type_error: "Display order must be a number." })
   .int("Display order must be an integer.")
@@ -52,6 +61,9 @@ export const updatePublicCompanySchema = z.object({
   phone: shortTextSchema.max(40, "Phone must be at most 40 characters."),
   email: z.string().trim().email("Please enter a valid email address.").max(120),
   address: longTextSchema.max(300, "Address must be at most 300 characters."),
+  facebookUrl: optionalSocialUrlSchema,
+  instagramUrl: optionalSocialUrlSchema,
+  linkedinUrl: optionalSocialUrlSchema,
 });
 
 export const createPublicServiceSchema = z.object({
@@ -103,6 +115,9 @@ export type ManagedPublicCompany = {
   phone: string;
   email: string;
   address: string;
+  facebookUrl: string | null;
+  instagramUrl: string | null;
+  linkedinUrl: string | null;
   createdAt: string;
   updatedAt: string;
 };

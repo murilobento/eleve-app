@@ -24,6 +24,9 @@ type PublicCompanyRow = {
   phone: string;
   email: string;
   address: string;
+  facebook_url: string | null;
+  instagram_url: string | null;
+  linkedin_url: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -71,6 +74,9 @@ const DEFAULT_PUBLIC_COMPANY = {
   phone: "(11) 4000-1234",
   email: "contato@eleve.com.br",
   address: "Av. Industrial, 1200 - Bloco A, Sao Paulo - SP",
+  facebookUrl: null,
+  instagramUrl: null,
+  linkedinUrl: null,
 };
 
 const DEFAULT_PUBLIC_SERVICES: Array<{
@@ -178,6 +184,9 @@ function mapPublicCompanyRow(row: PublicCompanyRow): ManagedPublicCompany {
     phone: row.phone,
     email: row.email,
     address: row.address,
+    facebookUrl: row.facebook_url,
+    instagramUrl: row.instagram_url,
+    linkedinUrl: row.linkedin_url,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -238,9 +247,27 @@ async function ensurePublicSiteSchema() {
           phone text NOT NULL,
           email text NOT NULL,
           address text NOT NULL,
+          facebook_url text,
+          instagram_url text,
+          linkedin_url text,
           created_at timestamptz NOT NULL DEFAULT now(),
           updated_at timestamptz NOT NULL DEFAULT now()
         );
+      `);
+
+      await pool.query(`
+        ALTER TABLE public_site_company_profile
+        ADD COLUMN IF NOT EXISTS facebook_url text;
+      `);
+
+      await pool.query(`
+        ALTER TABLE public_site_company_profile
+        ADD COLUMN IF NOT EXISTS instagram_url text;
+      `);
+
+      await pool.query(`
+        ALTER TABLE public_site_company_profile
+        ADD COLUMN IF NOT EXISTS linkedin_url text;
       `);
 
       await pool.query(`
@@ -387,7 +414,7 @@ export async function getPublicCompany() {
 
   const result = await pool.query<PublicCompanyRow>(
     `
-      SELECT id, name, phone, email, address, created_at, updated_at
+      SELECT id, name, phone, email, address, facebook_url, instagram_url, linkedin_url, created_at, updated_at
       FROM public_site_company_profile
       ORDER BY updated_at DESC
       LIMIT 1
@@ -405,16 +432,28 @@ export async function upsertPublicCompany(input: UpdatePublicCompanyInput) {
 
   await pool.query(
     `
-      INSERT INTO public_site_company_profile (id, singleton_key, name, phone, email, address)
-      VALUES ($1, true, $2, $3, $4, $5)
+      INSERT INTO public_site_company_profile (id, singleton_key, name, phone, email, address, facebook_url, instagram_url, linkedin_url)
+      VALUES ($1, true, $2, $3, $4, $5, $6, $7, $8)
       ON CONFLICT (singleton_key) DO UPDATE
       SET name = EXCLUDED.name,
           phone = EXCLUDED.phone,
           email = EXCLUDED.email,
           address = EXCLUDED.address,
+          facebook_url = EXCLUDED.facebook_url,
+          instagram_url = EXCLUDED.instagram_url,
+          linkedin_url = EXCLUDED.linkedin_url,
           updated_at = now()
     `,
-    [id, input.name.trim(), input.phone.trim(), input.email.trim().toLowerCase(), input.address.trim()],
+    [
+      id,
+      input.name.trim(),
+      input.phone.trim(),
+      input.email.trim().toLowerCase(),
+      input.address.trim(),
+      input.facebookUrl.trim() || null,
+      input.instagramUrl.trim() || null,
+      input.linkedinUrl.trim() || null,
+    ],
   );
 
   return id;

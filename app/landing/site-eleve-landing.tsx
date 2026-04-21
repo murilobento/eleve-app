@@ -6,7 +6,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Menu,
-  MessageCircle,
   Moon,
   Sun,
   Wrench,
@@ -176,6 +175,14 @@ const navigationItems = [
   { label: "Contato", href: "#contato" },
 ];
 
+const HERO_LOOP_IMAGES = [
+  "https://www.truck1eu.com.br/img/xxl/44492/XCMG-QY130K-130-ton-120-ton-140ton-150ton-160ton-200t-truck-crane-China_44492_5937391341.jpg",
+  "https://www.euroequipamentos.com.br/imagens/equipamentos/xcmg-750.png",
+  "https://sc04.alicdn.com/kf/Hde8d1becba464377b75e018b733da39fM.jpg",
+  "https://www.briquerural.com.br/fotos/anuncio9129-d466a0ec1563ef2f9cc415261c9207ba.jpg",
+  "https://www.carretaextensiva.com.br/images/gallery/large/2.jpg",
+];
+
 function EleveLogo({ className }: { className?: string }) {
   return (
     <svg
@@ -237,7 +244,38 @@ function smoothScroll(target: string, onDone?: () => void) {
   }, 500);
 }
 
-function LandingNavbar({ locale }: { locale: AppLocale }) {
+function toPhoneDigits(value: string) {
+  return value.replace(/\D/g, "");
+}
+
+function buildWhatsAppUrl(phone: string, message = "Olá! Gostaria de solicitar um orçamento.") {
+  const digits = toPhoneDigits(phone);
+  const normalizedPhone = digits.startsWith("55") ? digits : `55${digits}`;
+  return `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(message)}`;
+}
+
+function WhatsAppOutlineIcon({ size = 18, className }: { size?: number; className?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+      aria-hidden="true"
+    >
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M3.50002 12C3.50002 7.30558 7.3056 3.5 12 3.5C16.6944 3.5 20.5 7.30558 20.5 12C20.5 16.6944 16.6944 20.5 12 20.5C10.3278 20.5 8.77127 20.0182 7.45798 19.1861C7.21357 19.0313 6.91408 18.9899 6.63684 19.0726L3.75769 19.9319L4.84173 17.3953C4.96986 17.0955 4.94379 16.7521 4.77187 16.4751C3.9657 15.176 3.50002 13.6439 3.50002 12ZM12 1.5C6.20103 1.5 1.50002 6.20101 1.50002 12C1.50002 13.8381 1.97316 15.5683 2.80465 17.0727L1.08047 21.107C0.928048 21.4637 0.99561 21.8763 1.25382 22.1657C1.51203 22.4552 1.91432 22.5692 2.28599 22.4582L6.78541 21.1155C8.32245 21.9965 10.1037 22.5 12 22.5C17.799 22.5 22.5 17.799 22.5 12C22.5 6.20101 17.799 1.5 12 1.5ZM14.2925 14.1824L12.9783 15.1081C12.3628 14.7575 11.6823 14.2681 10.9997 13.5855C10.2901 12.8759 9.76402 12.1433 9.37612 11.4713L10.2113 10.7624C10.5697 10.4582 10.6678 9.94533 10.447 9.53028L9.38284 7.53028C9.23954 7.26097 8.98116 7.0718 8.68115 7.01654C8.38113 6.96129 8.07231 7.046 7.84247 7.24659L7.52696 7.52195C6.76823 8.18414 6.3195 9.2723 6.69141 10.3741C7.07698 11.5163 7.89983 13.314 9.58552 14.9997C11.3991 16.8133 13.2413 17.5275 14.3186 17.8049C15.1866 18.0283 16.008 17.7288 16.5868 17.2572L17.1783 16.7752C17.4313 16.5691 17.5678 16.2524 17.544 15.9269C17.5201 15.6014 17.3389 15.308 17.0585 15.1409L15.3802 14.1409C15.0412 13.939 14.6152 13.9552 14.2925 14.1824Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+function LandingNavbar({ whatsAppUrl }: { whatsAppUrl: string }) {
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const { theme, setTheme } = useTheme();
   const [isDarkMode, setIsDarkMode] = React.useState(false);
@@ -277,7 +315,7 @@ function LandingNavbar({ locale }: { locale: AppLocale }) {
               <a
                 key={item.href}
                 href={item.href}
-                className="text-sm font-semibold text-gray-600 transition-colors hover:text-black dark:text-gray-400 dark:hover:text-white"
+                className="rounded-sm px-2 py-1 text-sm font-semibold text-gray-600 transition-colors hover:bg-[#FCD34D] hover:text-gray-950 dark:text-gray-400 dark:hover:bg-[#FCD34D] dark:hover:text-gray-950"
                 onClick={(event) => {
                   event.preventDefault();
                   smoothScroll(item.href);
@@ -298,20 +336,12 @@ function LandingNavbar({ locale }: { locale: AppLocale }) {
               {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
             </button>
             <a
-              href={getAppUrl("/auth/sign-in", locale)}
-              className="text-sm font-semibold text-gray-700 transition-colors hover:text-black dark:text-gray-300 dark:hover:text-white"
-            >
-              Entrar
-            </a>
-            <a
-              href="#contato"
+              href={whatsAppUrl}
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center gap-2 rounded-sm bg-[#FCD34D] px-5 py-3 text-sm font-bold text-gray-950 transition-colors hover:bg-[#F59E0B]"
-              onClick={(event) => {
-                event.preventDefault();
-                smoothScroll("#contato");
-              }}
             >
-              <MessageCircle size={16} />
+              <WhatsAppOutlineIcon size={16} />
               Solicitar orçamento
             </a>
           </div>
@@ -334,7 +364,7 @@ function LandingNavbar({ locale }: { locale: AppLocale }) {
               <a
                 key={item.href}
                 href={item.href}
-                className="rounded-lg px-4 py-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-black/5 hover:text-black dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white"
+                className="rounded-lg px-4 py-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-[#FCD34D] hover:text-gray-950 dark:text-gray-300 dark:hover:bg-[#FCD34D] dark:hover:text-gray-950"
                 onClick={(event) => {
                   event.preventDefault();
                   smoothScroll(item.href, () => setMobileOpen(false));
@@ -353,20 +383,13 @@ function LandingNavbar({ locale }: { locale: AppLocale }) {
                 {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
               </button>
               <a
-                href={getAppUrl("/auth/sign-in", locale)}
-                className="inline-flex items-center justify-center rounded-lg border border-black/10 px-4 py-3 text-sm font-semibold text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:text-white dark:hover:bg-white/5"
-              >
-                Entrar
-              </a>
-              <a
-                href="#contato"
+                href={whatsAppUrl}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="col-span-2 inline-flex items-center justify-center gap-2 rounded-lg bg-[#FCD34D] px-4 py-3 text-sm font-bold text-gray-950 transition-colors hover:bg-[#F59E0B]"
-                onClick={(event) => {
-                  event.preventDefault();
-                  smoothScroll("#contato", () => setMobileOpen(false));
-                }}
+                onClick={() => setMobileOpen(false)}
               >
-                <MessageCircle size={16} />
+                <WhatsAppOutlineIcon size={16} />
                 Solicitar orçamento
               </a>
             </div>
@@ -660,6 +683,94 @@ function Carousel({
   );
 }
 
+function HeroBackgroundCarousel({
+  images,
+  intervalMs = 5000,
+}: {
+  images: string[];
+  intervalMs?: number;
+}) {
+  const [activeIndex, setActiveIndex] = React.useState(0);
+  const [isPaused, setIsPaused] = React.useState(false);
+  const totalImages = images.length;
+  const hasMultipleImages = totalImages > 1;
+  const displayedIndex = totalImages > 0 ? activeIndex % totalImages : 0;
+
+  const goToPrevious = React.useCallback(() => {
+    if (!hasMultipleImages) {
+      return;
+    }
+
+    setActiveIndex((current) => (current - 1 + totalImages) % totalImages);
+  }, [hasMultipleImages, totalImages]);
+
+  const goToNext = React.useCallback(() => {
+    if (!hasMultipleImages) {
+      return;
+    }
+
+    setActiveIndex((current) => (current + 1) % totalImages);
+  }, [hasMultipleImages, totalImages]);
+
+  React.useEffect(() => {
+    if (!hasMultipleImages || isPaused) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      setActiveIndex((current) => (current + 1) % totalImages);
+    }, intervalMs);
+
+    return () => window.clearInterval(interval);
+  }, [hasMultipleImages, intervalMs, isPaused, totalImages]);
+
+  return (
+    <div
+      className="absolute inset-0"
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+      onFocusCapture={() => setIsPaused(true)}
+      onBlurCapture={() => setIsPaused(false)}
+    >
+      <div className="absolute inset-0" aria-hidden="true">
+        {images.map((image, index) => (
+          <img
+            key={`${image}-${index}`}
+            src={image}
+            alt=""
+            className={cn(
+              "absolute inset-0 h-full w-full scale-[1.03] object-cover [filter:blur(0.75px)] transition-opacity duration-1000 ease-in-out",
+              index === displayedIndex ? "opacity-100" : "opacity-0",
+            )}
+            referrerPolicy="no-referrer"
+          />
+        ))}
+      </div>
+
+      {hasMultipleImages ? (
+        <>
+          <button
+            type="button"
+            onClick={goToPrevious}
+            className="absolute left-3 top-1/2 z-20 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/35 bg-black/35 text-white backdrop-blur-sm transition-colors hover:bg-black/55"
+            aria-label="Imagem anterior da hero"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <button
+            type="button"
+            onClick={goToNext}
+            className="absolute right-3 top-1/2 z-20 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/35 bg-black/35 text-white backdrop-blur-sm transition-colors hover:bg-black/55"
+            aria-label="Próxima imagem da hero"
+          >
+            <ChevronRight size={18} />
+          </button>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 function AccordionItem({ title, content }: { title: string; content: string }) {
   const [open, setOpen] = React.useState(false);
 
@@ -774,6 +885,12 @@ export function SiteEleveLanding({ locale, fontClassName }: LandingProps) {
   const companyAddress = publicContent?.company?.address?.trim() || "Av. Industrial, 1200 - Bloco A";
   const companyEmail = publicContent?.company?.email?.trim() || "contato@eleve.com.br";
   const companyPhone = publicContent?.company?.phone?.trim() || "(11) 4000-1234";
+  const whatsAppUrl = buildWhatsAppUrl(companyPhone);
+  const socialProfiles = [
+    { name: "Facebook", icon: Facebook, href: publicContent?.company?.facebookUrl?.trim() || "" },
+    { name: "Instagram", icon: Instagram, href: publicContent?.company?.instagramUrl?.trim() || "" },
+    { name: "LinkedIn", icon: Linkedin, href: publicContent?.company?.linkedinUrl?.trim() || "" },
+  ].filter((item) => item.href.length > 0);
   const equipmentDesktopBasisClass = equipmentCards.length <= 1
     ? "lg:basis-full"
     : equipmentCards.length === 2
@@ -784,6 +901,7 @@ export function SiteEleveLanding({ locale, fontClassName }: LandingProps) {
   const equipmentTabletBasisClass = equipmentCards.length <= 1
     ? "md:basis-full"
     : "md:basis-[calc(50%-0.75rem)]";
+  const heroImages = HERO_LOOP_IMAGES;
 
   return (
     <div
@@ -792,13 +910,16 @@ export function SiteEleveLanding({ locale, fontClassName }: LandingProps) {
         "min-h-screen bg-white text-black selection:bg-[#FCD34D] selection:text-gray-950 dark:bg-[#0A0A0A] dark:text-white",
       )}
     >
-      <LandingNavbar locale={locale} />
+      <LandingNavbar whatsAppUrl={whatsAppUrl} />
 
       <main>
         <section
           id="inicio"
-          className="relative overflow-hidden bg-gray-50 pb-20 pt-32 transition-colors dark:bg-[#0A0A0A] md:pb-32 md:pt-48"
+          className="relative overflow-hidden bg-gray-50 pb-16 pt-28 transition-colors dark:bg-[#0A0A0A] md:pb-24 md:pt-40"
         >
+          <HeroBackgroundCarousel images={heroImages} />
+          <div className="absolute inset-0 bg-black/35 dark:bg-black/50" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-black/30 to-black/45 dark:from-black/40 dark:via-black/50 dark:to-black/65" />
           <div className="absolute inset-0 opacity-[0.05]">
             <svg className="h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
               <defs>
@@ -813,68 +934,50 @@ export function SiteEleveLanding({ locale, fontClassName }: LandingProps) {
             </svg>
           </div>
 
-          <div className="relative z-10 mx-auto grid max-w-7xl items-center gap-12 px-4 md:px-6 lg:grid-cols-2">
-            <div className="text-center lg:text-left">
-              <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/80 px-4 py-2 text-[11px] font-bold uppercase tracking-[0.3em] text-gray-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-300">
+          <div className="relative z-10 mx-auto max-w-7xl px-4 md:px-6">
+            <div className="max-w-3xl text-center lg:text-left">
+              <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/25 bg-black/30 px-4 py-2 text-[11px] font-bold uppercase tracking-[0.3em] text-white backdrop-blur-sm">
                 <ShieldCheck size={14} className="text-[#FCD34D]" />
                 Operação segura e precisa
               </div>
-              <h1 className="text-5xl font-black leading-[0.92] tracking-[-0.06em] sm:text-6xl md:text-7xl lg:text-8xl">
+              <h1 className="text-5xl font-black leading-[0.92] tracking-[-0.06em] text-white sm:text-6xl md:text-7xl lg:text-8xl">
                 Elevação e
                 <br />
-                <span className="text-transparent [webkit-text-stroke:2px_currentColor]">movimentação</span>
+                <span className="text-transparent [webkit-text-stroke:2px_#FFFFFF]">movimentação</span>
                 <br />
                 de precisão.
               </h1>
-              <p className="mx-auto mt-6 max-w-xl text-base leading-8 text-gray-700 dark:text-gray-400 lg:mx-0 lg:text-lg">
+              <p className="mx-auto mt-6 max-w-xl text-base leading-8 text-white/90 lg:mx-0 lg:text-lg">
                 Soluções premium em locação de guindastes, empilhadeiras e transporte pesado para projetos industriais e civis.
               </p>
               <div className="mt-10 flex flex-col justify-center gap-4 sm:flex-row lg:justify-start">
                 <a
-                  href="#contato"
+                  href={whatsAppUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="inline-flex items-center justify-center gap-3 rounded-sm bg-[#FCD34D] px-8 py-4 text-sm font-bold uppercase tracking-[0.2em] text-gray-950 transition-colors hover:bg-[#F59E0B]"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    smoothScroll("#contato");
-                  }}
                 >
-                  <MessageCircle size={18} />
+                  <WhatsAppOutlineIcon size={18} />
                   Solicitar orçamento
-                </a>
-                <a
-                  href={getAppUrl("/auth/sign-in", locale)}
-                  className="inline-flex items-center justify-center gap-3 rounded-sm border border-black/10 px-8 py-4 text-sm font-bold uppercase tracking-[0.2em] text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:text-white dark:hover:bg-white/5"
-                >
-                  Entrar no sistema
                 </a>
               </div>
               <div className="mt-12 grid gap-4 sm:grid-cols-3">
-                <div className="rounded-2xl border border-black/5 bg-white/80 p-4 text-left backdrop-blur-sm dark:border-white/5 dark:bg-white/5">
+                <div className="rounded-2xl border border-white/20 bg-black/25 p-4 text-left text-white backdrop-blur-sm">
                   <Wrench className="mb-3 text-[#FCD34D]" size={22} />
-                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-gray-500 dark:text-gray-400">Frota técnica</p>
+                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-white/75">Frota técnica</p>
                   <p className="mt-2 text-sm font-semibold">Equipamentos para carga pesada e logística especializada.</p>
                 </div>
-                <div className="rounded-2xl border border-black/5 bg-white/80 p-4 text-left backdrop-blur-sm dark:border-white/5 dark:bg-white/5">
+                <div className="rounded-2xl border border-white/20 bg-black/25 p-4 text-left text-white backdrop-blur-sm">
                   <Clock3 className="mb-3 text-[#FCD34D]" size={22} />
-                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-gray-500 dark:text-gray-400">Resposta rápida</p>
+                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-white/75">Resposta rápida</p>
                   <p className="mt-2 text-sm font-semibold">Planejamento, mobilização e suporte para operações críticas.</p>
                 </div>
-                <div className="rounded-2xl border border-black/5 bg-white/80 p-4 text-left backdrop-blur-sm dark:border-white/5 dark:bg-white/5">
+                <div className="rounded-2xl border border-white/20 bg-black/25 p-4 text-left text-white backdrop-blur-sm">
                   <ShieldCheck className="mb-3 text-[#FCD34D]" size={22} />
-                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-gray-500 dark:text-gray-400">Confiabilidade</p>
+                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-white/75">Confiabilidade</p>
                   <p className="mt-2 text-sm font-semibold">Execução segura com equipe experiente e operação monitorada.</p>
                 </div>
               </div>
-            </div>
-
-            <div className="relative hidden sm:block">
-              <div className="absolute -inset-6 rounded-full bg-[#FCD34D]/10 blur-3xl" />
-              <img
-                src="https://images.unsplash.com/photo-1541888946425-d81bb19480c5?auto=format&fit=crop&q=80&w=1400"
-                alt="Guindaste da Eleve em operação"
-                className="relative w-full rounded-[2rem] object-cover shadow-2xl shadow-black/20"
-                referrerPolicy="no-referrer"
-              />
             </div>
           </div>
         </section>
@@ -883,7 +986,9 @@ export function SiteEleveLanding({ locale, fontClassName }: LandingProps) {
           <div className="mx-auto max-w-7xl px-4 md:px-6">
             <div className="mb-14 text-center">
               <p className="text-xs font-bold uppercase tracking-[0.35em] text-amber-700 dark:text-[#FCD34D]">O que oferecemos</p>
-              <h2 className="mt-4 text-4xl font-black tracking-[-0.04em] md:text-5xl">Nossos serviços</h2>
+              <h2 className="mt-4 text-4xl font-black tracking-[-0.04em] md:text-5xl">
+                <span className="inline-block rounded-sm bg-[#FCD34D] px-3 py-1 text-gray-950">Nossos serviços</span>
+              </h2>
               <p className="mx-auto mt-4 max-w-2xl text-base leading-8 text-gray-600 dark:text-gray-400">
                 Soluções completas para movimentação, elevação e transporte de alta complexidade.
               </p>
@@ -905,15 +1010,15 @@ export function SiteEleveLanding({ locale, fontClassName }: LandingProps) {
                 <p className="inline-flex rounded-full bg-amber-100 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.3em] text-amber-800 dark:bg-[#FCD34D]/10 dark:text-[#FCD34D]">
                   Frota de alta performance
                 </p>
-                <h2 className="mt-4 text-4xl font-black tracking-[-0.04em] md:text-5xl">Equipamentos em destaque</h2>
+                <h2 className="mt-4 text-4xl font-black tracking-[-0.04em] md:text-5xl">
+                  <span className="inline-block rounded-sm bg-[#FCD34D] px-3 py-1 text-gray-950">Equipamentos em destaque</span>
+                </h2>
               </div>
               <a
-                href="#contato"
-                className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-[0.2em] text-gray-600 transition-colors hover:text-black dark:text-gray-400 dark:hover:text-white"
-                onClick={(event) => {
-                  event.preventDefault();
-                  smoothScroll("#contato");
-                }}
+                href={whatsAppUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-[0.2em] text-gray-600 transition-colors hover:text-[#FCD34D] dark:text-gray-400 dark:hover:text-[#FCD34D]"
               >
                 Solicitar disponibilidade
                 <ArrowRight size={16} />
@@ -940,7 +1045,7 @@ export function SiteEleveLanding({ locale, fontClassName }: LandingProps) {
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.35em] text-amber-700 dark:text-[#FCD34D]">Excelência em elevação</p>
               <h2 className="mt-4 text-4xl font-black leading-none tracking-[-0.05em] md:text-6xl">
-                Por que escolher a Eleve Locações?
+                <span className="inline-block rounded-sm bg-[#FCD34D] px-3 py-1 text-gray-950">Por que escolher a Eleve Locações?</span>
               </h2>
               <p className="mt-6 max-w-xl text-base leading-8 text-gray-600 dark:text-gray-400">
                 Combinamos precisão de engenharia com agilidade operacional para entregar segurança, performance e previsibilidade.
@@ -974,7 +1079,9 @@ export function SiteEleveLanding({ locale, fontClassName }: LandingProps) {
           <div className="mx-auto max-w-7xl px-4 md:px-6">
             <div className="mb-14">
               <p className="text-xs font-bold uppercase tracking-[0.35em] text-amber-700 dark:text-[#FCD34D]">Depoimentos</p>
-              <h2 className="mt-4 text-4xl font-black tracking-[-0.04em] md:text-5xl">O que dizem nossos clientes</h2>
+              <h2 className="mt-4 text-4xl font-black tracking-[-0.04em] md:text-5xl">
+                <span className="inline-block rounded-sm bg-[#FCD34D] px-3 py-1 text-gray-950">O que dizem nossos clientes</span>
+              </h2>
             </div>
             <Carousel title="depoimentos" autoplayMs={5000}>
               {testimonialCards.map((testimonial) => (
@@ -1000,52 +1107,63 @@ export function SiteEleveLanding({ locale, fontClassName }: LandingProps) {
               Soluções de logística e locação para construção civil, indústria e operações especiais com resposta técnica rápida.
             </p>
             <div className="mt-8 flex gap-3">
-              {[Facebook, Instagram, Linkedin].map((Icon, index) => (
+              {socialProfiles.map((social) => (
                 <a
-                  key={index}
-                  href="#contato"
+                  key={social.name}
+                  href={social.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-black/10 bg-gray-50 text-gray-500 transition-colors hover:border-[#FCD34D] hover:text-[#F59E0B] dark:border-white/10 dark:bg-[#1A1A1A] dark:text-gray-400"
-                  aria-label="Rede social"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    smoothScroll("#contato");
-                  }}
+                  aria-label={social.name}
                 >
-                  <Icon size={18} />
+                  <social.icon size={18} />
                 </a>
               ))}
             </div>
           </div>
 
           <div>
-            <p className="text-sm font-bold uppercase tracking-[0.25em] text-black dark:text-white">Contato</p>
+            <p className="inline-block rounded-sm bg-[#FCD34D] px-2 py-1 text-sm font-bold uppercase tracking-[0.25em] text-gray-950">Contato</p>
             <div className="mt-6 space-y-4 text-sm leading-7 text-gray-600 dark:text-gray-400">
               <p>{companyAddress}</p>
-              <p>{companyEmail}</p>
-              <p>{companyPhone}</p>
+              <p>
+                <a href={`mailto:${companyEmail}`} className="transition-colors hover:text-[#FCD34D] dark:hover:text-[#FCD34D]">
+                  {companyEmail}
+                </a>
+              </p>
+              <p>
+                <a
+                  href={whatsAppUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="transition-colors hover:text-[#FCD34D] dark:hover:text-[#FCD34D]"
+                >
+                  {companyPhone}
+                </a>
+              </p>
             </div>
           </div>
 
           <div>
-            <p className="text-sm font-bold uppercase tracking-[0.25em] text-black dark:text-white">Acesso rápido</p>
+            <p className="inline-block rounded-sm bg-[#FCD34D] px-2 py-1 text-sm font-bold uppercase tracking-[0.25em] text-gray-950">Acesso rápido</p>
             <div className="mt-6 flex flex-col gap-3">
               <a
                 href={getAppUrl("/auth/sign-in", locale)}
-                className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700 transition-colors hover:text-black dark:text-gray-300 dark:hover:text-white"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700 transition-colors hover:text-[#FCD34D] dark:text-gray-300 dark:hover:text-[#FCD34D]"
               >
                 Entrar no sistema
                 <ArrowRight size={15} />
               </a>
               <a
                 href={getAppUrl("/dashboard", locale)}
-                className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700 transition-colors hover:text-black dark:text-gray-300 dark:hover:text-white"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700 transition-colors hover:text-[#FCD34D] dark:text-gray-300 dark:hover:text-[#FCD34D]"
               >
                 Ir para o dashboard
                 <ArrowRight size={15} />
               </a>
               <a
                 href="#servicos"
-                className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700 transition-colors hover:text-black dark:text-gray-300 dark:hover:text-white"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700 transition-colors hover:text-[#FCD34D] dark:text-gray-300 dark:hover:text-[#FCD34D]"
                 onClick={(event) => {
                   event.preventDefault();
                   smoothScroll("#servicos");
@@ -1078,4 +1196,3 @@ export function SiteEleveLanding({ locale, fontClassName }: LandingProps) {
     </div>
   );
 }
-
