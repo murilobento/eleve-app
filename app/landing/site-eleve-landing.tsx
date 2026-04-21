@@ -172,6 +172,7 @@ const navigationItems = [
   { label: "Serviços", href: "#servicos" },
   { label: "Equipamentos", href: "#equipamentos" },
   { label: "Sobre nós", href: "#sobre" },
+  { label: "Depoimentos", href: "#depoimentos" },
   { label: "Contato", href: "#contato" },
 ];
 
@@ -227,21 +228,44 @@ function EleveLogo({ className }: { className?: string }) {
 
 function smoothScroll(target: string, onDone?: () => void) {
   const element = document.querySelector(target);
-  if (element) {
-    const headerOffset = 80; // Altura do header fixo
-    const elementPosition = element.getBoundingClientRect().top;
-    const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
-
-    window.scrollTo({
-      top: offsetPosition,
-      behavior: "smooth"
-    });
+  if (!element) {
+    onDone?.();
+    return;
   }
 
-  // Aguarda a animação terminar antes de executar o callback
-  setTimeout(() => {
+  const headerOffset = 80;
+  const startY = window.pageYOffset;
+  const targetY = Math.max(0, element.getBoundingClientRect().top + startY - headerOffset);
+  const distance = targetY - startY;
+
+  if (Math.abs(distance) < 2) {
+    window.scrollTo({ top: targetY });
     onDone?.();
-  }, 500);
+    return;
+  }
+
+  const durationMs = 900;
+  const startTime = performance.now();
+  const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - ((-2 * t + 2) ** 3) / 2);
+
+  const step = (currentTime: number) => {
+    const elapsed = currentTime - startTime;
+    const progress = Math.min(elapsed / durationMs, 1);
+    const easedProgress = easeInOutCubic(progress);
+
+    window.scrollTo({
+      top: startY + distance * easedProgress,
+    });
+
+    if (progress < 1) {
+      window.requestAnimationFrame(step);
+      return;
+    }
+
+    onDone?.();
+  };
+
+  window.requestAnimationFrame(step);
 }
 
 function toPhoneDigits(value: string) {
@@ -1076,7 +1100,7 @@ export function SiteEleveLanding({ locale, fontClassName }: LandingProps) {
           </div>
         </section>
 
-        <section className="bg-gray-100 py-24 transition-colors dark:bg-[#121212] md:py-32">
+        <section id="depoimentos" className="bg-gray-100 py-24 transition-colors dark:bg-[#121212] md:py-32">
           <div className="mx-auto max-w-7xl px-4 md:px-6">
             <div className="mb-14">
               <p className="text-xs font-bold uppercase tracking-[0.35em] text-amber-700 dark:text-[#FCD34D]">Depoimentos</p>
