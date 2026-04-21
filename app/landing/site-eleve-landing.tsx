@@ -943,7 +943,7 @@ export function SiteEleveLanding({ locale, fontClassName }: LandingProps) {
               <h1 className="text-5xl font-black leading-[0.92] tracking-[-0.06em] text-white sm:text-6xl md:text-7xl lg:text-8xl">
                 Elevação e
                 <br />
-                <span className="text-transparent [webkit-text-stroke:2px_#FFFFFF]">movimentação</span>
+                <span className="inline-block rounded-sm bg-[#FCD34D] px-3 py-1 text-gray-950">movimentação</span>
                 <br />
                 de precisão.
               </h1>
@@ -960,23 +960,6 @@ export function SiteEleveLanding({ locale, fontClassName }: LandingProps) {
                   <WhatsAppOutlineIcon size={18} />
                   Solicitar orçamento
                 </a>
-              </div>
-              <div className="mt-12 grid gap-4 sm:grid-cols-3">
-                <div className="rounded-2xl border border-white/20 bg-black/25 p-4 text-left text-white backdrop-blur-sm">
-                  <Wrench className="mb-3 text-[#FCD34D]" size={22} />
-                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-white/75">Frota técnica</p>
-                  <p className="mt-2 text-sm font-semibold">Equipamentos para carga pesada e logística especializada.</p>
-                </div>
-                <div className="rounded-2xl border border-white/20 bg-black/25 p-4 text-left text-white backdrop-blur-sm">
-                  <Clock3 className="mb-3 text-[#FCD34D]" size={22} />
-                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-white/75">Resposta rápida</p>
-                  <p className="mt-2 text-sm font-semibold">Planejamento, mobilização e suporte para operações críticas.</p>
-                </div>
-                <div className="rounded-2xl border border-white/20 bg-black/25 p-4 text-left text-white backdrop-blur-sm">
-                  <ShieldCheck className="mb-3 text-[#FCD34D]" size={22} />
-                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-white/75">Confiabilidade</p>
-                  <p className="mt-2 text-sm font-semibold">Execução segura com equipe experiente e operação monitorada.</p>
-                </div>
               </div>
             </div>
           </div>
@@ -1050,6 +1033,24 @@ export function SiteEleveLanding({ locale, fontClassName }: LandingProps) {
               <p className="mt-6 max-w-xl text-base leading-8 text-gray-600 dark:text-gray-400">
                 Combinamos precisão de engenharia com agilidade operacional para entregar segurança, performance e previsibilidade.
               </p>
+
+              <div className="mt-10 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                <div className="rounded-2xl border border-black/5 bg-gray-50 p-4 text-left dark:border-white/5 dark:bg-[#121212]">
+                  <Wrench className="mb-3 text-[#FCD34D]" size={22} />
+                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-gray-500 dark:text-gray-400">Frota técnica</p>
+                  <p className="mt-2 text-sm font-semibold">Equipamentos para carga pesada e logística especializada.</p>
+                </div>
+                <div className="rounded-2xl border border-black/5 bg-gray-50 p-4 text-left dark:border-white/5 dark:bg-[#121212]">
+                  <Clock3 className="mb-3 text-[#FCD34D]" size={22} />
+                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-gray-500 dark:text-gray-400">Resposta rápida</p>
+                  <p className="mt-2 text-sm font-semibold">Planejamento, mobilização e suporte para operações críticas.</p>
+                </div>
+                <div className="rounded-2xl border border-black/5 bg-gray-50 p-4 text-left dark:border-white/5 dark:bg-[#121212] sm:col-span-2 xl:col-span-1">
+                  <ShieldCheck className="mb-3 text-[#FCD34D]" size={22} />
+                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-gray-500 dark:text-gray-400">Confiabilidade</p>
+                  <p className="mt-2 text-sm font-semibold">Execução segura com equipe experiente e operação monitorada.</p>
+                </div>
+              </div>
 
               <div className="mt-10 grid gap-4 sm:grid-cols-2">
                 <div className="rounded-2xl border border-black/5 bg-gray-50 p-6 dark:border-white/5 dark:bg-[#121212]">
