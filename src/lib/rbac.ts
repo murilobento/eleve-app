@@ -72,7 +72,7 @@ type SessionUser = {
   role?: string | null;
 };
 
-type SessionResult = Awaited<ReturnType<typeof auth.api.getSession>>;
+
 
 type StatusActorInput = {
   userId?: string | null;

@@ -40,7 +40,7 @@ function getIsMobileViewport() {
 }
 
 export function useIsMobile() {
-  const [isMobile, setIsMobile] = React.useState<boolean | undefined>(undefined)
+  const [isMobile, setIsMobile] = React.useState<boolean | undefined>(() => getIsMobileViewport())
 
   React.useEffect(() => {
     const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`)
@@ -56,7 +56,6 @@ export function useIsMobile() {
 
     window.addEventListener("resize", onChange)
     window.visualViewport?.addEventListener("resize", onChange)
-    setIsMobile(getIsMobileViewport())
 
     return () => {
       if (typeof mql.removeEventListener === "function") {

@@ -42,7 +42,7 @@ export function SiteHeader() {
   const normalizedPathname = stripLocaleFromPath(pathname)
   const nextNavigationMode = config.navigationMode === "sidebar" ? "topbar" : "sidebar"
   const [isFullscreen, setIsFullscreen] = React.useState(false)
-  const [supportsFullscreen, setSupportsFullscreen] = React.useState(false)
+  const supportsFullscreen = typeof document !== "undefined" && "fullscreenElement" in document
   const mainGroup = navGroups[0]
   const dashboardItem = mainGroup?.items[0]
   const groupedDropdowns = dashboardItem ? navGroups.slice(1) : navGroups
@@ -86,27 +86,6 @@ export function SiteHeader() {
 
     document.title = `${companyName} | ${pageTitle}`
   }, [companyName, normalizedPathname, t])
-
-  React.useEffect(() => {
-    const supported = canUseDocumentFullscreen()
-    setSupportsFullscreen(supported)
-
-    if (!supported) {
-      setIsFullscreen(false)
-      return
-    }
-
-    const updateFullscreen = () => {
-      setIsFullscreen(Boolean(document.fullscreenElement))
-    }
-
-    document.addEventListener("fullscreenchange", updateFullscreen)
-    updateFullscreen()
-
-    return () => {
-      document.removeEventListener("fullscreenchange", updateFullscreen)
-    }
-  }, [])
 
   const handleToggleFullscreen = async () => {
     if (!supportsFullscreen) {

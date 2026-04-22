@@ -12,7 +12,7 @@ const optionalTextFieldSchema = (label: string, max = 2000) =>
     .optional()
     .transform((value) => (value && value.length > 0 ? value : undefined));
 
-const relationIdSchema = (label: string) => z.string().uuid(`Select a valid ${label}.`);
+
 
 const optionalRelationIdSchema = (label: string) =>
   z

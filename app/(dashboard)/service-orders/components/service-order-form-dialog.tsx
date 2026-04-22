@@ -208,7 +208,7 @@ export function ServiceOrderFormDialog({
     fallback: t("serviceOrders.validationToastFallback"),
   });
 
-  const { fields, append, move, remove, replace, update } = useFieldArray({
+  const { fields, append, move, remove, update } = useFieldArray({
     control: form.control,
     name: "items",
   });
@@ -239,10 +239,6 @@ export function ServiceOrderFormDialog({
     [clients],
   );
 
-  const selectedClient = useMemo(
-    () => clientsById.get(watchedClientId ?? "") ?? null,
-    [clientsById, watchedClientId],
-  );
   const serviceTypesById = useMemo(
     () => new Map(serviceTypes.map((serviceType) => [serviceType.id, serviceType])),
     [serviceTypes],
