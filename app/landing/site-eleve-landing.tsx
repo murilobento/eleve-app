@@ -272,6 +272,15 @@ function toPhoneDigits(value: string) {
   return value.replace(/\D/g, "");
 }
 
+function formatCnpj(value: string) {
+  const digits = value.replace(/\D/g, "");
+  if (digits.length !== 14) {
+    return value;
+  }
+
+  return digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
+}
+
 function buildWhatsAppUrl(phone: string, message = "Olá! Gostaria de solicitar um orçamento.") {
   const digits = toPhoneDigits(phone);
   const normalizedPhone = digits.startsWith("55") ? digits : `55${digits}`;
@@ -575,66 +584,168 @@ function Carousel({
   children: React.ReactNode;
   autoplayMs?: number;
 }) {
-  const ref = React.useRef<HTMLDivElement>(null);
+  const trackRef = React.useRef<HTMLDivElement>(null);
+  const continuousScrollIntervalRef = React.useRef<number | null>(null);
+  const [currentIndex, setCurrentIndex] = React.useState(0);
+  const [itemStep, setItemStep] = React.useState(0);
+  const [isTransitionEnabled, setIsTransitionEnabled] = React.useState(true);
   const [hasOverflow, setHasOverflow] = React.useState(false);
-  const [canScrollLeft, setCanScrollLeft] = React.useState(false);
-  const [canScrollRight, setCanScrollRight] = React.useState(false);
   const [isPaused, setIsPaused] = React.useState(false);
+  const baseChildren = React.useMemo(() => React.Children.toArray(children), [children]);
+  const itemCount = baseChildren.length;
+  const hasInfiniteLoop = itemCount > 1;
 
-  const updateScrollState = React.useCallback(() => {
-    const container = ref.current;
+  const renderedChildren = React.useMemo(() => {
+    const source = hasInfiniteLoop ? [...baseChildren, ...baseChildren, ...baseChildren] : baseChildren;
+
+    return source.map((child, index) => {
+      if (React.isValidElement(child)) {
+        return React.cloneElement(child, {
+          key: `carousel-item-${index}`,
+          "data-carousel-item": "true",
+        });
+      }
+
+      return (
+        <div key={`carousel-item-${index}`} data-carousel-item="true">
+          {child}
+        </div>
+      );
+    });
+  }, [baseChildren, hasInfiniteLoop]);
+
+  const getItemElements = React.useCallback(() => {
+    const container = trackRef.current;
     if (!container) {
-      return;
+      return [];
     }
 
-    const overflow = container.scrollWidth - container.clientWidth > 2;
-    setHasOverflow(overflow);
-
-    if (!overflow) {
-      setCanScrollLeft(false);
-      setCanScrollRight(false);
-      return;
-    }
-
-    setCanScrollLeft(container.scrollLeft > 2);
-    setCanScrollRight(container.scrollLeft + container.clientWidth < container.scrollWidth - 2);
+    return Array.from(container.querySelectorAll<HTMLElement>("[data-carousel-item='true']"));
   }, []);
 
   React.useEffect(() => {
-    const container = ref.current;
-    if (!container) {
+    if (!hasInfiniteLoop) {
+      const timer = window.setTimeout(() => {
+        setCurrentIndex(0);
+        setHasOverflow(false);
+        setItemStep(0);
+        setIsTransitionEnabled(true);
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      const items = getItemElements();
+      const firstCenter = items[itemCount];
+      const secondCenter = items[itemCount + 1];
+
+      if (!firstCenter || !secondCenter) {
+        return;
+      }
+
+      const step = secondCenter.offsetLeft - firstCenter.offsetLeft;
+      if (step <= 0) {
+        return;
+      }
+
+      setItemStep(step);
+      setHasOverflow(true);
+      setIsTransitionEnabled(false);
+      setCurrentIndex(itemCount);
+      window.requestAnimationFrame(() => {
+        setIsTransitionEnabled(true);
+      });
+    });
+
+    const handleResize = () => {
+      const items = getItemElements();
+      const a = items[itemCount];
+      const b = items[itemCount + 1];
+      if (!a || !b) {
+        return;
+      }
+      const step = b.offsetLeft - a.offsetLeft;
+      if (step > 0) {
+        setItemStep(step);
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [getItemElements, hasInfiniteLoop, itemCount, renderedChildren]);
+
+  const move = React.useCallback((direction: "left" | "right") => {
+    if (!hasOverflow) {
       return;
     }
 
-    updateScrollState();
+    const delta = direction === "right" ? 1 : -1;
+    setIsTransitionEnabled(true);
+    setCurrentIndex((current) => current + delta);
+  }, [hasOverflow]);
 
-    const handleScroll = () => {
-      updateScrollState();
-    };
+  const handleTrackTransitionEnd = React.useCallback(() => {
+    if (!hasInfiniteLoop) {
+      return;
+    }
 
-    const handleResize = () => {
-      updateScrollState();
-    };
+    if (currentIndex >= itemCount * 2) {
+      setIsTransitionEnabled(false);
+      setCurrentIndex((current) => current - itemCount);
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => setIsTransitionEnabled(true));
+      });
+      return;
+    }
 
-    container.addEventListener("scroll", handleScroll, { passive: true });
-    window.addEventListener("resize", handleResize);
+    if (currentIndex < itemCount) {
+      setIsTransitionEnabled(false);
+      setCurrentIndex((current) => current + itemCount);
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => setIsTransitionEnabled(true));
+      });
+    }
+  }, [currentIndex, hasInfiniteLoop, itemCount]);
 
-    return () => {
-      container.removeEventListener("scroll", handleScroll);
-      window.removeEventListener("resize", handleResize);
-    };
-  }, [children, updateScrollState]);
-
-  const scroll = React.useCallback((direction: "left" | "right") => {
-    const container = ref.current;
-    if (!container) return;
-
-    const width = container.clientWidth * 0.8;
-    container.scrollBy({
-      left: direction === "left" ? -width : width,
-      behavior: "smooth",
-    });
+  const stopContinuousScroll = React.useCallback(() => {
+    if (continuousScrollIntervalRef.current !== null) {
+      window.clearInterval(continuousScrollIntervalRef.current);
+      continuousScrollIntervalRef.current = null;
+    }
+    setIsPaused(false);
   }, []);
+
+  const startContinuousScroll = React.useCallback((direction: "left" | "right") => {
+    if (!hasOverflow) {
+      return;
+    }
+
+    stopContinuousScroll();
+    setIsPaused(true);
+    move(direction);
+
+    continuousScrollIntervalRef.current = window.setInterval(() => {
+      move(direction);
+    }, 500);
+  }, [hasOverflow, move, stopContinuousScroll]);
+
+  React.useEffect(() => {
+    const handlePointerUp = () => {
+      stopContinuousScroll();
+    };
+
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerUp);
+    return () => {
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerUp);
+    };
+  }, [stopContinuousScroll]);
+
+  React.useEffect(() => () => stopContinuousScroll(), [stopContinuousScroll]);
 
   React.useEffect(() => {
     if (!hasOverflow || isPaused) {
@@ -642,22 +753,11 @@ function Carousel({
     }
 
     const interval = window.setInterval(() => {
-      const container = ref.current;
-      if (!container) {
-        return;
-      }
-
-      const nearEnd = container.scrollLeft + container.clientWidth >= container.scrollWidth - 4;
-      if (nearEnd) {
-        container.scrollTo({ left: 0, behavior: "smooth" });
-        return;
-      }
-
-      scroll("right");
+      move("right");
     }, autoplayMs);
 
     return () => window.clearInterval(interval);
-  }, [autoplayMs, hasOverflow, isPaused, scroll]);
+  }, [autoplayMs, hasOverflow, isPaused, move]);
 
   return (
     <div
@@ -670,11 +770,19 @@ function Carousel({
       {hasOverflow ? (
         <button
           type="button"
-          onClick={() => scroll("left")}
-          disabled={!canScrollLeft}
+          onPointerDown={(event) => {
+            event.preventDefault();
+            startContinuousScroll("left");
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              move("left");
+            }
+          }}
           className={cn(
             "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-black/10 bg-white text-black transition-colors dark:border-white/10 dark:bg-[#1A1A1A] dark:text-white",
-            canScrollLeft ? "hover:bg-[#FCD34D] dark:hover:bg-[#FCD34D] dark:hover:text-black" : "cursor-default opacity-40",
+            "hover:bg-[#FCD34D] dark:hover:bg-[#FCD34D] dark:hover:text-black",
           )}
           aria-label={`Voltar no carrossel ${title}`}
         >
@@ -683,20 +791,37 @@ function Carousel({
       ) : null}
 
       <div
-        ref={ref}
-        className="flex flex-1 snap-x snap-mandatory gap-6 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="relative flex-1 overflow-hidden pb-2"
       >
-        {children}
+        <div
+          ref={trackRef}
+          className="flex gap-6"
+          onTransitionEnd={handleTrackTransitionEnd}
+          style={{
+            transform: `translate3d(-${Math.max(currentIndex * itemStep, 0)}px, 0, 0)`,
+            transition: isTransitionEnabled ? "transform 340ms ease" : "none",
+          }}
+        >
+          {renderedChildren}
+        </div>
       </div>
 
       {hasOverflow ? (
         <button
           type="button"
-          onClick={() => scroll("right")}
-          disabled={!canScrollRight}
+          onPointerDown={(event) => {
+            event.preventDefault();
+            startContinuousScroll("right");
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              move("right");
+            }
+          }}
           className={cn(
             "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-black/10 bg-white text-black transition-colors dark:border-white/10 dark:bg-[#1A1A1A] dark:text-white",
-            canScrollRight ? "hover:bg-[#FCD34D] dark:hover:bg-[#FCD34D] dark:hover:text-black" : "cursor-default opacity-40",
+            "hover:bg-[#FCD34D] dark:hover:bg-[#FCD34D] dark:hover:text-black",
           )}
           aria-label={`Avancar no carrossel ${title}`}
         >
@@ -716,6 +841,7 @@ function HeroBackgroundCarousel({
 }) {
   const [activeIndex, setActiveIndex] = React.useState(0);
   const [isPaused, setIsPaused] = React.useState(false);
+  const continuousChangeIntervalRef = React.useRef<number | null>(null);
   const totalImages = images.length;
   const hasMultipleImages = totalImages > 1;
   const displayedIndex = totalImages > 0 ? activeIndex % totalImages : 0;
@@ -735,6 +861,51 @@ function HeroBackgroundCarousel({
 
     setActiveIndex((current) => (current + 1) % totalImages);
   }, [hasMultipleImages, totalImages]);
+
+  const stopContinuousChange = React.useCallback(() => {
+    if (continuousChangeIntervalRef.current !== null) {
+      window.clearInterval(continuousChangeIntervalRef.current);
+      continuousChangeIntervalRef.current = null;
+    }
+    setIsPaused(false);
+  }, []);
+
+  const startContinuousChange = React.useCallback((direction: "left" | "right") => {
+    if (!hasMultipleImages) {
+      return;
+    }
+
+    stopContinuousChange();
+    setIsPaused(true);
+    if (direction === "left") {
+      goToPrevious();
+    } else {
+      goToNext();
+    }
+
+    continuousChangeIntervalRef.current = window.setInterval(() => {
+      if (direction === "left") {
+        goToPrevious();
+        return;
+      }
+      goToNext();
+    }, 500);
+  }, [goToNext, goToPrevious, hasMultipleImages, stopContinuousChange]);
+
+  React.useEffect(() => {
+    const handlePointerUp = () => {
+      stopContinuousChange();
+    };
+
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerUp);
+    return () => {
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerUp);
+    };
+  }, [stopContinuousChange]);
+
+  React.useEffect(() => () => stopContinuousChange(), [stopContinuousChange]);
 
   React.useEffect(() => {
     if (!hasMultipleImages || isPaused) {
@@ -775,7 +946,16 @@ function HeroBackgroundCarousel({
         <>
           <button
             type="button"
-            onClick={goToPrevious}
+            onPointerDown={(event) => {
+              event.preventDefault();
+              startContinuousChange("left");
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                goToPrevious();
+              }
+            }}
             className="absolute left-3 top-1/2 z-20 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/35 bg-black/35 text-white backdrop-blur-sm transition-colors hover:bg-black/55"
             aria-label="Imagem anterior da hero"
           >
@@ -783,7 +963,16 @@ function HeroBackgroundCarousel({
           </button>
           <button
             type="button"
-            onClick={goToNext}
+            onPointerDown={(event) => {
+              event.preventDefault();
+              startContinuousChange("right");
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                goToNext();
+              }
+            }}
             className="absolute right-3 top-1/2 z-20 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/35 bg-black/35 text-white backdrop-blur-sm transition-colors hover:bg-black/55"
             aria-label="Próxima imagem da hero"
           >
@@ -907,6 +1096,8 @@ export function SiteEleveLanding({ locale, fontClassName }: LandingProps) {
     : testimonials;
 
   const companyAddress = publicContent?.company?.address?.trim() || "Av. Industrial, 1200 - Bloco A";
+  const companyCnpjRaw = publicContent?.company?.cnpj?.trim() || "";
+  const companyCnpj = companyCnpjRaw.length > 0 ? formatCnpj(companyCnpjRaw) : "-";
   const companyEmail = publicContent?.company?.email?.trim() || "contato@eleve.com.br";
   const companyPhone = publicContent?.company?.phone?.trim() || "(11) 4000-1234";
   const whatsAppUrl = buildWhatsAppUrl(companyPhone);
@@ -1012,8 +1203,8 @@ export function SiteEleveLanding({ locale, fontClassName }: LandingProps) {
 
         <section id="equipamentos" className="bg-gray-100 py-24 transition-colors dark:bg-[#121212] md:py-32">
           <div className="mx-auto max-w-7xl px-4 md:px-6">
-            <div className="mb-14 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-              <div className="max-w-2xl">
+            <div className="mb-14 text-center">
+              <div className="mx-auto max-w-2xl">
                 <p className="inline-flex rounded-full bg-amber-100 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.3em] text-amber-800 dark:bg-[#FCD34D]/10 dark:text-[#FCD34D]">
                   Frota de alta performance
                 </p>
@@ -1021,15 +1212,6 @@ export function SiteEleveLanding({ locale, fontClassName }: LandingProps) {
                   <span className="inline-block rounded-sm bg-[#FCD34D] px-3 py-1 text-gray-950">Equipamentos em destaque</span>
                 </h2>
               </div>
-              <a
-                href={whatsAppUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-[0.2em] text-gray-600 transition-colors hover:text-[#FCD34D] dark:text-gray-400 dark:hover:text-[#FCD34D]"
-              >
-                Solicitar disponibilidade
-                <ArrowRight size={16} />
-              </a>
             </div>
             <Carousel title="equipamentos" autoplayMs={5000}>
               {equipmentCards.map((item) => (
@@ -1150,19 +1332,21 @@ export function SiteEleveLanding({ locale, fontClassName }: LandingProps) {
           <div>
             <p className="inline-block rounded-sm bg-[#FCD34D] px-2 py-1 text-sm font-bold uppercase tracking-[0.25em] text-gray-950">Contato</p>
             <div className="mt-6 space-y-4 text-sm leading-7 text-gray-600 dark:text-gray-400">
-              <p>{companyAddress}</p>
               <p>
+                <span className="font-semibold">Endereço:</span> {companyAddress}
+              </p>
+              <p>
+                <span className="font-semibold">CNPJ:</span> {companyCnpj}
+              </p>
+              <p>
+                <span className="font-semibold">E-mail:</span>{" "}
                 <a href={`mailto:${companyEmail}`} className="transition-colors hover:text-[#FCD34D] dark:hover:text-[#FCD34D]">
                   {companyEmail}
                 </a>
               </p>
               <p>
-                <a
-                  href={whatsAppUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="transition-colors hover:text-[#FCD34D] dark:hover:text-[#FCD34D]"
-                >
+                <span className="font-semibold">Whatsapp/Telefone:</span>{" "}
+                <a href={whatsAppUrl} target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-[#FCD34D] dark:hover:text-[#FCD34D]">
                   {companyPhone}
                 </a>
               </p>
@@ -1202,7 +1386,14 @@ export function SiteEleveLanding({ locale, fontClassName }: LandingProps) {
         </div>
         <div className="mx-auto mt-16 flex max-w-7xl flex-col gap-4 border-t border-black/5 px-4 pt-8 text-[11px] font-bold uppercase tracking-[0.28em] text-gray-500 dark:border-white/5 dark:text-gray-400 md:flex-row md:items-center md:justify-between md:px-6">
           <p>© 2026 Eleve Locações. Todos os direitos reservados.</p>
-          <p>Desenvolvido com precisão.</p>
+          <a
+            href="https://wa.me/5518996973332"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="transition-colors hover:text-[#FCD34D] dark:hover:text-[#FCD34D]"
+          >
+            desenvolvido por mb
+          </a>
         </div>
       </footer>
 

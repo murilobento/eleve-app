@@ -50,6 +50,15 @@ const optionalSocialUrlSchema = z
     "Provide a valid social URL.",
   );
 
+const cnpjSchema = z
+  .string()
+  .trim()
+  .max(18, "CNPJ must be at most 18 characters.")
+  .refine(
+    (value) => value.length === 0 || /^\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}$/.test(value),
+    "Please enter a valid CNPJ.",
+  );
+
 const displayOrderSchema = z.coerce
   .number({ invalid_type_error: "Display order must be a number." })
   .int("Display order must be an integer.")
@@ -58,6 +67,7 @@ const displayOrderSchema = z.coerce
 
 export const updatePublicCompanySchema = z.object({
   name: shortTextSchema,
+  cnpj: cnpjSchema,
   phone: shortTextSchema.max(40, "Phone must be at most 40 characters."),
   email: z.string().trim().email("Please enter a valid email address.").max(120),
   address: longTextSchema.max(300, "Address must be at most 300 characters."),
@@ -112,6 +122,7 @@ export type UpdatePublicTestimonialInput = z.infer<typeof updatePublicTestimonia
 export type ManagedPublicCompany = {
   id: string;
   name: string;
+  cnpj: string;
   phone: string;
   email: string;
   address: string;

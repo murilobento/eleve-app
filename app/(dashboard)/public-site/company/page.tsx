@@ -17,6 +17,7 @@ type AdminCompanyResponse = {
 
 const EMPTY_COMPANY: UpdatePublicCompanyInput = {
   name: "",
+  cnpj: "",
   phone: "",
   email: "",
   address: "",
@@ -52,6 +53,7 @@ export default function PublicSiteCompanyPage() {
       setCompany(payload.company
         ? {
             name: payload.company.name,
+            cnpj: payload.company.cnpj ?? "",
             phone: payload.company.phone,
             email: payload.company.email,
             address: payload.company.address,
@@ -120,12 +122,20 @@ export default function PublicSiteCompanyPage() {
               <CardTitle>Dados publicos da empresa</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="grid gap-3 md:grid-cols-3">
+              <div className="grid gap-3 md:grid-cols-4">
                 <div className="space-y-1">
                   <Label>Nome</Label>
                   <Input
                     value={company.name}
                     onChange={(event) => setCompany((current) => ({ ...current, name: event.target.value }))}
+                    disabled={!canUpdate || isSaving}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>CNPJ</Label>
+                  <Input
+                    value={company.cnpj}
+                    onChange={(event) => setCompany((current) => ({ ...current, cnpj: event.target.value }))}
                     disabled={!canUpdate || isSaving}
                   />
                 </div>

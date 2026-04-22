@@ -21,6 +21,7 @@ let publicSiteSchemaPromise: Promise<void> | null = null;
 type PublicCompanyRow = {
   id: string;
   name: string;
+  cnpj: string | null;
   phone: string;
   email: string;
   address: string;
@@ -71,6 +72,7 @@ type PublicTestimonialRow = {
 
 const DEFAULT_PUBLIC_COMPANY = {
   name: "Eleve Locacoes",
+  cnpj: "",
   phone: "(11) 4000-1234",
   email: "contato@eleve.com.br",
   address: "Av. Industrial, 1200 - Bloco A, Sao Paulo - SP",
@@ -181,6 +183,7 @@ function mapPublicCompanyRow(row: PublicCompanyRow): ManagedPublicCompany {
   return {
     id: row.id,
     name: row.name,
+    cnpj: row.cnpj ?? "",
     phone: row.phone,
     email: row.email,
     address: row.address,
@@ -244,6 +247,7 @@ async function ensurePublicSiteSchema() {
           id text PRIMARY KEY,
           singleton_key boolean NOT NULL DEFAULT true UNIQUE,
           name text NOT NULL,
+          cnpj text NOT NULL DEFAULT '',
           phone text NOT NULL,
           email text NOT NULL,
           address text NOT NULL,
@@ -253,6 +257,11 @@ async function ensurePublicSiteSchema() {
           created_at timestamptz NOT NULL DEFAULT now(),
           updated_at timestamptz NOT NULL DEFAULT now()
         );
+      `);
+
+      await pool.query(`
+        ALTER TABLE public_site_company_profile
+        ADD COLUMN IF NOT EXISTS cnpj text NOT NULL DEFAULT '';
       `);
 
       await pool.query(`
@@ -330,12 +339,13 @@ async function ensurePublicSiteSchema() {
       if (Number(companyCount.rows[0]?.total ?? "0") === 0) {
         await pool.query(
           `
-            INSERT INTO public_site_company_profile (id, singleton_key, name, phone, email, address)
-            VALUES ($1, true, $2, $3, $4, $5)
+            INSERT INTO public_site_company_profile (id, singleton_key, name, cnpj, phone, email, address)
+            VALUES ($1, true, $2, $3, $4, $5, $6)
           `,
           [
             randomUUID(),
             DEFAULT_PUBLIC_COMPANY.name,
+            DEFAULT_PUBLIC_COMPANY.cnpj,
             DEFAULT_PUBLIC_COMPANY.phone,
             DEFAULT_PUBLIC_COMPANY.email,
             DEFAULT_PUBLIC_COMPANY.address,
@@ -414,7 +424,7 @@ export async function getPublicCompany() {
 
   const result = await pool.query<PublicCompanyRow>(
     `
-      SELECT id, name, phone, email, address, facebook_url, instagram_url, linkedin_url, created_at, updated_at
+      SELECT id, name, cnpj, phone, email, address, facebook_url, instagram_url, linkedin_url, created_at, updated_at
       FROM public_site_company_profile
       ORDER BY updated_at DESC
       LIMIT 1
@@ -432,10 +442,11 @@ export async function upsertPublicCompany(input: UpdatePublicCompanyInput) {
 
   await pool.query(
     `
-      INSERT INTO public_site_company_profile (id, singleton_key, name, phone, email, address, facebook_url, instagram_url, linkedin_url)
-      VALUES ($1, true, $2, $3, $4, $5, $6, $7, $8)
+      INSERT INTO public_site_company_profile (id, singleton_key, name, cnpj, phone, email, address, facebook_url, instagram_url, linkedin_url)
+      VALUES ($1, true, $2, $3, $4, $5, $6, $7, $8, $9)
       ON CONFLICT (singleton_key) DO UPDATE
       SET name = EXCLUDED.name,
+          cnpj = EXCLUDED.cnpj,
           phone = EXCLUDED.phone,
           email = EXCLUDED.email,
           address = EXCLUDED.address,
@@ -447,6 +458,7 @@ export async function upsertPublicCompany(input: UpdatePublicCompanyInput) {
     [
       id,
       input.name.trim(),
+      input.cnpj.trim(),
       input.phone.trim(),
       input.email.trim().toLowerCase(),
       input.address.trim(),
