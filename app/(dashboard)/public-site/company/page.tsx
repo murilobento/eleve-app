@@ -24,6 +24,14 @@ const EMPTY_COMPANY: UpdatePublicCompanyInput = {
   facebookUrl: "",
   instagramUrl: "",
   linkedinUrl: "",
+  seoTitle: "",
+  seoDescription: "",
+  legalName: "",
+  streetAddress: "",
+  addressLocality: "",
+  addressRegion: "",
+  postalCode: "",
+  serviceAreas: [],
 };
 
 async function parseResponse<T>(response: Response): Promise<T> {
@@ -60,6 +68,14 @@ export default function PublicSiteCompanyPage() {
             facebookUrl: payload.company.facebookUrl ?? "",
             instagramUrl: payload.company.instagramUrl ?? "",
             linkedinUrl: payload.company.linkedinUrl ?? "",
+            seoTitle: payload.company.seoTitle ?? "",
+            seoDescription: payload.company.seoDescription ?? "",
+            legalName: payload.company.legalName ?? "",
+            streetAddress: payload.company.streetAddress ?? "",
+            addressLocality: payload.company.addressLocality ?? "",
+            addressRegion: payload.company.addressRegion ?? "",
+            postalCode: payload.company.postalCode ?? "",
+            serviceAreas: payload.company.serviceAreas,
           }
         : EMPTY_COMPANY);
     } catch (error) {
@@ -163,6 +179,85 @@ export default function PublicSiteCompanyPage() {
                   rows={3}
                   value={company.address}
                   onChange={(event) => setCompany((current) => ({ ...current, address: event.target.value }))}
+                  disabled={!canUpdate || isSaving}
+                />
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-4">
+                <div className="space-y-1">
+                  <Label>Razao social</Label>
+                  <Input
+                    value={company.legalName ?? ""}
+                    onChange={(event) => setCompany((current) => ({ ...current, legalName: event.target.value }))}
+                    disabled={!canUpdate || isSaving}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Logradouro</Label>
+                  <Input
+                    value={company.streetAddress ?? ""}
+                    onChange={(event) => setCompany((current) => ({ ...current, streetAddress: event.target.value }))}
+                    disabled={!canUpdate || isSaving}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Cidade</Label>
+                  <Input
+                    value={company.addressLocality ?? ""}
+                    onChange={(event) => setCompany((current) => ({ ...current, addressLocality: event.target.value }))}
+                    disabled={!canUpdate || isSaving}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>UF/CEP</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      placeholder="SP"
+                      value={company.addressRegion ?? ""}
+                      onChange={(event) => setCompany((current) => ({ ...current, addressRegion: event.target.value }))}
+                      disabled={!canUpdate || isSaving}
+                    />
+                    <Input
+                      placeholder="00000-000"
+                      value={company.postalCode ?? ""}
+                      onChange={(event) => setCompany((current) => ({ ...current, postalCode: event.target.value }))}
+                      disabled={!canUpdate || isSaving}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-1">
+                  <Label>SEO title</Label>
+                  <Input
+                    value={company.seoTitle ?? ""}
+                    onChange={(event) => setCompany((current) => ({ ...current, seoTitle: event.target.value }))}
+                    disabled={!canUpdate || isSaving}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>SEO description</Label>
+                  <Input
+                    value={company.seoDescription ?? ""}
+                    onChange={(event) => setCompany((current) => ({ ...current, seoDescription: event.target.value }))}
+                    disabled={!canUpdate || isSaving}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <Label>Areas atendidas</Label>
+                <Input
+                  placeholder="Sao Paulo, ABC Paulista, Interior de SP"
+                  value={(company.serviceAreas ?? []).join(", ")}
+                  onChange={(event) => setCompany((current) => ({
+                    ...current,
+                    serviceAreas: event.target.value
+                      .split(",")
+                      .map((item) => item.trim())
+                      .filter(Boolean),
+                  }))}
                   disabled={!canUpdate || isSaving}
                 />
               </div>

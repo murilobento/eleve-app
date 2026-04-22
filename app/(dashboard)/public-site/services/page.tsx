@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useResourcePermissions } from "@/hooks/use-resource-permissions";
 import type { ManagedPublicService, UpdatePublicServiceInput } from "@/lib/public-site-admin";
 
@@ -21,6 +22,11 @@ const EMPTY_SERVICE: UpdatePublicServiceInput = {
   imageUrl: "",
   displayOrder: 0,
   isPublished: true,
+  slug: "",
+  seoTitle: "",
+  seoDescription: "",
+  pageContent: "",
+  imageAlt: "",
 };
 
 async function parseResponse<T>(response: Response): Promise<T> {
@@ -99,7 +105,7 @@ export default function PublicSiteServicesPage() {
               <CardTitle>Servicos publicados na landing</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="grid gap-3 rounded-md border p-3 md:grid-cols-6">
+              <div className="grid gap-3 rounded-md border p-3 md:grid-cols-2 lg:grid-cols-6">
                 <Input
                   placeholder="Tag"
                   value={newService.tag}
@@ -110,6 +116,12 @@ export default function PublicSiteServicesPage() {
                   placeholder="Titulo"
                   value={newService.title}
                   onChange={(event) => setNewService((current) => ({ ...current, title: event.target.value }))}
+                  disabled={!canCreate || isMutating}
+                />
+                <Input
+                  placeholder="Slug SEO"
+                  value={newService.slug ?? ""}
+                  onChange={(event) => setNewService((current) => ({ ...current, slug: event.target.value }))}
                   disabled={!canCreate || isMutating}
                 />
                 <Input
@@ -131,7 +143,34 @@ export default function PublicSiteServicesPage() {
                   onChange={(event) => setNewService((current) => ({ ...current, description: event.target.value }))}
                   disabled={!canCreate || isMutating}
                 />
-                <div className="flex items-center justify-between gap-2">
+                <Input
+                  placeholder="Alt da imagem"
+                  value={newService.imageAlt ?? ""}
+                  onChange={(event) => setNewService((current) => ({ ...current, imageAlt: event.target.value }))}
+                  disabled={!canCreate || isMutating}
+                />
+                <Input
+                  placeholder="SEO title"
+                  value={newService.seoTitle ?? ""}
+                  onChange={(event) => setNewService((current) => ({ ...current, seoTitle: event.target.value }))}
+                  className="lg:col-span-2"
+                  disabled={!canCreate || isMutating}
+                />
+                <Input
+                  placeholder="SEO description"
+                  value={newService.seoDescription ?? ""}
+                  onChange={(event) => setNewService((current) => ({ ...current, seoDescription: event.target.value }))}
+                  className="lg:col-span-4"
+                  disabled={!canCreate || isMutating}
+                />
+                <Textarea
+                  placeholder="Conteudo da pagina SEO"
+                  value={newService.pageContent ?? ""}
+                  onChange={(event) => setNewService((current) => ({ ...current, pageContent: event.target.value }))}
+                  className="min-h-24 md:col-span-2 lg:col-span-6"
+                  disabled={!canCreate || isMutating}
+                />
+                <div className="flex items-center justify-between gap-2 md:col-span-2 lg:col-span-6">
                   <label className="flex items-center gap-2 text-sm">
                     <Checkbox
                       checked={newService.isPublished}
@@ -161,7 +200,7 @@ export default function PublicSiteServicesPage() {
               </div>
 
               {services.map((item) => (
-                <div key={item.id} className="grid gap-3 rounded-md border p-3 md:grid-cols-6">
+                <div key={item.id} className="grid gap-3 rounded-md border p-3 md:grid-cols-2 lg:grid-cols-6">
                   <Input
                     value={item.tag}
                     onChange={(event) => setServices((current) => current.map((entry) => (
@@ -173,6 +212,14 @@ export default function PublicSiteServicesPage() {
                     value={item.title}
                     onChange={(event) => setServices((current) => current.map((entry) => (
                       entry.id === item.id ? { ...entry, title: event.target.value } : entry
+                    )))}
+                    disabled={!canUpdate || isMutating}
+                  />
+                  <Input
+                    value={item.slug}
+                    placeholder="Slug SEO"
+                    onChange={(event) => setServices((current) => current.map((entry) => (
+                      entry.id === item.id ? { ...entry, slug: event.target.value } : entry
                     )))}
                     disabled={!canUpdate || isMutating}
                   />
@@ -198,7 +245,42 @@ export default function PublicSiteServicesPage() {
                     )))}
                     disabled={!canUpdate || isMutating}
                   />
-                  <div className="flex items-center justify-between gap-2">
+                  <Input
+                    value={item.imageAlt ?? ""}
+                    placeholder="Alt da imagem"
+                    onChange={(event) => setServices((current) => current.map((entry) => (
+                      entry.id === item.id ? { ...entry, imageAlt: event.target.value || null } : entry
+                    )))}
+                    disabled={!canUpdate || isMutating}
+                  />
+                  <Input
+                    value={item.seoTitle ?? ""}
+                    placeholder="SEO title"
+                    onChange={(event) => setServices((current) => current.map((entry) => (
+                      entry.id === item.id ? { ...entry, seoTitle: event.target.value || null } : entry
+                    )))}
+                    className="lg:col-span-2"
+                    disabled={!canUpdate || isMutating}
+                  />
+                  <Input
+                    value={item.seoDescription ?? ""}
+                    placeholder="SEO description"
+                    onChange={(event) => setServices((current) => current.map((entry) => (
+                      entry.id === item.id ? { ...entry, seoDescription: event.target.value || null } : entry
+                    )))}
+                    className="lg:col-span-4"
+                    disabled={!canUpdate || isMutating}
+                  />
+                  <Textarea
+                    value={item.pageContent ?? ""}
+                    placeholder="Conteudo da pagina SEO"
+                    onChange={(event) => setServices((current) => current.map((entry) => (
+                      entry.id === item.id ? { ...entry, pageContent: event.target.value || null } : entry
+                    )))}
+                    className="min-h-24 md:col-span-2 lg:col-span-6"
+                    disabled={!canUpdate || isMutating}
+                  />
+                  <div className="flex items-center justify-between gap-2 md:col-span-2 lg:col-span-6">
                     <label className="flex items-center gap-2 text-sm">
                       <Checkbox
                         checked={item.isPublished}
@@ -224,6 +306,11 @@ export default function PublicSiteServicesPage() {
                                 tag: item.tag,
                                 title: item.title,
                                 description: item.description ?? "",
+                                slug: item.slug,
+                                seoTitle: item.seoTitle ?? "",
+                                seoDescription: item.seoDescription ?? "",
+                                pageContent: item.pageContent ?? "",
+                                imageAlt: item.imageAlt ?? "",
                                 imageUrl: item.imageUrl,
                                 displayOrder: item.displayOrder,
                                 isPublished: item.isPublished,

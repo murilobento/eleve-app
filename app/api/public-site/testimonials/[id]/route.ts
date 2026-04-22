@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 
 import { updatePublicTestimonialSchema } from "@/lib/public-site-admin";
 import {
@@ -11,6 +12,10 @@ import { requirePermission } from "@/lib/rbac";
 function getErrorResponse(error: unknown) {
   const message = error instanceof Error ? error.message : "Unexpected error while processing the request.";
   return NextResponse.json({ error: message }, { status: 400 });
+}
+
+async function revalidatePublicHome() {
+  await revalidatePath("/");
 }
 
 export async function PUT(
@@ -28,6 +33,7 @@ export async function PUT(
     const payload = updatePublicTestimonialSchema.parse(await request.json());
     await updatePublicTestimonial(id, payload);
     const testimonial = await getPublicTestimonialById(id);
+    await revalidatePublicHome();
     return NextResponse.json({ testimonial });
   } catch (error) {
     return getErrorResponse(error);
@@ -47,6 +53,7 @@ export async function DELETE(
 
     const { id } = await params;
     await deletePublicTestimonial(id);
+    await revalidatePublicHome();
     return NextResponse.json({ success: true });
   } catch (error) {
     return getErrorResponse(error);

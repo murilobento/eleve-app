@@ -28,15 +28,28 @@ type PublicCompanyRow = {
   facebook_url: string | null;
   instagram_url: string | null;
   linkedin_url: string | null;
+  seo_title: string | null;
+  seo_description: string | null;
+  legal_name: string | null;
+  street_address: string | null;
+  address_locality: string | null;
+  address_region: string | null;
+  postal_code: string | null;
+  service_areas: unknown;
   created_at: string;
   updated_at: string;
 };
 
 type PublicServiceRow = {
   id: string;
+  slug: string | null;
   tag: string;
   title: string;
   description: string | null;
+  seo_title: string | null;
+  seo_description: string | null;
+  page_content: string | null;
+  image_alt: string | null;
   image_url: string;
   display_order: number;
   is_published: boolean;
@@ -46,10 +59,15 @@ type PublicServiceRow = {
 
 type PublicEquipmentRow = {
   id: string;
+  slug: string | null;
   name: string;
   model: string;
   capacity: string;
   technical_info: string;
+  seo_title: string | null;
+  seo_description: string | null;
+  page_content: string | null;
+  image_alt: string | null;
   manual_url: string | null;
   image_url: string;
   display_order: number;
@@ -179,6 +197,101 @@ const DEFAULT_PUBLIC_TESTIMONIALS: Array<{
   },
 ];
 
+const PUBLIC_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+type PublicSiteSlugTable = "public_site_services" | "public_site_equipment_showcase";
+type PublicSiteSlugColumn = "title" | "name";
+
+function slugifyPublicValue(value: string) {
+  const slug = value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-{2,}/g, "-")
+    .slice(0, 140);
+
+  return slug.length > 0 ? slug : "item";
+}
+
+function sanitizePublicSlug(value: string | undefined, fallback: string) {
+  const candidate = value?.trim() ? value.trim() : fallback;
+  const slug = slugifyPublicValue(candidate);
+  return PUBLIC_SLUG_PATTERN.test(slug) ? slug : "item";
+}
+
+async function getUniquePublicSlug(tableName: PublicSiteSlugTable, baseSlug: string, excludeId?: string) {
+  let suffix = 1;
+  let candidate = baseSlug;
+
+  while (true) {
+    const params = excludeId ? [candidate, excludeId] : [candidate];
+    const result = await pool.query<{ id: string }>(
+      `
+        SELECT id
+        FROM ${tableName}
+        WHERE slug = $1
+        ${excludeId ? "AND id <> $2" : ""}
+        LIMIT 1
+      `,
+      params,
+    );
+
+    if (!result.rows[0]) {
+      return candidate;
+    }
+
+    suffix += 1;
+    const suffixText = `-${suffix}`;
+    candidate = `${baseSlug.slice(0, 140 - suffixText.length)}${suffixText}`;
+  }
+}
+
+async function backfillPublicSlugs(tableName: PublicSiteSlugTable, labelColumn: PublicSiteSlugColumn) {
+  const result = await pool.query<{ id: string; label: string; slug: string | null }>(
+    `
+      SELECT id, ${labelColumn} AS label, slug
+      FROM ${tableName}
+      ORDER BY created_at ASC, id ASC
+    `,
+  );
+  const usedSlugs = new Set<string>();
+
+  for (const row of result.rows) {
+    const currentSlug = row.slug?.trim() ?? "";
+
+    if (PUBLIC_SLUG_PATTERN.test(currentSlug) && !usedSlugs.has(currentSlug)) {
+      usedSlugs.add(currentSlug);
+      continue;
+    }
+
+    const baseSlug = slugifyPublicValue(row.label);
+    let nextSlug = baseSlug;
+    let suffix = 1;
+
+    while (usedSlugs.has(nextSlug)) {
+      suffix += 1;
+      const suffixText = `-${suffix}`;
+      nextSlug = `${baseSlug.slice(0, 140 - suffixText.length)}${suffixText}`;
+    }
+
+    usedSlugs.add(nextSlug);
+    await pool.query(`UPDATE ${tableName} SET slug = $2 WHERE id = $1`, [row.id, nextSlug]);
+  }
+}
+
+function normalizeServiceAreas(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+}
+
 function mapPublicCompanyRow(row: PublicCompanyRow): ManagedPublicCompany {
   return {
     id: row.id,
@@ -190,6 +303,14 @@ function mapPublicCompanyRow(row: PublicCompanyRow): ManagedPublicCompany {
     facebookUrl: row.facebook_url,
     instagramUrl: row.instagram_url,
     linkedinUrl: row.linkedin_url,
+    seoTitle: row.seo_title,
+    seoDescription: row.seo_description,
+    legalName: row.legal_name,
+    streetAddress: row.street_address,
+    addressLocality: row.address_locality,
+    addressRegion: row.address_region,
+    postalCode: row.postal_code,
+    serviceAreas: normalizeServiceAreas(row.service_areas),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -198,9 +319,14 @@ function mapPublicCompanyRow(row: PublicCompanyRow): ManagedPublicCompany {
 function mapPublicServiceRow(row: PublicServiceRow): ManagedPublicService {
   return {
     id: row.id,
+    slug: row.slug || slugifyPublicValue(row.title),
     tag: row.tag,
     title: row.title,
     description: row.description,
+    seoTitle: row.seo_title,
+    seoDescription: row.seo_description,
+    pageContent: row.page_content,
+    imageAlt: row.image_alt,
     imageUrl: row.image_url,
     displayOrder: Number(row.display_order),
     isPublished: row.is_published,
@@ -212,10 +338,15 @@ function mapPublicServiceRow(row: PublicServiceRow): ManagedPublicService {
 function mapPublicEquipmentRow(row: PublicEquipmentRow): ManagedPublicEquipment {
   return {
     id: row.id,
+    slug: row.slug || slugifyPublicValue(row.name),
     name: row.name,
     model: row.model,
     capacity: row.capacity,
     technicalInfo: row.technical_info,
+    seoTitle: row.seo_title,
+    seoDescription: row.seo_description,
+    pageContent: row.page_content,
+    imageAlt: row.image_alt,
     manualUrl: row.manual_url,
     imageUrl: row.image_url,
     displayOrder: Number(row.display_order),
@@ -280,11 +411,56 @@ async function ensurePublicSiteSchema() {
       `);
 
       await pool.query(`
+        ALTER TABLE public_site_company_profile
+        ADD COLUMN IF NOT EXISTS seo_title text;
+      `);
+
+      await pool.query(`
+        ALTER TABLE public_site_company_profile
+        ADD COLUMN IF NOT EXISTS seo_description text;
+      `);
+
+      await pool.query(`
+        ALTER TABLE public_site_company_profile
+        ADD COLUMN IF NOT EXISTS legal_name text;
+      `);
+
+      await pool.query(`
+        ALTER TABLE public_site_company_profile
+        ADD COLUMN IF NOT EXISTS street_address text;
+      `);
+
+      await pool.query(`
+        ALTER TABLE public_site_company_profile
+        ADD COLUMN IF NOT EXISTS address_locality text;
+      `);
+
+      await pool.query(`
+        ALTER TABLE public_site_company_profile
+        ADD COLUMN IF NOT EXISTS address_region text;
+      `);
+
+      await pool.query(`
+        ALTER TABLE public_site_company_profile
+        ADD COLUMN IF NOT EXISTS postal_code text;
+      `);
+
+      await pool.query(`
+        ALTER TABLE public_site_company_profile
+        ADD COLUMN IF NOT EXISTS service_areas jsonb NOT NULL DEFAULT '[]'::jsonb;
+      `);
+
+      await pool.query(`
         CREATE TABLE IF NOT EXISTS public_site_services (
           id text PRIMARY KEY,
+          slug text,
           tag text NOT NULL,
           title text NOT NULL,
           description text,
+          seo_title text,
+          seo_description text,
+          page_content text,
+          image_alt text,
           image_url text NOT NULL,
           display_order integer NOT NULL DEFAULT 0,
           is_published boolean NOT NULL DEFAULT true,
@@ -294,12 +470,42 @@ async function ensurePublicSiteSchema() {
       `);
 
       await pool.query(`
+        ALTER TABLE public_site_services
+        ADD COLUMN IF NOT EXISTS slug text;
+      `);
+
+      await pool.query(`
+        ALTER TABLE public_site_services
+        ADD COLUMN IF NOT EXISTS seo_title text;
+      `);
+
+      await pool.query(`
+        ALTER TABLE public_site_services
+        ADD COLUMN IF NOT EXISTS seo_description text;
+      `);
+
+      await pool.query(`
+        ALTER TABLE public_site_services
+        ADD COLUMN IF NOT EXISTS page_content text;
+      `);
+
+      await pool.query(`
+        ALTER TABLE public_site_services
+        ADD COLUMN IF NOT EXISTS image_alt text;
+      `);
+
+      await pool.query(`
         CREATE TABLE IF NOT EXISTS public_site_equipment_showcase (
           id text PRIMARY KEY,
+          slug text,
           name text NOT NULL,
           model text NOT NULL,
           capacity text NOT NULL,
           technical_info text NOT NULL DEFAULT '',
+          seo_title text,
+          seo_description text,
+          page_content text,
+          image_alt text,
           manual_url text,
           image_url text NOT NULL,
           display_order integer NOT NULL DEFAULT 0,
@@ -320,6 +526,31 @@ async function ensurePublicSiteSchema() {
       `);
 
       await pool.query(`
+        ALTER TABLE public_site_equipment_showcase
+        ADD COLUMN IF NOT EXISTS slug text;
+      `);
+
+      await pool.query(`
+        ALTER TABLE public_site_equipment_showcase
+        ADD COLUMN IF NOT EXISTS seo_title text;
+      `);
+
+      await pool.query(`
+        ALTER TABLE public_site_equipment_showcase
+        ADD COLUMN IF NOT EXISTS seo_description text;
+      `);
+
+      await pool.query(`
+        ALTER TABLE public_site_equipment_showcase
+        ADD COLUMN IF NOT EXISTS page_content text;
+      `);
+
+      await pool.query(`
+        ALTER TABLE public_site_equipment_showcase
+        ADD COLUMN IF NOT EXISTS image_alt text;
+      `);
+
+      await pool.query(`
         CREATE TABLE IF NOT EXISTS public_site_testimonials (
           id text PRIMARY KEY,
           name text NOT NULL,
@@ -331,6 +562,21 @@ async function ensurePublicSiteSchema() {
           created_at timestamptz NOT NULL DEFAULT now(),
           updated_at timestamptz NOT NULL DEFAULT now()
         );
+      `);
+
+      await backfillPublicSlugs("public_site_services", "title");
+      await backfillPublicSlugs("public_site_equipment_showcase", "name");
+
+      await pool.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS public_site_services_slug_unique
+        ON public_site_services (slug)
+        WHERE slug IS NOT NULL;
+      `);
+
+      await pool.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS public_site_equipment_showcase_slug_unique
+        ON public_site_equipment_showcase (slug)
+        WHERE slug IS NOT NULL;
       `);
 
       const companyCount = await pool.query<{ total: string }>(
@@ -413,6 +659,9 @@ async function ensurePublicSiteSchema() {
           );
         }
       }
+
+      await backfillPublicSlugs("public_site_services", "title");
+      await backfillPublicSlugs("public_site_equipment_showcase", "name");
     })();
   }
 
@@ -424,7 +673,26 @@ export async function getPublicCompany() {
 
   const result = await pool.query<PublicCompanyRow>(
     `
-      SELECT id, name, cnpj, phone, email, address, facebook_url, instagram_url, linkedin_url, created_at, updated_at
+      SELECT
+        id,
+        name,
+        cnpj,
+        phone,
+        email,
+        address,
+        facebook_url,
+        instagram_url,
+        linkedin_url,
+        seo_title,
+        seo_description,
+        legal_name,
+        street_address,
+        address_locality,
+        address_region,
+        postal_code,
+        service_areas,
+        created_at,
+        updated_at
       FROM public_site_company_profile
       ORDER BY updated_at DESC
       LIMIT 1
@@ -442,8 +710,27 @@ export async function upsertPublicCompany(input: UpdatePublicCompanyInput) {
 
   await pool.query(
     `
-      INSERT INTO public_site_company_profile (id, singleton_key, name, cnpj, phone, email, address, facebook_url, instagram_url, linkedin_url)
-      VALUES ($1, true, $2, $3, $4, $5, $6, $7, $8, $9)
+      INSERT INTO public_site_company_profile (
+        id,
+        singleton_key,
+        name,
+        cnpj,
+        phone,
+        email,
+        address,
+        facebook_url,
+        instagram_url,
+        linkedin_url,
+        seo_title,
+        seo_description,
+        legal_name,
+        street_address,
+        address_locality,
+        address_region,
+        postal_code,
+        service_areas
+      )
+      VALUES ($1, true, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17::jsonb)
       ON CONFLICT (singleton_key) DO UPDATE
       SET name = EXCLUDED.name,
           cnpj = EXCLUDED.cnpj,
@@ -453,6 +740,14 @@ export async function upsertPublicCompany(input: UpdatePublicCompanyInput) {
           facebook_url = EXCLUDED.facebook_url,
           instagram_url = EXCLUDED.instagram_url,
           linkedin_url = EXCLUDED.linkedin_url,
+          seo_title = EXCLUDED.seo_title,
+          seo_description = EXCLUDED.seo_description,
+          legal_name = EXCLUDED.legal_name,
+          street_address = EXCLUDED.street_address,
+          address_locality = EXCLUDED.address_locality,
+          address_region = EXCLUDED.address_region,
+          postal_code = EXCLUDED.postal_code,
+          service_areas = EXCLUDED.service_areas,
           updated_at = now()
     `,
     [
@@ -465,6 +760,14 @@ export async function upsertPublicCompany(input: UpdatePublicCompanyInput) {
       input.facebookUrl.trim() || null,
       input.instagramUrl.trim() || null,
       input.linkedinUrl.trim() || null,
+      input.seoTitle?.trim() || null,
+      input.seoDescription?.trim() || null,
+      input.legalName?.trim() || null,
+      input.streetAddress?.trim() || null,
+      input.addressLocality?.trim() || null,
+      input.addressRegion?.trim() || null,
+      input.postalCode?.trim() || null,
+      JSON.stringify(input.serviceAreas ?? []),
     ],
   );
 
@@ -476,7 +779,21 @@ export async function listPublicServices(onlyPublished = false) {
 
   const result = await pool.query<PublicServiceRow>(
     `
-      SELECT id, tag, title, description, image_url, display_order, is_published, created_at, updated_at
+      SELECT
+        id,
+        slug,
+        tag,
+        title,
+        description,
+        seo_title,
+        seo_description,
+        page_content,
+        image_alt,
+        image_url,
+        display_order,
+        is_published,
+        created_at,
+        updated_at
       FROM public_site_services
       ${onlyPublished ? "WHERE is_published = true" : ""}
       ORDER BY display_order ASC, title ASC
@@ -490,7 +807,21 @@ export async function getPublicServiceById(id: string) {
   await ensurePublicSiteSchema();
   const result = await pool.query<PublicServiceRow>(
     `
-      SELECT id, tag, title, description, image_url, display_order, is_published, created_at, updated_at
+      SELECT
+        id,
+        slug,
+        tag,
+        title,
+        description,
+        seo_title,
+        seo_description,
+        page_content,
+        image_alt,
+        image_url,
+        display_order,
+        is_published,
+        created_at,
+        updated_at
       FROM public_site_services
       WHERE id = $1
       LIMIT 1
@@ -502,20 +833,73 @@ export async function getPublicServiceById(id: string) {
   return row ? mapPublicServiceRow(row) : null;
 }
 
+export async function getPublicServiceBySlug(slug: string, onlyPublished = true) {
+  await ensurePublicSiteSchema();
+  const result = await pool.query<PublicServiceRow>(
+    `
+      SELECT
+        id,
+        slug,
+        tag,
+        title,
+        description,
+        seo_title,
+        seo_description,
+        page_content,
+        image_alt,
+        image_url,
+        display_order,
+        is_published,
+        created_at,
+        updated_at
+      FROM public_site_services
+      WHERE slug = $1
+      ${onlyPublished ? "AND is_published = true" : ""}
+      LIMIT 1
+    `,
+    [slug],
+  );
+
+  const row = result.rows[0];
+  return row ? mapPublicServiceRow(row) : null;
+}
+
 export async function createPublicService(input: CreatePublicServiceInput) {
   await ensurePublicSiteSchema();
   const id = randomUUID();
+  const slug = await getUniquePublicSlug(
+    "public_site_services",
+    sanitizePublicSlug(input.slug, input.title),
+  );
 
   await pool.query(
     `
-      INSERT INTO public_site_services (id, tag, title, description, image_url, display_order, is_published)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      INSERT INTO public_site_services (
+        id,
+        slug,
+        tag,
+        title,
+        description,
+        seo_title,
+        seo_description,
+        page_content,
+        image_alt,
+        image_url,
+        display_order,
+        is_published
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
     `,
     [
       id,
+      slug,
       input.tag.trim(),
       input.title.trim(),
       input.description?.trim() || null,
+      input.seoTitle?.trim() || null,
+      input.seoDescription?.trim() || null,
+      input.pageContent?.trim() || null,
+      input.imageAlt?.trim() || null,
       input.imageUrl.trim(),
       input.displayOrder,
       input.isPublished,
@@ -527,25 +911,46 @@ export async function createPublicService(input: CreatePublicServiceInput) {
 
 export async function updatePublicService(id: string, input: UpdatePublicServiceInput) {
   await ensurePublicSiteSchema();
+  const current = await getPublicServiceById(id);
+
+  if (!current) {
+    throw new Error("Public service not found.");
+  }
+
+  const slug = await getUniquePublicSlug(
+    "public_site_services",
+    input.slug ? sanitizePublicSlug(input.slug, input.title) : current.slug,
+    id,
+  );
 
   const result = await pool.query<{ id: string }>(
     `
       UPDATE public_site_services
-      SET tag = $2,
-          title = $3,
-          description = $4,
-          image_url = $5,
-          display_order = $6,
-          is_published = $7,
+      SET slug = $2,
+          tag = $3,
+          title = $4,
+          description = $5,
+          seo_title = $6,
+          seo_description = $7,
+          page_content = $8,
+          image_alt = $9,
+          image_url = $10,
+          display_order = $11,
+          is_published = $12,
           updated_at = now()
       WHERE id = $1
       RETURNING id
     `,
     [
       id,
+      slug,
       input.tag.trim(),
       input.title.trim(),
       input.description?.trim() || null,
+      input.seoTitle?.trim() || null,
+      input.seoDescription?.trim() || null,
+      input.pageContent?.trim() || null,
+      input.imageAlt?.trim() || null,
       input.imageUrl.trim(),
       input.displayOrder,
       input.isPublished,
@@ -567,7 +972,23 @@ export async function listPublicEquipment(onlyPublished = false) {
 
   const result = await pool.query<PublicEquipmentRow>(
     `
-      SELECT id, name, model, capacity, technical_info, manual_url, image_url, display_order, is_published, created_at, updated_at
+      SELECT
+        id,
+        slug,
+        name,
+        model,
+        capacity,
+        technical_info,
+        seo_title,
+        seo_description,
+        page_content,
+        image_alt,
+        manual_url,
+        image_url,
+        display_order,
+        is_published,
+        created_at,
+        updated_at
       FROM public_site_equipment_showcase
       ${onlyPublished ? "WHERE is_published = true" : ""}
       ORDER BY display_order ASC, name ASC
@@ -582,7 +1003,23 @@ export async function getPublicEquipmentById(id: string) {
 
   const result = await pool.query<PublicEquipmentRow>(
     `
-      SELECT id, name, model, capacity, technical_info, manual_url, image_url, display_order, is_published, created_at, updated_at
+      SELECT
+        id,
+        slug,
+        name,
+        model,
+        capacity,
+        technical_info,
+        seo_title,
+        seo_description,
+        page_content,
+        image_alt,
+        manual_url,
+        image_url,
+        display_order,
+        is_published,
+        created_at,
+        updated_at
       FROM public_site_equipment_showcase
       WHERE id = $1
       LIMIT 1
@@ -594,21 +1031,79 @@ export async function getPublicEquipmentById(id: string) {
   return row ? mapPublicEquipmentRow(row) : null;
 }
 
+export async function getPublicEquipmentBySlug(slug: string, onlyPublished = true) {
+  await ensurePublicSiteSchema();
+
+  const result = await pool.query<PublicEquipmentRow>(
+    `
+      SELECT
+        id,
+        slug,
+        name,
+        model,
+        capacity,
+        technical_info,
+        seo_title,
+        seo_description,
+        page_content,
+        image_alt,
+        manual_url,
+        image_url,
+        display_order,
+        is_published,
+        created_at,
+        updated_at
+      FROM public_site_equipment_showcase
+      WHERE slug = $1
+      ${onlyPublished ? "AND is_published = true" : ""}
+      LIMIT 1
+    `,
+    [slug],
+  );
+
+  const row = result.rows[0];
+  return row ? mapPublicEquipmentRow(row) : null;
+}
+
 export async function createPublicEquipment(input: CreatePublicEquipmentInput) {
   await ensurePublicSiteSchema();
   const id = randomUUID();
+  const slug = await getUniquePublicSlug(
+    "public_site_equipment_showcase",
+    sanitizePublicSlug(input.slug, input.name),
+  );
 
   await pool.query(
     `
-      INSERT INTO public_site_equipment_showcase (id, name, model, capacity, technical_info, manual_url, image_url, display_order, is_published)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      INSERT INTO public_site_equipment_showcase (
+        id,
+        slug,
+        name,
+        model,
+        capacity,
+        technical_info,
+        seo_title,
+        seo_description,
+        page_content,
+        image_alt,
+        manual_url,
+        image_url,
+        display_order,
+        is_published
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
     `,
     [
       id,
+      slug,
       input.name.trim(),
       input.model.trim(),
       input.capacity.trim(),
       input.technicalInfo.trim(),
+      input.seoTitle?.trim() || null,
+      input.seoDescription?.trim() || null,
+      input.pageContent?.trim() || null,
+      input.imageAlt?.trim() || null,
       input.manualUrl?.trim() || null,
       input.imageUrl.trim(),
       input.displayOrder,
@@ -621,28 +1116,49 @@ export async function createPublicEquipment(input: CreatePublicEquipmentInput) {
 
 export async function updatePublicEquipment(id: string, input: UpdatePublicEquipmentInput) {
   await ensurePublicSiteSchema();
+  const current = await getPublicEquipmentById(id);
+
+  if (!current) {
+    throw new Error("Public equipment not found.");
+  }
+
+  const slug = await getUniquePublicSlug(
+    "public_site_equipment_showcase",
+    input.slug ? sanitizePublicSlug(input.slug, input.name) : current.slug,
+    id,
+  );
 
   const result = await pool.query<{ id: string }>(
     `
       UPDATE public_site_equipment_showcase
-      SET name = $2,
-          model = $3,
-          capacity = $4,
-          technical_info = $5,
-          manual_url = $6,
-          image_url = $7,
-          display_order = $8,
-          is_published = $9,
+      SET slug = $2,
+          name = $3,
+          model = $4,
+          capacity = $5,
+          technical_info = $6,
+          seo_title = $7,
+          seo_description = $8,
+          page_content = $9,
+          image_alt = $10,
+          manual_url = $11,
+          image_url = $12,
+          display_order = $13,
+          is_published = $14,
           updated_at = now()
       WHERE id = $1
       RETURNING id
     `,
     [
       id,
+      slug,
       input.name.trim(),
       input.model.trim(),
       input.capacity.trim(),
       input.technicalInfo.trim(),
+      input.seoTitle?.trim() || null,
+      input.seoDescription?.trim() || null,
+      input.pageContent?.trim() || null,
+      input.imageAlt?.trim() || null,
       input.manualUrl?.trim() || null,
       input.imageUrl.trim(),
       input.displayOrder,

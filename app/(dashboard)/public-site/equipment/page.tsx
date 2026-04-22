@@ -24,6 +24,11 @@ const EMPTY_EQUIPMENT: UpdatePublicEquipmentInput = {
   imageUrl: "",
   displayOrder: 0,
   isPublished: true,
+  slug: "",
+  seoTitle: "",
+  seoDescription: "",
+  pageContent: "",
+  imageAlt: "",
 };
 
 async function parseResponse<T>(response: Response): Promise<T> {
@@ -118,6 +123,13 @@ export default function PublicSiteEquipmentPage() {
                   disabled={!canCreate || isMutating}
                 />
                 <Input
+                  placeholder="Slug SEO"
+                  value={newEquipment.slug ?? ""}
+                  onChange={(event) => setNewEquipment((current) => ({ ...current, slug: event.target.value }))}
+                  className="lg:col-span-2"
+                  disabled={!canCreate || isMutating}
+                />
+                <Input
                   placeholder="Capacidade"
                   value={newEquipment.capacity}
                   onChange={(event) => setNewEquipment((current) => ({ ...current, capacity: event.target.value }))}
@@ -151,6 +163,34 @@ export default function PublicSiteEquipmentPage() {
                   value={newEquipment.displayOrder}
                   onChange={(event) => setNewEquipment((current) => ({ ...current, displayOrder: Number(event.target.value || 0) }))}
                   className="lg:col-span-1"
+                  disabled={!canCreate || isMutating}
+                />
+                <Input
+                  placeholder="Alt da imagem"
+                  value={newEquipment.imageAlt ?? ""}
+                  onChange={(event) => setNewEquipment((current) => ({ ...current, imageAlt: event.target.value }))}
+                  className="lg:col-span-3"
+                  disabled={!canCreate || isMutating}
+                />
+                <Input
+                  placeholder="SEO title"
+                  value={newEquipment.seoTitle ?? ""}
+                  onChange={(event) => setNewEquipment((current) => ({ ...current, seoTitle: event.target.value }))}
+                  className="lg:col-span-3"
+                  disabled={!canCreate || isMutating}
+                />
+                <Input
+                  placeholder="SEO description"
+                  value={newEquipment.seoDescription ?? ""}
+                  onChange={(event) => setNewEquipment((current) => ({ ...current, seoDescription: event.target.value }))}
+                  className="lg:col-span-5"
+                  disabled={!canCreate || isMutating}
+                />
+                <Textarea
+                  placeholder="Conteudo da pagina SEO"
+                  value={newEquipment.pageContent ?? ""}
+                  onChange={(event) => setNewEquipment((current) => ({ ...current, pageContent: event.target.value }))}
+                  className="min-h-24 md:col-span-2 lg:col-span-8"
                   disabled={!canCreate || isMutating}
                 />
                 <div className="flex items-center justify-between gap-2 md:col-span-2 lg:col-span-8">
@@ -201,6 +241,15 @@ export default function PublicSiteEquipmentPage() {
                     disabled={!canUpdate || isMutating}
                   />
                   <Input
+                    value={item.slug}
+                    placeholder="Slug SEO"
+                    onChange={(event) => setEquipment((current) => current.map((entry) => (
+                      entry.id === item.id ? { ...entry, slug: event.target.value } : entry
+                    )))}
+                    className="lg:col-span-2"
+                    disabled={!canUpdate || isMutating}
+                  />
+                  <Input
                     value={item.capacity}
                     onChange={(event) => setEquipment((current) => current.map((entry) => (
                       entry.id === item.id ? { ...entry, capacity: event.target.value } : entry
@@ -243,6 +292,42 @@ export default function PublicSiteEquipmentPage() {
                     className="lg:col-span-1"
                     disabled={!canUpdate || isMutating}
                   />
+                  <Input
+                    value={item.imageAlt ?? ""}
+                    placeholder="Alt da imagem"
+                    onChange={(event) => setEquipment((current) => current.map((entry) => (
+                      entry.id === item.id ? { ...entry, imageAlt: event.target.value || null } : entry
+                    )))}
+                    className="lg:col-span-3"
+                    disabled={!canUpdate || isMutating}
+                  />
+                  <Input
+                    value={item.seoTitle ?? ""}
+                    placeholder="SEO title"
+                    onChange={(event) => setEquipment((current) => current.map((entry) => (
+                      entry.id === item.id ? { ...entry, seoTitle: event.target.value || null } : entry
+                    )))}
+                    className="lg:col-span-3"
+                    disabled={!canUpdate || isMutating}
+                  />
+                  <Input
+                    value={item.seoDescription ?? ""}
+                    placeholder="SEO description"
+                    onChange={(event) => setEquipment((current) => current.map((entry) => (
+                      entry.id === item.id ? { ...entry, seoDescription: event.target.value || null } : entry
+                    )))}
+                    className="lg:col-span-5"
+                    disabled={!canUpdate || isMutating}
+                  />
+                  <Textarea
+                    value={item.pageContent ?? ""}
+                    placeholder="Conteudo da pagina SEO"
+                    onChange={(event) => setEquipment((current) => current.map((entry) => (
+                      entry.id === item.id ? { ...entry, pageContent: event.target.value || null } : entry
+                    )))}
+                    className="min-h-24 md:col-span-2 lg:col-span-8"
+                    disabled={!canUpdate || isMutating}
+                  />
                   <div className="flex items-center justify-between gap-2 md:col-span-2 lg:col-span-8">
                     <label className="flex items-center gap-2 text-sm">
                       <Checkbox
@@ -267,9 +352,14 @@ export default function PublicSiteEquipmentPage() {
                               },
                               body: JSON.stringify({
                                 name: item.name,
+                                slug: item.slug,
                                 model: item.model,
                                 capacity: item.capacity,
                                 technicalInfo: item.technicalInfo,
+                                seoTitle: item.seoTitle ?? "",
+                                seoDescription: item.seoDescription ?? "",
+                                pageContent: item.pageContent ?? "",
+                                imageAlt: item.imageAlt ?? "",
                                 manualUrl: item.manualUrl ?? undefined,
                                 imageUrl: item.imageUrl,
                                 displayOrder: item.displayOrder,

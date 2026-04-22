@@ -19,6 +19,36 @@ const optionalLongTextSchema = z
   .optional()
   .transform((value) => (value && value.length > 0 ? value : undefined));
 
+const optionalSeoTitleSchema = z
+  .string()
+  .trim()
+  .max(70, "SEO title must be at most 70 characters.")
+  .optional()
+  .transform((value) => (value && value.length > 0 ? value : undefined));
+
+const optionalSeoDescriptionSchema = z
+  .string()
+  .trim()
+  .max(170, "SEO description must be at most 170 characters.")
+  .optional()
+  .transform((value) => (value && value.length > 0 ? value : undefined));
+
+const optionalShortTextSchema = z
+  .string()
+  .trim()
+  .max(120, "This field must be at most 120 characters.")
+  .optional()
+  .transform((value) => (value && value.length > 0 ? value : undefined));
+
+function optionalTextSchema(max: number, message: string) {
+  return z
+    .string()
+    .trim()
+    .max(max, message)
+    .optional()
+    .transform((value) => (value && value.length > 0 ? value : undefined));
+}
+
 const imageUrlSchema = z
   .string()
   .trim()
@@ -65,6 +95,21 @@ const displayOrderSchema = z.coerce
   .min(0, "Display order must be 0 or greater.")
   .max(9999, "Display order must be 9999 or less.");
 
+const slugSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug must use lowercase letters, numbers and hyphens.")
+  .max(140, "Slug must be at most 140 characters.");
+
+const optionalSlugSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .optional()
+  .transform((value) => (value && value.length > 0 ? value : undefined))
+  .pipe(slugSchema.optional());
+
 export const updatePublicCompanySchema = z.object({
   name: shortTextSchema,
   cnpj: cnpjSchema,
@@ -74,6 +119,14 @@ export const updatePublicCompanySchema = z.object({
   facebookUrl: optionalSocialUrlSchema,
   instagramUrl: optionalSocialUrlSchema,
   linkedinUrl: optionalSocialUrlSchema,
+  seoTitle: optionalSeoTitleSchema,
+  seoDescription: optionalSeoDescriptionSchema,
+  legalName: optionalShortTextSchema,
+  streetAddress: optionalShortTextSchema,
+  addressLocality: optionalShortTextSchema,
+  addressRegion: optionalTextSchema(40, "State/region must be at most 40 characters."),
+  postalCode: optionalTextSchema(20, "Postal code must be at most 20 characters."),
+  serviceAreas: z.array(shortTextSchema.max(80, "Service area must be at most 80 characters.")).default([]),
 });
 
 export const createPublicServiceSchema = z.object({
@@ -83,6 +136,11 @@ export const createPublicServiceSchema = z.object({
   imageUrl: imageUrlSchema,
   displayOrder: displayOrderSchema.default(0),
   isPublished: z.boolean().default(true),
+  slug: optionalSlugSchema,
+  seoTitle: optionalSeoTitleSchema,
+  seoDescription: optionalSeoDescriptionSchema,
+  pageContent: optionalLongTextSchema,
+  imageAlt: optionalShortTextSchema,
 });
 
 export const updatePublicServiceSchema = createPublicServiceSchema;
@@ -96,6 +154,11 @@ export const createPublicEquipmentSchema = z.object({
   imageUrl: imageUrlSchema,
   displayOrder: displayOrderSchema.default(0),
   isPublished: z.boolean().default(true),
+  slug: optionalSlugSchema,
+  seoTitle: optionalSeoTitleSchema,
+  seoDescription: optionalSeoDescriptionSchema,
+  pageContent: optionalLongTextSchema,
+  imageAlt: optionalShortTextSchema,
 });
 
 export const updatePublicEquipmentSchema = createPublicEquipmentSchema;
@@ -129,15 +192,28 @@ export type ManagedPublicCompany = {
   facebookUrl: string | null;
   instagramUrl: string | null;
   linkedinUrl: string | null;
+  seoTitle: string | null;
+  seoDescription: string | null;
+  legalName: string | null;
+  streetAddress: string | null;
+  addressLocality: string | null;
+  addressRegion: string | null;
+  postalCode: string | null;
+  serviceAreas: string[];
   createdAt: string;
   updatedAt: string;
 };
 
 export type ManagedPublicService = {
   id: string;
+  slug: string;
   tag: string;
   title: string;
   description: string | null;
+  seoTitle: string | null;
+  seoDescription: string | null;
+  pageContent: string | null;
+  imageAlt: string | null;
   imageUrl: string;
   displayOrder: number;
   isPublished: boolean;
@@ -147,10 +223,15 @@ export type ManagedPublicService = {
 
 export type ManagedPublicEquipment = {
   id: string;
+  slug: string;
   name: string;
   model: string;
   capacity: string;
   technicalInfo: string;
+  seoTitle: string | null;
+  seoDescription: string | null;
+  pageContent: string | null;
+  imageAlt: string | null;
   manualUrl: string | null;
   imageUrl: string;
   displayOrder: number;

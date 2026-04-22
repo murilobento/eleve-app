@@ -33,12 +33,15 @@ import type { PublicSiteContent } from "@/lib/public-site-admin";
 type LandingProps = {
   locale: AppLocale;
   fontClassName?: string;
+  initialContent?: PublicSiteContent | null;
 };
 
 type FeatureCardProps = {
   title: string;
   img: string;
   tag: string;
+  href?: string;
+  imageAlt?: string | null;
   highlighted?: boolean;
   className?: string;
 };
@@ -50,6 +53,8 @@ type EquipmentCardProps = {
   technicalInfo: string;
   manualUrl?: string | null;
   img: string;
+  href?: string;
+  imageAlt?: string | null;
   onOpenDetails?: () => void;
   className?: string;
 };
@@ -59,8 +64,6 @@ type TestimonialCard = {
   role: string;
   text: string;
 };
-
-type PublicSiteContentResponse = PublicSiteContent;
 
 const services = [
   {
@@ -433,12 +436,12 @@ function LandingNavbar({ whatsAppUrl }: { whatsAppUrl: string }) {
   );
 }
 
-function FeatureCard({ title, img, tag, highlighted, className }: FeatureCardProps) {
-  return (
+function FeatureCard({ title, img, tag, href, imageAlt, highlighted, className }: FeatureCardProps) {
+  const card = (
     <article className={cn("group relative aspect-[1.2/1] w-full overflow-hidden rounded-2xl bg-black shadow-2xl shadow-black/15", className)}>
       <img
         src={img}
-        alt={title}
+        alt={imageAlt?.trim() || title}
         className="absolute inset-0 h-full w-full object-cover opacity-85 transition-transform duration-700 group-hover:scale-110"
         referrerPolicy="no-referrer"
       />
@@ -460,42 +463,65 @@ function FeatureCard({ title, img, tag, highlighted, className }: FeatureCardPro
       </div>
     </article>
   );
+
+  if (!href) {
+    return card;
+  }
+
+  return (
+    <a href={href} className="block h-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FCD34D]">
+      {card}
+    </a>
+  );
 }
 
-function EquipmentCard({ name, model, capacity, img, onOpenDetails, className }: EquipmentCardProps) {
+function EquipmentCard({ name, model, capacity, img, href, imageAlt, onOpenDetails, className }: EquipmentCardProps) {
   return (
-    <button
-      type="button"
-      onClick={onOpenDetails}
+    <article
       className={cn(
-        "group w-full overflow-hidden rounded-2xl border border-black/5 bg-white text-left shadow-lg shadow-black/5 transition-transform duration-300 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FCD34D] dark:border-white/5 dark:bg-[#1A1A1A] dark:shadow-black/20",
+        "group w-full overflow-hidden rounded-2xl border border-black/5 bg-white text-left shadow-lg shadow-black/5 transition-transform duration-300 hover:-translate-y-1 dark:border-white/5 dark:bg-[#1A1A1A] dark:shadow-black/20",
         className,
       )}
     >
-      <div className="relative aspect-[16/10] overflow-hidden">
-        <img
-          src={img}
-          alt={name}
-          className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-          referrerPolicy="no-referrer"
-        />
-        <div className="absolute right-4 top-4 rounded-sm bg-[#FCD34D] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em] text-gray-950">
-          {capacity}
+      <button
+        type="button"
+        onClick={onOpenDetails}
+        className="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FCD34D]"
+      >
+        <div className="relative aspect-[16/10] overflow-hidden">
+          <img
+            src={img}
+            alt={imageAlt?.trim() || name}
+            className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+            referrerPolicy="no-referrer"
+          />
+          <div className="absolute right-4 top-4 rounded-sm bg-[#FCD34D] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em] text-gray-950">
+            {capacity}
+          </div>
         </div>
-      </div>
-      <div className="p-5">
-        <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-gray-500 dark:text-gray-400">{model}</p>
-        <h3 className="mt-2 text-lg font-bold text-black transition-colors group-hover:text-amber-700 dark:text-white dark:group-hover:text-[#FCD34D]">
-          {name}
-        </h3>
-        <div className="mt-5 flex items-center justify-between border-t border-black/5 pt-4 dark:border-white/5">
-          <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-gray-500 dark:text-gray-400">
-            Ver detalhes
-          </span>
-          <ChevronRight size={18} className="text-amber-700 dark:text-[#FCD34D]" />
+        <div className="p-5 pb-3">
+          <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-gray-500 dark:text-gray-400">{model}</p>
+          <h3 className="mt-2 text-lg font-bold text-black transition-colors group-hover:text-amber-700 dark:text-white dark:group-hover:text-[#FCD34D]">
+            {name}
+          </h3>
+          <div className="mt-5 flex items-center justify-between border-t border-black/5 pt-4 dark:border-white/5">
+            <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-gray-500 dark:text-gray-400">
+              Ver detalhes
+            </span>
+            <ChevronRight size={18} className="text-amber-700 dark:text-[#FCD34D]" />
+          </div>
         </div>
-      </div>
-    </button>
+      </button>
+      {href ? (
+        <a
+          href={href}
+          className="mx-5 mb-5 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-amber-700 transition-colors hover:text-black dark:text-[#FCD34D] dark:hover:text-white"
+        >
+          Pagina do equipamento
+          <ArrowRight size={14} />
+        </a>
+      ) : null}
+    </article>
   );
 }
 
@@ -538,7 +564,7 @@ function EquipmentDetailsModal({
           <div className="relative h-full min-h-64">
             <img
               src={equipment.img}
-              alt={equipment.name}
+              alt={equipment.imageAlt?.trim() || equipment.name}
               className="h-full w-full rounded-t-3xl object-cover md:rounded-l-3xl md:rounded-tr-none"
               referrerPolicy="no-referrer"
             />
@@ -1037,41 +1063,18 @@ function BackToTop() {
   );
 }
 
-export function SiteEleveLanding({ locale, fontClassName }: LandingProps) {
-  const [publicContent, setPublicContent] = React.useState<PublicSiteContentResponse | null>(null);
+export function SiteEleveLanding({ locale, fontClassName, initialContent = null }: LandingProps) {
+  const publicContent = initialContent;
   const [selectedEquipment, setSelectedEquipment] = React.useState<EquipmentCardProps | null>(null);
   const [isEquipmentModalOpen, setIsEquipmentModalOpen] = React.useState(false);
-
-  React.useEffect(() => {
-    const controller = new AbortController();
-
-    async function loadPublicContent() {
-      try {
-        const response = await fetch("/api/public-site/content", {
-          cache: "no-store",
-          signal: controller.signal,
-        });
-        const payload = await response.json().catch(() => null);
-
-        if (!response.ok || !payload) {
-          return;
-        }
-
-        setPublicContent(payload as PublicSiteContentResponse);
-      } catch {
-        // Keep static fallback content when public API is unavailable.
-      }
-    }
-
-    void loadPublicContent();
-    return () => controller.abort();
-  }, []);
 
   const serviceCards = publicContent?.services?.length
     ? publicContent.services.map((service, index) => ({
         tag: service.tag,
         title: service.title,
         img: service.imageUrl,
+        imageAlt: service.imageAlt,
+        href: `/servicos/${service.slug}`,
         highlighted: index === 0,
       }))
     : services;
@@ -1084,6 +1087,8 @@ export function SiteEleveLanding({ locale, fontClassName }: LandingProps) {
         technicalInfo: item.technicalInfo,
         manualUrl: item.manualUrl,
         img: item.imageUrl,
+        imageAlt: item.imageAlt,
+        href: `/equipamentos/${item.slug}`,
       }))
     : equipment;
 

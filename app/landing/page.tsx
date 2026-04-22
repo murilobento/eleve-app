@@ -1,7 +1,5 @@
-import { getPreferredLocaleFromCookie } from "@/i18n/server";
-
-import { SiteEleveLanding } from "./site-eleve-landing";
+import { redirect } from "next/navigation";
 
 export default function LandingPage() {
-  return <SiteEleveLanding locale={getPreferredLocaleFromCookie()} />;
+  redirect("/");
 }

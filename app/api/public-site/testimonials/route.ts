@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 
 import { createPublicTestimonialSchema } from "@/lib/public-site-admin";
 import {
@@ -11,6 +12,10 @@ import { requirePermission } from "@/lib/rbac";
 function getErrorResponse(error: unknown) {
   const message = error instanceof Error ? error.message : "Unexpected error while processing the request.";
   return NextResponse.json({ error: message }, { status: 400 });
+}
+
+async function revalidatePublicHome() {
+  await revalidatePath("/");
 }
 
 export async function GET(request: Request) {
@@ -39,6 +44,7 @@ export async function POST(request: Request) {
     const payload = createPublicTestimonialSchema.parse(await request.json());
     const testimonialId = await createPublicTestimonial(payload);
     const testimonial = await getPublicTestimonialById(testimonialId);
+    await revalidatePublicHome();
     return NextResponse.json({ testimonial });
   } catch (error) {
     return getErrorResponse(error);
