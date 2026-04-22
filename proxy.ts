@@ -20,15 +20,27 @@ export function proxy(request: NextRequest) {
   const isApiRoute = pathname.startsWith("/api");
   const isAuthPage = strippedPath.startsWith("/auth");
   const isLanding = strippedPath === "/landing" || strippedPath === "/";
+  const isPublicMarketingPath = strippedPath === "/"
+    || strippedPath === "/landing"
+    || strippedPath === "/servicos"
+    || strippedPath.startsWith("/servicos/")
+    || strippedPath === "/equipamentos"
+    || strippedPath.startsWith("/equipamentos/");
+  const isLocalizedPublicMarketingPath = Boolean(pathLocale) && (
+    strippedPath === "/servicos"
+    || strippedPath.startsWith("/servicos/")
+    || strippedPath === "/equipamentos"
+    || strippedPath.startsWith("/equipamentos/")
+  );
   const isPublicRoot = pathname === "/";
 
-  if (!isApiRoute && !pathLocale && !isPublicRoot && !isLanding) {
+  if (!isApiRoute && !pathLocale && !isPublicRoot && !isLanding && !isPublicMarketingPath) {
     const url = request.nextUrl.clone();
     url.pathname = getLocalizedPath(strippedPath, preferredLocale);
     return withSecurityHeaders(NextResponse.redirect(url));
   }
 
-  if (isLanding || isAuthPage || isApiRoute) {
+  if (isLanding || isAuthPage || isApiRoute || isPublicMarketingPath || isLocalizedPublicMarketingPath) {
     return withSecurityHeaders(NextResponse.next());
   }
 

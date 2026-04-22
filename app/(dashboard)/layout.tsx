@@ -41,7 +41,6 @@ const routePermissions = [
   { path: "/equipment-types", permission: "equipment-types.read" },
   { path: "/service-types", permission: "service-types.read" },
   { path: "/equipment", permission: "equipment.read" },
-  { path: "/public-site", permission: "public-site.read" },
   { path: "/users", permission: "users.read" },
   { path: "/roles", permission: "roles.read" },
 ] as const

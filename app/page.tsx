@@ -36,7 +36,7 @@ export async function generateMetadata(): Promise<Metadata> {
       title,
       description,
       url: getPublicSiteUrl("/"),
-      siteName: content.company?.name || "Eleve Locacoes",
+      siteName: content.company?.name || "Eleve Locações",
       locale: "pt_BR",
       type: "website",
       images: firstImage ? [{ url: firstImage, alt: title }] : undefined,
@@ -62,7 +62,7 @@ export default async function HomePage() {
         url: getPublicSiteUrl(`/servicos/${service.slug}`),
       })),
       "/#services",
-      "Servicos",
+      "Serviços",
     ),
     buildItemListJsonLd(
       content.equipment.map((equipment) => ({

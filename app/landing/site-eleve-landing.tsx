@@ -12,23 +12,20 @@ import {
   ShieldCheck,
   Clock3,
   ArrowUp,
-  Facebook,
-  Instagram,
-  Linkedin,
   X,
 } from "lucide-react";
 
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { useTheme } from "@/hooks/use-theme";
-import { cn, getAppUrl } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import type { AppLocale } from "@/i18n/config";
 import type { PublicSiteContent } from "@/lib/public-site-admin";
+import { PublicSiteFooter, PublicSiteTopbar } from "../components/public-site-chrome";
+import {
+  HeroCarousel,
+  ServicesCarousel,
+  EquipmentCarousel,
+  TestimonialsCarousel,
+} from "./components";
 
 type LandingProps = {
   locale: AppLocale;
@@ -1100,17 +1097,8 @@ export function SiteEleveLanding({ locale, fontClassName, initialContent = null 
       }))
     : testimonials;
 
-  const companyAddress = publicContent?.company?.address?.trim() || "Av. Industrial, 1200 - Bloco A";
-  const companyCnpjRaw = publicContent?.company?.cnpj?.trim() || "";
-  const companyCnpj = companyCnpjRaw.length > 0 ? formatCnpj(companyCnpjRaw) : "-";
-  const companyEmail = publicContent?.company?.email?.trim() || "contato@eleve.com.br";
   const companyPhone = publicContent?.company?.phone?.trim() || "(11) 4000-1234";
   const whatsAppUrl = buildWhatsAppUrl(companyPhone);
-  const socialProfiles = [
-    { name: "Facebook", icon: Facebook, href: publicContent?.company?.facebookUrl?.trim() || "" },
-    { name: "Instagram", icon: Instagram, href: publicContent?.company?.instagramUrl?.trim() || "" },
-    { name: "LinkedIn", icon: Linkedin, href: publicContent?.company?.linkedinUrl?.trim() || "" },
-  ].filter((item) => item.href.length > 0);
   const equipmentDesktopBasisClass = equipmentCards.length <= 1
     ? "lg:basis-full"
     : equipmentCards.length === 2
@@ -1130,14 +1118,14 @@ export function SiteEleveLanding({ locale, fontClassName, initialContent = null 
         "min-h-screen bg-white text-black selection:bg-[#FCD34D] selection:text-gray-950 dark:bg-[#0A0A0A] dark:text-white",
       )}
     >
-      <LandingNavbar whatsAppUrl={whatsAppUrl} />
+      <PublicSiteTopbar whatsAppUrl={whatsAppUrl} isHome />
 
       <main>
         <section
           id="inicio"
           className="relative overflow-hidden bg-gray-50 pb-16 pt-28 transition-colors dark:bg-[#0A0A0A] md:pb-24 md:pt-40"
         >
-          <HeroBackgroundCarousel images={heroImages} />
+          <HeroCarousel images={heroImages} />
           <div className="absolute inset-0 bg-black/35 dark:bg-black/50" />
           <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-black/30 to-black/45 dark:from-black/40 dark:via-black/50 dark:to-black/65" />
           <div className="absolute inset-0 opacity-[0.05]">
@@ -1196,13 +1184,7 @@ export function SiteEleveLanding({ locale, fontClassName, initialContent = null 
                 Soluções completas para movimentação, elevação e transporte de alta complexidade.
               </p>
             </div>
-            <Carousel title="serviços" autoplayMs={5000}>
-              {serviceCards.map((service) => (
-                <div key={service.title} className="w-full shrink-0 snap-start basis-[calc(100%-0.5rem)] md:basis-[calc(50%-0.75rem)] lg:basis-[calc(33.333%-1rem)]">
-                  <FeatureCard {...service} />
-                </div>
-              ))}
-            </Carousel>
+            <ServicesCarousel services={serviceCards} autoplayMs={5000} />
           </div>
         </section>
 
@@ -1218,19 +1200,7 @@ export function SiteEleveLanding({ locale, fontClassName, initialContent = null 
                 </h2>
               </div>
             </div>
-            <Carousel title="equipamentos" autoplayMs={5000}>
-              {equipmentCards.map((item) => (
-                <div key={item.name} className={cn("w-full shrink-0 snap-start basis-[calc(100%-0.5rem)]", equipmentTabletBasisClass, equipmentDesktopBasisClass)}>
-                  <EquipmentCard
-                    {...item}
-                    onOpenDetails={() => {
-                      setSelectedEquipment(item);
-                      setIsEquipmentModalOpen(true);
-                    }}
-                  />
-                </div>
-              ))}
-            </Carousel>
+            <EquipmentCarousel equipment={equipmentCards} autoplayMs={5000} />
           </div>
         </section>
 
@@ -1295,123 +1265,12 @@ export function SiteEleveLanding({ locale, fontClassName, initialContent = null 
                 <span className="inline-block rounded-sm bg-[#FCD34D] px-3 py-1 text-gray-950">O que dizem nossos clientes</span>
               </h2>
             </div>
-            <Carousel title="depoimentos" autoplayMs={5000}>
-              {testimonialCards.map((testimonial) => (
-                <div key={testimonial.name} className="w-full shrink-0 snap-start basis-[calc(100%-0.5rem)] md:basis-[calc(50%-0.75rem)] lg:basis-[calc(33.333%-1rem)]">
-                  <TestimonialCardView testimonial={testimonial} />
-                </div>
-              ))}
-            </Carousel>
+            <TestimonialsCarousel testimonials={testimonialCards} autoplayMs={5000} />
           </div>
         </section>
       </main>
 
-      <footer id="contato" className="border-t border-black/5 bg-white py-20 transition-colors dark:border-white/5 dark:bg-[#0A0A0A]">
-        <div className="mx-auto grid max-w-7xl gap-12 px-4 md:px-6 lg:grid-cols-[1.2fr_0.9fr_0.9fr]">
-          <div className="max-w-sm">
-            <a href="#inicio" className="flex flex-col" onClick={(event) => {
-              event.preventDefault();
-              smoothScroll("#inicio");
-            }}>
-              <EleveLogo className="h-12 w-auto" />
-            </a>
-            <p className="mt-6 text-sm leading-7 text-gray-600 dark:text-gray-400">
-              Soluções de logística e locação para construção civil, indústria e operações especiais com resposta técnica rápida.
-            </p>
-            <div className="mt-8 flex gap-3">
-              {socialProfiles.map((social) => (
-                <a
-                  key={social.name}
-                  href={social.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-black/10 bg-gray-50 text-gray-500 transition-colors hover:border-[#FCD34D] hover:text-[#F59E0B] dark:border-white/10 dark:bg-[#1A1A1A] dark:text-gray-400"
-                  aria-label={social.name}
-                >
-                  <social.icon size={18} />
-                </a>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <p className="inline-block rounded-sm bg-[#FCD34D] px-2 py-1 text-sm font-bold uppercase tracking-[0.25em] text-gray-950">Contato</p>
-            <div className="mt-6 space-y-4 text-sm leading-7 text-gray-600 dark:text-gray-400">
-              <p>
-                <span className="font-semibold">Endereço:</span> {companyAddress}
-              </p>
-              <p>
-                <span className="font-semibold">CNPJ:</span> {companyCnpj}
-              </p>
-              <p>
-                <span className="font-semibold">E-mail:</span>{" "}
-                <a href={`mailto:${companyEmail}`} className="transition-colors hover:text-[#FCD34D] dark:hover:text-[#FCD34D]">
-                  {companyEmail}
-                </a>
-              </p>
-              <p>
-                <span className="font-semibold">Whatsapp/Telefone:</span>{" "}
-                <a href={whatsAppUrl} target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-[#FCD34D] dark:hover:text-[#FCD34D]">
-                  {companyPhone}
-                </a>
-              </p>
-            </div>
-          </div>
-
-          <div>
-            <p className="inline-block rounded-sm bg-[#FCD34D] px-2 py-1 text-sm font-bold uppercase tracking-[0.25em] text-gray-950">Acesso rápido</p>
-            <div className="mt-6 flex flex-col gap-3">
-              <a
-                href={getAppUrl("/auth/sign-in", locale)}
-                className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700 transition-colors hover:text-[#FCD34D] dark:text-gray-300 dark:hover:text-[#FCD34D]"
-              >
-                Entrar no sistema
-                <ArrowRight size={15} />
-              </a>
-              <a
-                href={getAppUrl("/dashboard", locale)}
-                className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700 transition-colors hover:text-[#FCD34D] dark:text-gray-300 dark:hover:text-[#FCD34D]"
-              >
-                Ir para o dashboard
-                <ArrowRight size={15} />
-              </a>
-              <a
-                href="#servicos"
-                className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700 transition-colors hover:text-[#FCD34D] dark:text-gray-300 dark:hover:text-[#FCD34D]"
-                onClick={(event) => {
-                  event.preventDefault();
-                  smoothScroll("#servicos");
-                }}
-              >
-                Ver serviços
-                <ArrowRight size={15} />
-              </a>
-            </div>
-          </div>
-        </div>
-        <div className="mx-auto mt-16 flex max-w-7xl flex-col gap-4 border-t border-black/5 px-4 pt-8 text-[11px] font-bold uppercase tracking-[0.28em] text-gray-500 dark:border-white/5 dark:text-gray-400 md:flex-row md:items-center md:justify-between md:px-6">
-          <p>© 2026 Eleve Locações. Todos os direitos reservados.</p>
-          <a
-            href="https://wa.me/5518996973332"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="transition-colors hover:text-[#FCD34D] dark:hover:text-[#FCD34D]"
-          >
-            desenvolvido por mb
-          </a>
-        </div>
-      </footer>
-
-      <EquipmentDetailsModal
-        equipment={selectedEquipment}
-        open={isEquipmentModalOpen}
-        onOpenChange={(open) => {
-          setIsEquipmentModalOpen(open);
-          if (!open) {
-            setSelectedEquipment(null);
-          }
-        }}
-      />
+      <PublicSiteFooter company={publicContent?.company ?? {}} whatsAppUrl={whatsAppUrl} locale={locale} isHome />
 
       <BackToTop />
     </div>

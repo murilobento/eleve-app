@@ -10,7 +10,6 @@ import {
   ChevronDown,
   Coins,
   FileText,
-  Globe,
   LayoutDashboard,
   ReceiptText,
   Shield,
@@ -142,12 +141,6 @@ export function useAppNavigation() {
           url: getAppUrl("/company", locale),
           icon: Building2,
           visible: hasPermission("company.read"),
-        },
-        {
-          title: "Site publico",
-          url: getAppUrl("/public-site", locale),
-          icon: Globe,
-          visible: hasPermission("public-site.read"),
         },
         {
           title: t("navigation.roles"),

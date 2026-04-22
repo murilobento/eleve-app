@@ -6,9 +6,9 @@ import type {
 
 export const PUBLIC_SITE_REVALIDATE_SECONDS = 3600;
 
-const DEFAULT_COMPANY_NAME = "Eleve Locacoes";
+const DEFAULT_COMPANY_NAME = "Eleve Locações";
 const DEFAULT_DESCRIPTION =
-  "Locacao de guindastes, empilhadeiras e transporte pesado para operacoes industriais e civis.";
+  "Locação de guindastes, empilhadeiras e transporte pesado para operações industriais e civis.";
 
 function trimTrailingSlash(value: string) {
   return value.replace(/\/+$/, "");
@@ -35,7 +35,7 @@ export function getPublicCompanyName(company?: ManagedPublicCompany | null) {
 }
 
 export function getHomeSeoTitle(company?: ManagedPublicCompany | null) {
-  return company?.seoTitle?.trim() || `${getPublicCompanyName(company)} | Locacao de guindastes e equipamentos`;
+  return company?.seoTitle?.trim() || `${getPublicCompanyName(company)} | Locação de guindastes e equipamentos`;
 }
 
 export function getHomeSeoDescription(company?: ManagedPublicCompany | null) {
@@ -49,7 +49,7 @@ export function getServiceSeoTitle(service: ManagedPublicService, company?: Mana
 export function getServiceSeoDescription(service: ManagedPublicService) {
   return service.seoDescription?.trim()
     || service.description?.trim()
-    || `Conheca o servico de ${service.title} para operacoes industriais e civis.`;
+    || `Conheça o serviço de ${service.title} para operações industriais e civis.`;
 }
 
 export function getEquipmentSeoTitle(equipment: ManagedPublicEquipment, company?: ManagedPublicCompany | null) {
@@ -59,7 +59,7 @@ export function getEquipmentSeoTitle(equipment: ManagedPublicEquipment, company?
 export function getEquipmentSeoDescription(equipment: ManagedPublicEquipment) {
   return equipment.seoDescription?.trim()
     || equipment.technicalInfo?.trim()
-    || `Conheca o equipamento ${equipment.name} para locacao e operacoes especializadas.`;
+    || `Conheça o equipamento ${equipment.name} para locação e operações especializadas.`;
 }
 
 export function compactDescription(value: string, maxLength = 170) {
