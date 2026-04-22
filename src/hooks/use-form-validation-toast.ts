@@ -31,6 +31,12 @@ function collectMessages(errors: unknown, touchedFields?: unknown) {
     }
 
     Object.entries(errorValue).forEach(([key, value]) => {
+      // Skip react-hook-form internal leaf keys to avoid recursing into
+      // DOM elements (ref) which contain circular references.
+      if (key === "message" || key === "type" || key === "ref" || key === "root") {
+        return;
+      }
+
       const nextTouched =
         touchedValue && typeof touchedValue === "object" && !Array.isArray(touchedValue)
           ? (touchedValue as Record<string, unknown>)[key]

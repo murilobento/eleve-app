@@ -254,11 +254,11 @@ export function PublicSiteFooter({
   locale?: AppLocale;
   isHome?: boolean;
 }) {
-  const companyAddress = company.address?.trim() || "Av. Industrial, 1200 - Bloco A";
-  const companyCnpjRaw = company.cnpj?.trim() || "";
+  const companyAddress = company.address?.trim() || "Rua Benedito Virgínio Garcia, 535. Distrito Industrial - 19043-020. Presidente Prudente, SP";
+  const companyCnpjRaw = company.cnpj?.trim() || "04616748000174";
   const companyCnpj = companyCnpjRaw.length > 0 ? formatCnpj(companyCnpjRaw) : "-";
-  const companyEmail = company.email?.trim() || "contato@eleve.com.br";
-  const companyPhone = company.phone?.trim() || "(11) 4000-1234";
+  const companyEmail = company.email?.trim() || "comercial@eleve.com.br";
+  const companyPhone = company.phone?.trim() || "(18) 99776-6064";
   const socialProfiles = [
     { name: "Facebook", icon: Facebook, href: company.facebookUrl?.trim() || "" },
     { name: "Instagram", icon: Instagram, href: company.instagramUrl?.trim() || "" },
@@ -305,7 +305,10 @@ export function PublicSiteFooter({
         <div>
           <p className="inline-block rounded-sm bg-[#FCD34D] px-2 py-1 text-sm font-bold uppercase tracking-[0.25em] text-gray-950">Contato</p>
           <div className="mt-6 space-y-4 text-sm leading-7 text-gray-600 dark:text-gray-400">
-            <p><span className="font-semibold">Endereço:</span> {companyAddress}</p>
+            <p>
+              <span className="font-semibold">Endereço:</span>{" "}
+              <a href="https://maps.app.goo.gl/DmjrE6qVkLGhsgen7" target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-[#FCD34D] dark:hover:text-[#FCD34D]">{companyAddress}</a>
+            </p>
             <p><span className="font-semibold">CNPJ:</span> {companyCnpj}</p>
             <p>
               <span className="font-semibold">E-mail:</span>{" "}
@@ -322,7 +325,6 @@ export function PublicSiteFooter({
           <p className="inline-block rounded-sm bg-[#FCD34D] px-2 py-1 text-sm font-bold uppercase tracking-[0.25em] text-gray-950">Acesso rápido</p>
           <div className="mt-6 flex flex-col gap-3">
             <a href={locale ? getAppUrl("/auth/sign-in", locale) : "/auth/sign-in"} className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700 transition-colors hover:text-[#FCD34D] dark:text-gray-300 dark:hover:text-[#FCD34D]">Entrar no sistema<ArrowRight size={15} /></a>
-            <a href={locale ? getAppUrl("/dashboard", locale) : "/dashboard"} className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700 transition-colors hover:text-[#FCD34D] dark:text-gray-300 dark:hover:text-[#FCD34D]">Ir para o dashboard<ArrowRight size={15} /></a>
             <a
               href={isHome ? "#servicos" : "/servicos"}
               className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700 transition-colors hover:text-[#FCD34D] dark:text-gray-300 dark:hover:text-[#FCD34D]"
@@ -336,6 +338,34 @@ export function PublicSiteFooter({
               }}
             >
               Ver serviços<ArrowRight size={15} />
+            </a>
+            <a
+              href={isHome ? "#equipamentos" : "/equipamentos"}
+              className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700 transition-colors hover:text-[#FCD34D] dark:text-gray-300 dark:hover:text-[#FCD34D]"
+              onClick={(event) => {
+                if (!isHome) {
+                  return;
+                }
+
+                event.preventDefault();
+                smoothScroll("#equipamentos");
+              }}
+            >
+              Ver equipamentos<ArrowRight size={15} />
+            </a>
+            <a
+              href={isHome ? "#depoimentos" : "/#depoimentos"}
+              className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700 transition-colors hover:text-[#FCD34D] dark:text-gray-300 dark:hover:text-[#FCD34D]"
+              onClick={(event) => {
+                if (!isHome) {
+                  return;
+                }
+
+                event.preventDefault();
+                smoothScroll("#depoimentos");
+              }}
+            >
+              Ver depoimentos<ArrowRight size={15} />
             </a>
           </div>
         </div>

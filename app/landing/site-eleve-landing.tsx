@@ -552,7 +552,7 @@ export function SiteEleveLanding({ locale, fontClassName, initialContent = null 
       }))
     : testimonials;
 
-const companyPhone = publicContent?.company?.phone?.trim() || "(11) 4000-1234";
+const companyPhone = publicContent?.company?.phone?.trim() || "(18) 99776-6064";
   const whatsAppUrl = buildWhatsAppUrl(companyPhone);
   const heroImages = HERO_LOOP_IMAGES;
 
@@ -571,8 +571,8 @@ const companyPhone = publicContent?.company?.phone?.trim() || "(11) 4000-1234";
           className="relative overflow-hidden bg-gray-50 pb-16 pt-28 transition-colors dark:bg-[#0A0A0A] md:pb-24 md:pt-40"
         >
           <HeroCarousel images={heroImages} />
-          <div className="absolute inset-0 bg-black/35 dark:bg-black/50" />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-black/30 to-black/45 dark:from-black/40 dark:via-black/50 dark:to-black/65" />
+          <div className="absolute inset-0 bg-black/45 dark:bg-black/60" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-black/38 to-black/55 dark:from-black/50 dark:via-black/60 dark:to-black/72" />
           <div className="absolute inset-0 opacity-[0.05]">
             <svg className="h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
               <defs>
@@ -618,7 +618,7 @@ const companyPhone = publicContent?.company?.phone?.trim() || "(11) 4000-1234";
           </div>
         </section>
 
-        <section id="servicos" className="bg-white py-24 transition-colors dark:bg-[#0A0A0A] md:py-32">
+        <section id="servicos" className="bg-white py-16 transition-colors dark:bg-[#0A0A0A] md:py-20">
           <div className="mx-auto max-w-7xl px-4 md:px-6">
             <div className="mb-14 text-center">
               <p className="text-xs font-bold uppercase tracking-[0.35em] text-amber-700 dark:text-[#FCD34D]">O que oferecemos</p>
@@ -633,7 +633,7 @@ const companyPhone = publicContent?.company?.phone?.trim() || "(11) 4000-1234";
           </div>
         </section>
 
-        <section id="equipamentos" className="bg-gray-100 py-24 transition-colors dark:bg-[#121212] md:py-32">
+        <section id="equipamentos" className="bg-gray-100 py-16 transition-colors dark:bg-[#121212] md:py-20">
           <div className="mx-auto max-w-7xl px-4 md:px-6">
             <div className="mb-14 text-center">
               <div className="mx-auto max-w-2xl">
@@ -649,7 +649,7 @@ const companyPhone = publicContent?.company?.phone?.trim() || "(11) 4000-1234";
           </div>
         </section>
 
-        <section id="sobre" className="bg-white py-24 transition-colors dark:bg-[#0A0A0A] md:py-32">
+        <section id="sobre" className="bg-white py-16 transition-colors dark:bg-[#0A0A0A] md:py-20">
           <div className="mx-auto grid max-w-7xl gap-12 px-4 md:px-6 lg:grid-cols-2 lg:gap-16">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.35em] text-amber-700 dark:text-[#FCD34D]">Excelência em elevação</p>
@@ -702,7 +702,7 @@ const companyPhone = publicContent?.company?.phone?.trim() || "(11) 4000-1234";
           </div>
         </section>
 
-        <section id="depoimentos" className="bg-gray-100 py-24 transition-colors dark:bg-[#121212] md:py-32">
+        <section id="depoimentos" className="bg-gray-100 py-16 transition-colors dark:bg-[#121212] md:py-20">
           <div className="mx-auto max-w-7xl px-4 md:px-6">
             <div className="mb-14">
               <p className="text-xs font-bold uppercase tracking-[0.35em] text-amber-700 dark:text-[#FCD34D]">Depoimentos</p>

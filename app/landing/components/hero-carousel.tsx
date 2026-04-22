@@ -32,7 +32,7 @@ export function HeroCarousel({
         <img
           src={images[0]}
           alt=""
-          className="h-full w-full object-cover"
+          className="h-full w-full scale-[1.02] object-cover brightness-50 blur-[0.5px]"
           referrerPolicy="no-referrer"
         />
       </div>
@@ -74,7 +74,7 @@ export function HeroCarousel({
             <img
               src={image}
               alt=""
-              className="h-full w-full object-cover"
+              className="h-full w-full scale-[1.02] object-cover brightness-50 blur-[0.5px]"
               referrerPolicy="no-referrer"
             />
           </SwiperSlide>
