@@ -48,6 +48,7 @@ export function TestimonialsCarousel({
 }: TestimonialsCarouselProps) {
   const swiperRef = useRef<SwiperType | null>(null);
   const hasMultipleTestimonials = testimonials.length > 1;
+  const canLoop = testimonials.length > 3;
 
   return (
     <div className={cn("relative", className)}>
@@ -55,7 +56,7 @@ export function TestimonialsCarousel({
         modules={[Navigation, Autoplay]}
         slidesPerView={1}
         spaceBetween={24}
-        loop={hasMultipleTestimonials}
+        loop={canLoop}
         autoplay={
           hasMultipleTestimonials
             ? {

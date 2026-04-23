@@ -10,7 +10,8 @@ import {
   Sun,
   Wrench,
   ShieldCheck,
-  Clock3,
+  Truck,
+  Target,
   ArrowUp,
   X,
 } from "lucide-react";
@@ -34,15 +35,14 @@ type LandingProps = {
 };
 
 type EquipmentCardProps = {
-  name: string;
-  model: string;
-  capacity: string;
+  tag: string;
+  title: string;
+  capacity?: string;
   technicalInfo: string;
   manualUrl?: string | null;
   img: string;
   href?: string;
   imageAlt?: string | null;
-  onOpenDetails?: () => void;
   className?: string;
 };
 
@@ -81,34 +81,34 @@ const services = [
   },
 ];
 
-const equipment = [
+const equipment: Omit<EquipmentCardProps, "className">[] = [
   {
-    name: "Guindaste LTM 11200",
-    model: "Liebherr",
+    tag: "Guindaste",
+    title: "Guindaste LTM 11200",
     capacity: "1200 ton",
     technicalInfo: "Guindaste telescopico de alta capacidade para operacoes de elevacao em projetos industriais e civis.",
     manualUrl: null,
     img: "https://images.unsplash.com/photo-1541888946425-d81bb19480c5?auto=format&fit=crop&q=80&w=1200",
   },
   {
-    name: "Empilhadeira Industrial",
-    model: "Hyster",
+    tag: "Empilhadeira",
+    title: "Empilhadeira Hyster",
     capacity: "16 ton",
     technicalInfo: "Equipamento para movimentacao de carga paletizada em ambientes industriais com operacao continua.",
     manualUrl: null,
     img: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&q=80&w=1200",
   },
   {
-    name: "Caminhão Munck",
-    model: "Volvo",
+    tag: "Munck",
+    title: "Munck Volvo",
     capacity: "45 ton",
     technicalInfo: "Veiculo com munck para operacoes de carga, descarga e apoio logistico em obras e plantas industriais.",
     manualUrl: null,
     img: "https://images.unsplash.com/photo-1589939705384-5185137a7f0f?auto=format&fit=crop&q=80&w=1200",
   },
   {
-    name: "Plataforma Elevatória",
-    model: "JLG",
+    tag: "Plataforma",
+    title: "Plataforma JLG",
     capacity: "12m",
     technicalInfo: "Plataforma para trabalhos em altura com alcance vertical e horizontal para manutencoes e montagens.",
     manualUrl: null,
@@ -134,26 +134,30 @@ const testimonials = [
   },
 ];
 
-const reasons = [
+const aboutFeatures = [
   {
-    title: "Segurança certificada",
-    content:
-      "Protocolos rigorosos, operadores treinados continuamente e processos alinhados às principais normas do setor.",
+    icon: ShieldCheck,
+    title: "Segurança em primeiro lugar",
+    description:
+      "Toda operação segue protocolos de segurança rigorosos. Nossos operadores são treinados e certificados para atuar em ambientes industriais, obras civis e operações de risco controlado.",
   },
   {
-    title: "Experiência operacional",
-    content:
-      "Atuação em projetos industriais e civis de alta complexidade, com planejamento técnico e execução precisa.",
+    icon: Wrench,
+    title: "Frota própria e preparada",
+    description:
+      "Guindastes de 25 a 130 toneladas, muncks, empilhadeiras, carretas e containers — todos com manutenção preventiva em dia e prontos para mobilização imediata.",
   },
   {
-    title: "Frota renovada",
-    content:
-      "Equipamentos de marcas líderes globais com manutenção controlada e disponibilidade para contratos de curto e longo prazo.",
+    icon: Target,
+    title: "Planejamento técnico",
+    description:
+      "Do dimensionamento do equipamento ao plano rigging, cada projeto é estudado para garantir eficiência, reduzir imprevistos e cumprir prazos com precisão.",
   },
   {
-    title: "Suporte ágil",
-    content:
-      "Atendimento consultivo desde o dimensionamento até a operação em campo, reduzindo risco e tempo parado.",
+    icon: Truck,
+    title: "Logística completa",
+    description:
+      "Transporte de cargas especiais e superdimensionadas com escolta, análise de rota e controle operacional ponta a ponta, do canteiro ao destino final.",
   },
 ];
 
@@ -414,7 +418,37 @@ function LandingNavbar({ whatsAppUrl }: { whatsAppUrl: string }) {
   );
 }
 
-function EquipmentCard({ name, model, capacity, img, href, imageAlt, onOpenDetails, className }: EquipmentCardProps) {
+function EquipmentCard({ tag, title, capacity, img, href, imageAlt, className }: EquipmentCardProps) {
+  const content = (
+    <>
+      <div className="relative aspect-[16/10] overflow-hidden">
+        <img
+          src={img}
+          alt={imageAlt?.trim() || title}
+          className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+          referrerPolicy="no-referrer"
+        />
+        <div className="absolute right-4 top-4 rounded-sm bg-[#FCD34D] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em] text-gray-950">
+          {tag}
+        </div>
+      </div>
+      <div className="p-5">
+        {capacity ? (
+          <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-gray-500 dark:text-gray-400">{capacity}</p>
+        ) : null}
+        <h3 className={cn("text-lg font-bold text-black transition-colors group-hover:text-amber-700 dark:text-white dark:group-hover:text-[#FCD34D]", capacity ? "mt-2" : "")}>
+          {title}
+        </h3>
+        <div className="mt-5 flex items-center justify-between border-t border-black/5 pt-4 dark:border-white/5">
+          <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-gray-500 dark:text-gray-400">
+            Ver detalhes
+          </span>
+          <ChevronRight size={18} className="text-amber-700 dark:text-[#FCD34D]" />
+        </div>
+      </div>
+    </>
+  );
+
   return (
     <article
       className={cn(
@@ -422,74 +456,21 @@ function EquipmentCard({ name, model, capacity, img, href, imageAlt, onOpenDetai
         className,
       )}
     >
-      <button
-        type="button"
-        onClick={onOpenDetails}
-        className="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FCD34D]"
-      >
-        <div className="relative aspect-[16/10] overflow-hidden">
-          <img
-            src={img}
-            alt={imageAlt?.trim() || name}
-            className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-            referrerPolicy="no-referrer"
-          />
-          <div className="absolute right-4 top-4 rounded-sm bg-[#FCD34D] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em] text-gray-950">
-            {capacity}
-          </div>
-        </div>
-        <div className="p-5 pb-3">
-          <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-gray-500 dark:text-gray-400">{model}</p>
-          <h3 className="mt-2 text-lg font-bold text-black transition-colors group-hover:text-amber-700 dark:text-white dark:group-hover:text-[#FCD34D]">
-            {name}
-          </h3>
-          <div className="mt-5 flex items-center justify-between border-t border-black/5 pt-4 dark:border-white/5">
-            <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-gray-500 dark:text-gray-400">
-              Ver detalhes
-            </span>
-            <ChevronRight size={18} className="text-amber-700 dark:text-[#FCD34D]" />
-          </div>
-        </div>
-      </button>
       {href ? (
         <a
           href={href}
-          className="mx-5 mb-5 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-amber-700 transition-colors hover:text-black dark:text-[#FCD34D] dark:hover:text-white"
+          className="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FCD34D]"
         >
-          Pagina do equipamento
-          <ArrowRight size={14} />
+          {content}
         </a>
-      ) : null}
+      ) : (
+        <div className="block w-full text-left">{content}</div>
+      )}
     </article>
   );
 }
 
-function AccordionItem({ title, content }: { title: string; content: string }) {
-  const [open, setOpen] = React.useState(false);
 
-  return (
-    <div className="border-b border-black/5 py-1 dark:border-white/5">
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        className="flex w-full items-center justify-between gap-4 py-5 text-left"
-      >
-        <span className="text-base font-bold uppercase tracking-[0.15em] text-black dark:text-white">{title}</span>
-        <span
-          className={cn(
-            "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-black/10 transition-all dark:border-white/10",
-            open ? "rotate-90 bg-[#FCD34D] text-black" : "text-gray-500 dark:text-gray-400",
-          )}
-        >
-          <ChevronRight size={16} />
-        </span>
-      </button>
-      {open ? (
-        <p className="pb-5 text-sm leading-7 text-gray-600 dark:text-gray-400">{content}</p>
-      ) : null}
-    </div>
-  );
-}
 
 function BackToTop() {
   const [visible, setVisible] = React.useState(false);
@@ -531,17 +512,30 @@ export function SiteEleveLanding({ locale, fontClassName, initialContent = null 
       }))
     : services;
 
+  const categoryTagMap: Record<string, string> = {
+    guindastes: "Guindaste",
+    munck: "Munck",
+    empilhadeiras: "Empilhadeira",
+    "guinchos-e-carretas": "Transporte",
+    containers: "Container",
+  };
+
   const equipmentCards = publicContent?.equipment?.length
-    ? publicContent.equipment.map((item) => ({
-        name: item.name,
-        model: item.model,
-        capacity: item.capacity,
-        technicalInfo: item.technicalInfo,
-        manualUrl: item.manualUrl,
-        img: item.imageUrl,
-        imageAlt: item.imageAlt,
-        href: `/equipamentos/${item.slug}`,
-      }))
+    ? publicContent.equipment.map((item) => {
+        const categorySlug = item.slug.split("/")[0] || "";
+        const tag = categoryTagMap[categorySlug] || item.capacity;
+        const isCapacityActual = /\d/.test(item.capacity);
+        return {
+          tag,
+          title: `${tag} ${item.model}`,
+          capacity: isCapacityActual ? item.capacity : undefined,
+          technicalInfo: item.technicalInfo,
+          manualUrl: item.manualUrl,
+          img: item.imageUrl,
+          imageAlt: item.imageAlt,
+          href: `/equipamentos/${item.slug}`,
+        };
+      })
     : equipment;
 
   const testimonialCards: TestimonialCard[] = publicContent?.testimonials?.length
@@ -649,55 +643,59 @@ const companyPhone = publicContent?.company?.phone?.trim() || "(18) 99776-6064";
           </div>
         </section>
 
-        <section id="sobre" className="bg-white py-16 transition-colors dark:bg-[#0A0A0A] md:py-20">
-          <div className="mx-auto grid max-w-7xl gap-12 px-4 md:px-6 lg:grid-cols-2 lg:gap-16">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.35em] text-amber-700 dark:text-[#FCD34D]">Excelência em elevação</p>
-              <h2 className="mt-4 text-4xl font-black leading-none tracking-[-0.05em] md:text-6xl">
-                <span className="inline-block rounded-sm bg-[#FCD34D] px-3 py-1 text-gray-950">Por que escolher a Eleve Locações?</span>
+        <section id="sobre" className="bg-white py-16 transition-colors dark:bg-[#0A0A0A] md:py-24">
+          <div className="mx-auto max-w-7xl px-4 md:px-6">
+            {/* Header */}
+            <div className="mx-auto max-w-3xl text-center">
+              <p className="text-xs font-bold uppercase tracking-[0.35em] text-amber-700 dark:text-[#FCD34D]">Sobre a Eleve Locações</p>
+              <h2 className="mt-4 text-4xl font-black leading-none tracking-[-0.05em] md:text-5xl lg:text-6xl">
+                Estrutura própria para{" "}
+                operações que exigem{" "}
+                <span className="inline-block rounded-sm bg-[#FCD34D] px-3 py-1 text-gray-950">precisão</span>
               </h2>
-              <p className="mt-6 max-w-xl text-base leading-8 text-gray-600 dark:text-gray-400">
-                Combinamos precisão de engenharia com agilidade operacional para entregar segurança, performance e previsibilidade.
+              <p className="mx-auto mt-6 max-w-2xl text-base leading-8 text-gray-600 dark:text-gray-400">
+                Com sede em Presidente Prudente e atuação em todo o estado de São Paulo, a Eleve oferece locação de guindastes, muncks, empilhadeiras e transporte especial com planejamento técnico, frota própria e equipe dedicada a cada projeto.
               </p>
-
-              <div className="mt-10 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                <div className="rounded-2xl border border-black/5 bg-gray-50 p-4 text-left dark:border-white/5 dark:bg-[#121212]">
-                  <Wrench className="mb-3 text-[#FCD34D]" size={22} />
-                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-gray-500 dark:text-gray-400">Frota técnica</p>
-                  <p className="mt-2 text-sm font-semibold">Equipamentos para carga pesada e logística especializada.</p>
-                </div>
-                <div className="rounded-2xl border border-black/5 bg-gray-50 p-4 text-left dark:border-white/5 dark:bg-[#121212]">
-                  <Clock3 className="mb-3 text-[#FCD34D]" size={22} />
-                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-gray-500 dark:text-gray-400">Resposta rápida</p>
-                  <p className="mt-2 text-sm font-semibold">Planejamento, mobilização e suporte para operações críticas.</p>
-                </div>
-                <div className="rounded-2xl border border-black/5 bg-gray-50 p-4 text-left dark:border-white/5 dark:bg-[#121212] sm:col-span-2 xl:col-span-1">
-                  <ShieldCheck className="mb-3 text-[#FCD34D]" size={22} />
-                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-gray-500 dark:text-gray-400">Confiabilidade</p>
-                  <p className="mt-2 text-sm font-semibold">Execução segura com equipe experiente e operação monitorada.</p>
-                </div>
-              </div>
-
-              <div className="mt-10 grid gap-4 sm:grid-cols-2">
-                <div className="rounded-2xl border border-black/5 bg-gray-50 p-6 dark:border-white/5 dark:bg-[#121212]">
-                  <p className="text-3xl font-black">10+</p>
-                  <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.28em] text-gray-500 dark:text-gray-400">
-                    Anos de mercado
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-black/5 bg-gray-50 p-6 dark:border-white/5 dark:bg-[#121212]">
-                  <p className="text-3xl font-black">2k+</p>
-                  <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.28em] text-gray-500 dark:text-gray-400">
-                    Obras concluídas
-                  </p>
-                </div>
-              </div>
             </div>
 
-            <div className="rounded-[2rem] border border-black/5 bg-white p-6 shadow-xl shadow-black/5 dark:border-white/5 dark:bg-[#1A1A1A] dark:shadow-black/20 md:p-10">
-              {reasons.map((reason) => (
-                <AccordionItem key={reason.title} {...reason} />
+            {/* Feature cards – 2×2 grid */}
+            <div className="mt-16 grid gap-6 sm:grid-cols-2">
+              {aboutFeatures.map((feature) => (
+                <div
+                  key={feature.title}
+                  className="group rounded-2xl border border-black/5 bg-gray-50 p-6 transition-all hover:border-[#FCD34D]/40 hover:shadow-lg hover:shadow-[#FCD34D]/5 dark:border-white/5 dark:bg-[#121212] dark:hover:border-[#FCD34D]/30 md:p-8"
+                >
+                  <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-[#FCD34D]/10 text-[#F59E0B] transition-colors group-hover:bg-[#FCD34D]/20 dark:bg-[#FCD34D]/5 dark:text-[#FCD34D]">
+                    <feature.icon size={24} />
+                  </div>
+                  <h3 className="text-lg font-bold tracking-tight">{feature.title}</h3>
+                  <p className="mt-2 text-sm leading-7 text-gray-600 dark:text-gray-400">
+                    {feature.description}
+                  </p>
+                </div>
               ))}
+            </div>
+
+            {/* Stats bar */}
+            <div className="mt-16 grid gap-6 sm:grid-cols-3">
+              <div className="rounded-2xl border border-black/5 bg-gray-50 p-8 text-center dark:border-white/5 dark:bg-[#121212]">
+                <p className="text-4xl font-black text-[#F59E0B] md:text-5xl">10+</p>
+                <p className="mt-3 text-[11px] font-bold uppercase tracking-[0.28em] text-gray-500 dark:text-gray-400">
+                  Anos de atuação no mercado
+                </p>
+              </div>
+              <div className="rounded-2xl border border-black/5 bg-gray-50 p-8 text-center dark:border-white/5 dark:bg-[#121212]">
+                <p className="text-4xl font-black text-[#F59E0B] md:text-5xl">2.000+</p>
+                <p className="mt-3 text-[11px] font-bold uppercase tracking-[0.28em] text-gray-500 dark:text-gray-400">
+                  Operações concluídas com segurança
+                </p>
+              </div>
+              <div className="rounded-2xl border border-black/5 bg-gray-50 p-8 text-center dark:border-white/5 dark:bg-[#121212]">
+                <p className="text-4xl font-black text-[#F59E0B] md:text-5xl">130t</p>
+                <p className="mt-3 text-[11px] font-bold uppercase tracking-[0.28em] text-gray-500 dark:text-gray-400">
+                  Capacidade máxima de elevação
+                </p>
+              </div>
             </div>
           </div>
         </section>
