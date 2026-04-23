@@ -39,7 +39,9 @@ function ServiceCard({ service }: { service: ServiceCard }) {
         {service.tag}
       </div>
       <div className="absolute inset-x-4 bottom-4 rounded-xl border border-white/15 bg-white/95 p-4 backdrop-blur-sm transition-colors group-hover:bg-[#FCD34D] dark:bg-[#121212]/95 dark:group-hover:bg-[#FCD34D]">
-        <h3 className="text-lg font-bold text-black dark:text-white dark:group-hover:text-black">{service.title}</h3>
+        <h3 className="min-h-[3.5rem] line-clamp-2 text-lg font-bold text-black dark:text-white dark:group-hover:text-black">
+          {service.title}
+        </h3>
         <div className="mt-3 flex items-center justify-between">
           <div className="h-0.5 w-10 bg-black/20 transition-all duration-300 group-hover:w-24" />
           {service.highlighted ? (

@@ -47,7 +47,12 @@ function EquipmentCard({ equipment }: { equipment: EquipmentCard }) {
             {equipment.capacity}
           </p>
         ) : null}
-        <h3 className={cn("text-lg font-bold text-black transition-colors group-hover:text-amber-700 dark:text-white dark:group-hover:text-[#FCD34D]", equipment.capacity ? "mt-2" : "")}>
+        <h3
+          className={cn(
+            "min-h-[3.5rem] line-clamp-2 text-lg font-bold text-black transition-colors group-hover:text-amber-700 dark:text-white dark:group-hover:text-[#FCD34D]",
+            equipment.capacity ? "mt-2" : "",
+          )}
+        >
           {equipment.title}
         </h3>
         <div className="mt-5 flex items-center justify-between border-t border-black/5 pt-4 dark:border-white/5">
