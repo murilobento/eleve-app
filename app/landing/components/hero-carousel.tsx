@@ -86,14 +86,14 @@ export function HeroCarousel({
         <>
           <button
             type="button"
-            className="hero-nav-prev absolute left-3 top-1/2 z-20 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/35 bg-black/35 text-white backdrop-blur-sm transition-colors hover:bg-black/55"
+            className="hero-nav-prev absolute left-3 top-1/2 z-20 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/35 bg-black/35 text-white backdrop-blur-sm transition-colors hover:bg-black/55"
             aria-label="Imagem anterior"
           >
             <ChevronLeft size={18} />
           </button>
           <button
             type="button"
-            className="hero-nav-next absolute right-3 top-1/2 z-20 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/35 bg-black/35 text-white backdrop-blur-sm transition-colors hover:bg-black/55"
+            className="hero-nav-next absolute right-3 top-1/2 z-20 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/35 bg-black/35 text-white backdrop-blur-sm transition-colors hover:bg-black/55"
             aria-label="Próxima imagem"
           >
             <ChevronRight size={18} />

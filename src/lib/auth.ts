@@ -41,6 +41,45 @@ function parseConfiguredOrigins() {
     .map((value) => normalizeOrigin(value, "BETTER_AUTH_TRUSTED_ORIGINS"));
 }
 
+function isPrivateIpv4(hostname: string) {
+  const parts = hostname.split(".").map((part) => Number(part));
+
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
+    return false;
+  }
+
+  const [first, second] = parts;
+
+  return first === 10 || (first === 172 && second >= 16 && second <= 31) || (first === 192 && second === 168);
+}
+
+function getTrustedDevRequestOrigin(request?: Request) {
+  if (isProduction || !request) {
+    return null;
+  }
+
+  const origin = request.headers.get("origin");
+
+  if (!origin) {
+    return null;
+  }
+
+  try {
+    const url = new URL(origin);
+    const hostname = url.hostname.toLowerCase();
+    const isExpectedPort = url.port === port;
+    const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1";
+
+    if (url.protocol === "http:" && isExpectedPort && (isLocalHost || isPrivateIpv4(hostname))) {
+      return url.origin;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
 function resolveAppOrigin() {
   const configuredAuthUrl = process.env.BETTER_AUTH_URL?.trim();
   const publicAppUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
@@ -88,9 +127,16 @@ function getAuthSecret() {
   return "dev-only-fallback-secret-not-for-production";
 }
 
-function getTrustedOrigins(appOrigin: string) {
+function getTrustedOrigins(appOrigin: string, request?: Request) {
   const baseOrigins = isProduction ? [normalizeOrigin(appOrigin, "BETTER_AUTH_URL")] : defaultLocalOrigins;
-  return [...new Set([...baseOrigins, normalizeOrigin(appOrigin, "BETTER_AUTH_URL"), ...parseConfiguredOrigins()])];
+  return [
+    ...new Set([
+      ...baseOrigins,
+      normalizeOrigin(appOrigin, "BETTER_AUTH_URL"),
+      ...parseConfiguredOrigins(),
+      getTrustedDevRequestOrigin(request),
+    ].filter((origin): origin is string => Boolean(origin))),
+  ];
 }
 
 const appOrigin = resolveAppOrigin();
@@ -103,7 +149,7 @@ export const auth = betterAuth({
   database: pool,
   secret: getAuthSecret(),
   baseURL: appOrigin,
-  trustedOrigins: getTrustedOrigins(appOrigin),
+  trustedOrigins: (request) => getTrustedOrigins(appOrigin, request),
   rateLimit: {
     enabled: isProduction,
     storage: "memory",

@@ -178,5 +178,32 @@
   body {
     @apply bg-background text-foreground;
     letter-spacing: var(--tracking-normal);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+@layer utilities {
+  .text-fluid-hero {
+    font-size: clamp(2.5rem, 5.5vw + 0.5rem, 6rem);
+    line-height: 0.92;
+    letter-spacing: -0.06em;
+  }
+
+  .text-fluid-section-title {
+    font-size: clamp(2rem, 3vw + 0.5rem, 3rem);
+    letter-spacing: -0.04em;
+  }
+
+  .text-fluid-detail-hero {
+    font-size: clamp(2.75rem, 4.5vw + 0.5rem, 4.5rem);
+    letter-spacing: -0.05em;
+  }
+}
+
+@media (hover: none) {
+  .tilt-card-hover,
+  .magnetic-button-hover {
+    transform: none !important;
   }
 }
